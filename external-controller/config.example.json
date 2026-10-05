@@ -1,0 +1,7 @@
+{
+  "base_url": "http://127.0.0.1:38121",
+  "token": "",
+  "enabled": false,
+  "expected_identity": null,
+  "timeout": 0.4
+}
