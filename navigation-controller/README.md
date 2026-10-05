@@ -15,11 +15,18 @@ Python 3.10 or later; no installation or third-party dependencies:
 ```sh
 python -m unittest discover -v
 python -m navigation_controller
+python -m navigation_controller.sample_demo
 ```
 
 The demonstration plans around a block obstacle, follows the resulting route in a
 small deterministic fake, and prints its path, pulse count and release outcome.
-Every movement pulse is at most 100 ms and is followed by release and observation.
+This original demonstration uses an abstract duration-based fake, with pulses at
+most 100 ms followed by release and observation.
+
+The separate `sample_demo` uses the companion guarded movement/turn wire contract:
+one half-forward input sample per action, fresh observation challenges, bounded
+yaw steps and settling readback. Its 100 ms value is an admission lease, never a
+travel duration or a displacement guarantee. The two fake models are distinct.
 
 ## Implemented
 
@@ -52,11 +59,14 @@ not extrapolate a route through an unseen chunk or provide global navigation.
 - `planner.py`: conservative graph and bounded A* with cost/depth labels
 - `observation.py`: actual status/state parsing and safe observation gates
 - `executor.py`: fake-only finite-pulse navigation state machine
-- `fake.py`: deterministic terrain and movement fixtures; not game physics
+- `fake.py`: deterministic terrain and original duration-based fixtures; not game physics
+- `sample_adapter.py`: guarded one-sample/turn contract, default disabled, offline transport only
+- `sample_fake.py`, `sample_demo.py`: wire-shaped fake and separate one-sample demonstration
 - `tests/`: positive paths and failure-mode regression tests
 
-Read [protocol and evidence rules](docs/PROTOCOL.md) and the
-[live acceptance boundary](docs/ACCEPTANCE.md) before implementing any adapter.
+Read [protocol and evidence rules](docs/PROTOCOL.md), the
+[one-sample adapter contract](docs/ONE_SAMPLE_ADAPTER.md), and the
+[live acceptance boundary](docs/ACCEPTANCE.md) before implementing any live transport.
 
 ## Status
 

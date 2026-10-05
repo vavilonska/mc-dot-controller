@@ -62,15 +62,15 @@ identity/numeric bounds are rejected. No credential belongs in example files.
 First read `/control/state`. Its `guarded_movement` object contains:
 
 - `schema_version: 1`, `enabled`, `session`, `admission_open`, `requests_remaining`
-- `owner_request_id` (null if none), `sampled`, `released`
+- `owner_request_id` (null if none), `owner_action`, `sampled`, `released`
 - `observation_id` (null while a request owns admission), `observation_yaw`
 - `max_observation_age_ms: 150`, `max_duration_ms: 100`, `max_ttl_ms: 250`
 - `max_input_samples: 1`, `forward_impulse: 0.5`, `held_keys: false`
-- `local_unpublished_survival_only: true`, `turn_supported: false`
+- `local_unpublished_survival_only: true`, `turn_supported: true`
 
 Capabilities exposes the same status/bounds except the observation fields; it
 does not issue observations. Each new `/state` observation invalidates its
-predecessor. Copy the corresponding state world/player/tick/position exactly;
+predecessor. `/control/status` does not issue or invalidate an observation. Copy the corresponding state world/player/tick/position exactly;
 use `guarded_movement.observation_yaw` for the canonical [-180,180) yaw because
 Minecraft's ordinary player yaw may accumulate rotations beyond that range.
 
@@ -164,17 +164,20 @@ serialized, and movement revalidates pose at its later sample.
 
 ## Integration limits and next gate
 
-The external navigator currently uses a fake duration-based adapter. It must not
-map `pulse_forward(100)` to this route assuming 100 ms of held movement or its
-fake 4-block/s displacement. A future adapter needs explicit one-sample semantics,
-new state+observation ID for every sample, lease/result checks, near-rest readback,
-and separately measured progress/pulse budgets.
+The original external duration fake remains separate and must not map
+`pulse_forward(100)` to this route assuming 100 ms of held movement or its fake
+4-block/s displacement. A new [offline one-sample adapter](../../navigation-controller/docs/ONE_SAMPLE_ADAPTER.md)
+now checks fresh observations, leases/results and near-rest readback using an
+explicitly simulated transport. There is no live HTTP implementation. Actual
+progress, displacement and settling thresholds still need game acceptance.
 
-**Navigation-only turning remains unsupported.** Existing guarded combat `look`
-requires a named hostile target and is not a navigation look API. The minimal next
-source step is a separate default-disabled guarded player-only yaw alignment with
-fresh world/player/pose observation, bounded angle delta, cancellation/replay
-checks and a new observation after turning. Never fall back to `/control/look`.
+A separate default-disabled [guarded player-only yaw route](guarded-turning.md)
+now exists in source. It shares this admission owner, observation ID and replay
+budget, applies at most 30 degrees, and requires a new observation after every
+turn. Existing guarded combat `look` still requires a named hostile and must not
+be used for navigation. Never fall back to `/control/look`. A source-only external
+adapter can exercise the new wire contract with a fake transport; actual physics,
+settling thresholds and live acceptance remain separate gates.
 
 Before any game input: independently review this source, preserve the current
 profile/JAR, obtain separate install/test permission, use a disposable local arena

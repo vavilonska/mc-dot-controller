@@ -1,6 +1,6 @@
 # MineClient Bridge: integrated development snapshot
 
-> Based on upstream 1.1.5, with experimental terrain, guarded combat and guarded forward samples (`1.1.5-terrain-guard-movement.1`). The current full mod build and 35 JUnit cases pass, and small read-only live terrain checks pass; guarded combat/movement and navigation acceptance remain incomplete. Read [the repository status](../README.md#验证状态) and [current movement build verification](docs/movement-verification.md). Historical upstream checks below do not verify these extensions.
+> Based on upstream 1.1.5, with experimental terrain, guarded combat and guarded forward samples (`1.1.5-terrain-guard-navigation.1`). The current full mod build and 54 JUnit cases pass, and small read-only live terrain checks pass; guarded combat/movement and navigation acceptance remain incomplete. Read [the repository status](../README.md#验证状态) and [current yaw integration verification](docs/turning-verification.md). Historical upstream checks below do not verify these extensions.
 
 
 MineClient Bridge is a client-side NeoForge 1.21.1 mod that exposes an authenticated HTTP interface on the local loopback address. External tools can inspect the active Minecraft client, capture its current framebuffer, and operate configured keys and GUI controls. Isolated background sessions use process-local virtual input rather than the operating system cursor and clipboard.
@@ -46,7 +46,7 @@ Any local program that receives the token can operate the exposed client actions
 ## Installation
 
 1. Install NeoForge for Minecraft 1.21.1.
-2. Only after separately approving experimental installation, place `mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-movement.1.jar` in a disposable test client's `mods` directory. Preserve the known-working client; never install two bridge versions together. Follow the guarded-action acceptance gates before enabling that route.
+2. Only after separately approving experimental installation, place `mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.1.jar` in a disposable test client's `mods` directory. Preserve the known-working client; never install two bridge versions together. Follow the guarded-action acceptance gates before enabling that route.
 3. Start the client. The mod creates its config and token files on first launch.
 4. Connect an authorized loopback client to `http://127.0.0.1:38121` using the generated token.
 
@@ -103,7 +103,7 @@ The upstream project documented a real 960x540 framebuffer from its NeoForge 1.2
 npm --prefix .\mcp test
 ```
 
-The development artifact is `build/libs/mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-movement.1.jar`. No compiled mod is distributed in this source repository. See [the verified build command](docs/movement-verification.md).
+The development artifact is `build/libs/mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.1.jar`. No compiled mod is distributed in this source repository. See [the verified build command](docs/turning-verification.md).
 
 ## License And References
 
@@ -113,9 +113,9 @@ The bundled mod icon is an original upstream AI-assisted illustration and does n
 
 ## Experimental terrain extension
 
-See [the bounded terrain API](docs/terrain-api.md) for paging, limits, unknown-cell semantics, validation, and current verification limits. This integrated development source uses version `1.1.5-terrain-guard-movement.1`; it is not a live-tested release.
+See [the bounded terrain API](docs/terrain-api.md) for paging, limits, unknown-cell semantics, validation, and current verification limits. This integrated development source uses version `1.1.5-terrain-guard-navigation.1`; it is not a live-tested release.
 
-The terrain extension passed a complete Gradle compile/test/build against NeoForge 21.1.255 using the official memory-efficient binary dependency pipeline. See [verification details](docs/terrain-verification.md). The earlier terrain-only extension passed limited live reads of a 27-cell cube, equivalent seven-page scan and 17-cell vertical boundary. Sanitized offline schema/planner regressions also pass. Maximum scans, navigation and combat remain unvalidated; this does not live-accept the current movement build. See [the limited live record](docs/terrain-live-validation.md) and [captured-data limits](../navigation-controller/docs/PROTOCOL.md#captured-schema-regression).
+The terrain extension passed a complete Gradle compile/test/build against NeoForge 21.1.255 using the official memory-efficient binary dependency pipeline. See [verification details](docs/terrain-verification.md). The earlier terrain-only extension passed limited live reads of a 27-cell cube, equivalent seven-page scan and 17-cell vertical boundary. Sanitized offline schema/planner regressions also pass. Maximum scans, navigation and combat remain unvalidated; this does not live-accept the current navigation-primitives build. See [the limited live record](docs/terrain-live-validation.md) and [captured-data limits](../navigation-controller/docs/PROTOCOL.md#captured-schema-regression).
 
 ## Experimental guarded local actions
 
@@ -134,9 +134,21 @@ The current source adds a separate **default-disabled, unaccepted**
 half-forward input sample, clears its owned fields at tick end, and waits for
 release before acknowledging. Its 100 ms bound is a handler-entry-to-sample lease,
 not held-key duration or a physical stopping guarantee. It does not brake vanilla
-momentum, and stalled cleanup can block acknowledgement. Navigation-only turning
-and a real external movement adapter remain absent.
+momentum, and stalled cleanup can block acknowledgement. A separately default-disabled yaw primitive and offline one-sample adapter now exist;
+there is still no live HTTP navigation transport.
 
-The complete movement build passed 35 JUnit cases, including 21 movement tests.
+The preceding movement-only build passed 35 JUnit cases, including 21 movement tests.
 No installation or live input was performed for this extension. See
 [movement build verification](docs/movement-verification.md).
+
+## Experimental guarded player-only yaw
+
+A separate default-disabled [yaw-only primitive](docs/guarded-turning.md) changes
+at most 30 degrees using validated float32 angles. It shares movement admission,
+one-use state observations and replay protection; every turn needs fresh state
+before any following action. It changes no pitch and applies no movement impulse.
+
+The complete navigation-primitives build passes 54 JUnit cases (35 prior plus 19
+yaw cases). The external adapter exercises the wire contract only through a fake
+transport. No installation, live HTTP, actual input or physical settling has been
+accepted. See [current verification](docs/turning-verification.md).

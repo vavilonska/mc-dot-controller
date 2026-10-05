@@ -1,0 +1,363 @@
+{
+  "format": "building-plan-v1",
+  "status": "provisional_plan",
+  "provisional": true,
+  "executable": false,
+  "execution_enabled": false,
+  "blueprint": {
+    "schema_version": 1,
+    "template": "wall",
+    "origin": {
+      "x": 0,
+      "y": 64,
+      "z": 0
+    },
+    "region": {
+      "min": {
+        "x": 0,
+        "y": 64,
+        "z": 0
+      },
+      "max": {
+        "x": 2,
+        "y": 66,
+        "z": 0
+      }
+    },
+    "size": {
+      "width": 3,
+      "extent": 3
+    },
+    "axis": "x",
+    "palette": {
+      "primary": "minecraft:oak_planks",
+      "accent": "minecraft:stone_bricks"
+    },
+    "pattern": "frame"
+  },
+  "evidence": {
+    "source": "offline_files",
+    "live_freshness": "not_established",
+    "world_generation": "00000000-0000-4000-8000-000000000001",
+    "scan_generation": "00000000-0000-4000-8000-000000000002",
+    "dimension": "minecraft:overworld",
+    "first_tick": 100,
+    "last_response_tick": 100,
+    "consistency": "live_pages_not_atomic"
+  },
+  "summary": {
+    "blueprint_cells": 9,
+    "already_correct": 0,
+    "known_air_candidates": 9,
+    "remaining_upper_bound": 9,
+    "proposed_placements": 9,
+    "blocker_count": 0
+  },
+  "materials": [
+    {
+      "block": "minecraft:oak_planks",
+      "blueprint_total": 1,
+      "already_correct": 0,
+      "remaining_upper_bound": 1,
+      "observed_main_inventory": 64,
+      "shortage": 0
+    },
+    {
+      "block": "minecraft:stone_bricks",
+      "blueprint_total": 8,
+      "already_correct": 0,
+      "remaining_upper_bound": 8,
+      "observed_main_inventory": 64,
+      "shortage": 0
+    }
+  ],
+  "assessments": [
+    {
+      "position": {
+        "x": 0,
+        "y": 64,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 1,
+        "y": 64,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 2,
+        "y": 64,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 0,
+        "y": 65,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 1,
+        "y": 65,
+        "z": 0
+      },
+      "desired": "minecraft:oak_planks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 2,
+        "y": 65,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 0,
+        "y": 66,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 1,
+        "y": 66,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    },
+    {
+      "position": {
+        "x": 2,
+        "y": 66,
+        "z": 0
+      },
+      "desired": "minecraft:stone_bricks",
+      "observed": "minecraft:air",
+      "classification": "candidate_air",
+      "reason": "known_air_not_yet_reachability_validated"
+    }
+  ],
+  "blockers": [],
+  "proposed_placements": [
+    {
+      "index": 0,
+      "position": {
+        "x": 0,
+        "y": 64,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 0,
+          "y": 63,
+          "z": 0
+        },
+        "face": "up",
+        "source": "observed_full_cube"
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 1,
+      "position": {
+        "x": 1,
+        "y": 64,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 1,
+          "y": 63,
+          "z": 0
+        },
+        "face": "up",
+        "source": "observed_full_cube"
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 2,
+      "position": {
+        "x": 2,
+        "y": 64,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 2,
+          "y": 63,
+          "z": 0
+        },
+        "face": "up",
+        "source": "observed_full_cube"
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 3,
+      "position": {
+        "x": 0,
+        "y": 65,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 0,
+          "y": 64,
+          "z": 0
+        },
+        "face": "up",
+        "source": "earlier_proposed_block",
+        "depends_on_index": 0
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 4,
+      "position": {
+        "x": 1,
+        "y": 65,
+        "z": 0
+      },
+      "block": "minecraft:oak_planks",
+      "anchor": {
+        "position": {
+          "x": 1,
+          "y": 64,
+          "z": 0
+        },
+        "face": "up",
+        "source": "earlier_proposed_block",
+        "depends_on_index": 1
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 5,
+      "position": {
+        "x": 2,
+        "y": 65,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 2,
+          "y": 64,
+          "z": 0
+        },
+        "face": "up",
+        "source": "earlier_proposed_block",
+        "depends_on_index": 2
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 6,
+      "position": {
+        "x": 0,
+        "y": 66,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 0,
+          "y": 65,
+          "z": 0
+        },
+        "face": "up",
+        "source": "earlier_proposed_block",
+        "depends_on_index": 3
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 7,
+      "position": {
+        "x": 1,
+        "y": 66,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 1,
+          "y": 65,
+          "z": 0
+        },
+        "face": "up",
+        "source": "earlier_proposed_block",
+        "depends_on_index": 4
+      },
+      "reach_and_line_of_sight": "unverified"
+    },
+    {
+      "index": 8,
+      "position": {
+        "x": 2,
+        "y": 66,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks",
+      "anchor": {
+        "position": {
+          "x": 2,
+          "y": 65,
+          "z": 0
+        },
+        "face": "up",
+        "source": "earlier_proposed_block",
+        "depends_on_index": 5
+      },
+      "reach_and_line_of_sight": "unverified"
+    }
+  ],
+  "required_before_any_real_placement": [
+    "Implement and independently accept a bounded placement primitive",
+    "Accept guarded navigation and turning, then prove reachable stand positions and line of sight",
+    "Reobserve world, inventory, complete entity coverage and target/support cells at action time",
+    "Verify item selection, placement properties, reach and exact hit face",
+    "Stop and release on any conflict, state change, damage, hazard or unexpected result",
+    "Observe the result after each single placement; never break, replace, craft or gather automatically"
+  ]
+}

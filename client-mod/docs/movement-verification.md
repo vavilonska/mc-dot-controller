@@ -1,5 +1,9 @@
 # Guarded movement source/build verification
 
+This records the preceding movement-only build. The current source additionally
+contains guarded yaw and an offline one-sample adapter; see [current yaw integration](turning-verification.md).
+The absence statements below describe this older artifact, not the current source inventory.
+
 Verified 2026-10-05. Base: integrated `1.1.5-terrain-guard.1` source, originally
 Campione01/MineClient-Bridge v1.1.5 (`60e78940f7e7fa06116cf4fbc58df346ad617531`).
 MIT license and existing terrain/combat/input-isolation code retained.

@@ -8,12 +8,16 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.LongSupplier;
+import java.util.function.DoubleConsumer;
+import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-/** Single-use, one-input-sample lease. Never owns a physical or mapped key. */
+/** Shared single-use admission for one input sample or synchronous yaw. Never owns a key. */
 final class GuardedMovement {
     static final int SCHEMA = 1;
     static final int MAX_DURATION_MS = 100;
+    static final int MAX_TURN_TTL_MS = 100;
+    static final double MAX_TURN_STEP = 30.0;
     static final int MAX_TTL_MS = 250;
     static final int MAX_REQUESTS = 4096;
     static final int MAX_OBSERVATION_AGE_MS = 150;
@@ -38,8 +42,8 @@ final class GuardedMovement {
     record State(String worldGeneration, String playerUuid, long tick, double x, double y, double z,
                  double yaw, boolean enabled, boolean localSurvival, boolean ready,
                  boolean neutralInput, boolean safeCorridor) { }
-    record Outcome(String requestId, boolean sampled, boolean released, String reason) { }
-    record Status(String session, String ownerRequestId, boolean sampled, boolean released,
+    record Outcome(String requestId, boolean sampled, boolean turned, boolean released, String reason) { }
+    record Status(String session, String ownerRequestId, String ownerAction, boolean sampled, boolean released,
                   boolean admissionOpen, int requestsRemaining) { }
 
     private final LongSupplier clock;
@@ -63,6 +67,7 @@ final class GuardedMovement {
     synchronized String session() { return session; }
     synchronized Status status() {
         return new Status(session, active == null ? null : active.request.requestId(),
+                active == null ? null : active.turnYaw == null ? "forward_sample" : "yaw",
                 active != null && active.sampled, active == null || active.cleanup == null, open,
                 maxRequests - seen.size());
     }
@@ -75,6 +80,24 @@ final class GuardedMovement {
     }
 
     synchronized Ticket submit(Request request, long receivedNanos, String entrySession) {
+        return admit(request, receivedNanos, entrySession, null);
+    }
+
+    Ticket submitTurn(Request request, long receivedNanos, String entrySession, double targetYaw,
+                      Executor executor, Supplier<State> liveState, DoubleConsumer apply) {
+        require(request.ttlMs() <= MAX_TURN_TTL_MS && request.durationMs() == request.ttlMs(), "invalid_turn_ttl_ms");
+        require(Double.isFinite(targetYaw) && targetYaw >= -180 && targetYaw < 180, "invalid_target_yaw");
+        double appliedYaw = (float) targetYaw; // Validate the exact float that Minecraft's setters receive.
+        if (appliedYaw >= 180) appliedYaw -= 360;
+        require(Math.abs(Math.IEEEremainder(appliedYaw - request.yaw(), 360)) <= MAX_TURN_STEP, "turn_step_too_large");
+        final Ticket ticket;
+        synchronized (this) { ticket = admit(request, receivedNanos, entrySession, appliedYaw); }
+        try { executor.execute(() -> turn(ticket, liveState, apply)); }
+        catch (RuntimeException rejected) { ticket.cancel("turn_executor_rejected"); throw rejected; }
+        return ticket;
+    }
+
+    private synchronized Ticket admit(Request request, long receivedNanos, String entrySession, Double turnYaw) {
         require(open && session.equals(entrySession) && session.equals(request.session()), "movement_session_changed");
         require(!seen.contains(request.requestId()), "movement_request_replayed");
         require(active == null, "movement_busy");
@@ -91,7 +114,7 @@ final class GuardedMovement {
         require(request.worldGeneration().equals(snapshot.worldGeneration()) && request.playerUuid().equals(snapshot.playerUuid())
                 && request.expectedTick() == snapshot.tick() && request.x() == snapshot.x() && request.y() == snapshot.y()
                 && request.z() == snapshot.z() && request.yaw() == snapshot.yaw(), "movement_observation_mismatch");
-        Ticket ticket = new Ticket(request, receivedNanos, observed.createdNanos());
+        Ticket ticket = new Ticket(request, receivedNanos, observed.createdNanos(), turnYaw);
         require(!expired(ticket), "movement_expired");
         active = ticket;
         return ticket;
@@ -100,7 +123,7 @@ final class GuardedMovement {
     /** Game-thread-only callbacks. Monitor spans fresh checks and the sole input mutation. */
     synchronized void sample(Supplier<State> liveState, Runnable apply, Runnable release) {
         Ticket ticket = active;
-        if (ticket == null || ticket.sampled) return;
+        if (ticket == null || ticket.sampled || ticket.turnYaw != null) return;
         try {
             checkLive(ticket);
             validate(ticket.request, liveState.get());
@@ -112,6 +135,22 @@ final class GuardedMovement {
             ticket.reason = failure instanceof GuardedAction.Rejected ? failure.getMessage() : "movement_failed";
             finish(ticket);
         }
+    }
+
+    /** A queued callback is bound to its exact ticket, never to a replacement request. */
+    private synchronized void turn(Ticket ticket, Supplier<State> liveState, DoubleConsumer apply) {
+        if (active != ticket) return;
+        try {
+            checkLive(ticket);
+            State live = liveState.get();
+            validate(ticket.request, live);
+            require(Math.abs(Math.IEEEremainder(ticket.turnYaw - live.yaw(), 360)) <= MAX_TURN_STEP, "turn_step_too_large");
+            checkLive(ticket);
+            ticket.turned = true; // Dispatch attempted; fresh observation must confirm the final rotation.
+            apply.accept(ticket.turnYaw);
+        } catch (RuntimeException | Error failure) {
+            ticket.reason = failure instanceof GuardedAction.Rejected ? failure.getMessage() : "turn_failed";
+        } finally { finish(ticket); }
     }
 
     /** At client tick end, and at game-thread screen/world/death/stop cleanup. */
@@ -150,8 +189,8 @@ final class GuardedMovement {
             ticket.cleanup = null;
         }
         if (active == ticket) active = null;
-        ticket.result.complete(new Outcome(ticket.request.requestId(), ticket.sampled, true,
-                ticket.reason == null ? "sample_released" : ticket.reason));
+        ticket.result.complete(new Outcome(ticket.request.requestId(), ticket.sampled, ticket.turned, true,
+                ticket.reason == null ? ticket.turnYaw == null ? "sample_released" : "turn_dispatched" : ticket.reason));
     }
 
     static void validate(Request request, State live) {
@@ -183,9 +222,11 @@ final class GuardedMovement {
         final long observedNanos;
         final CompletableFuture<Outcome> result = new CompletableFuture<>();
         boolean sampled;
+        boolean turned;
+        final Double turnYaw;
         Runnable cleanup;
         String reason;
-        Ticket(Request request, long receivedNanos, long observedNanos) { this.request = request; this.receivedNanos = receivedNanos; this.observedNanos = observedNanos; }
+        Ticket(Request request, long receivedNanos, long observedNanos, Double turnYaw) { this.request = request; this.receivedNanos = receivedNanos; this.observedNanos = observedNanos; this.turnYaw = turnYaw; }
 
         Outcome await() throws InterruptedException, ExecutionException {
             try {

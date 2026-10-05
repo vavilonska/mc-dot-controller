@@ -1,0 +1,127 @@
+{
+  "format": "building-blueprint-v1",
+  "blueprint": {
+    "schema_version": 1,
+    "template": "floor",
+    "origin": {
+      "x": 0,
+      "y": 64,
+      "z": 0
+    },
+    "region": {
+      "min": {
+        "x": 0,
+        "y": 64,
+        "z": 0
+      },
+      "max": {
+        "x": 2,
+        "y": 64,
+        "z": 2
+      }
+    },
+    "size": {
+      "width": 3,
+      "extent": 3
+    },
+    "axis": "x",
+    "palette": {
+      "primary": "minecraft:oak_planks",
+      "accent": "minecraft:stone_bricks"
+    },
+    "pattern": "frame"
+  },
+  "provisional": true,
+  "executable": false,
+  "material_totals": {
+    "minecraft:oak_planks": 1,
+    "minecraft:stone_bricks": 8
+  },
+  "preview": {
+    "view": "top (+z downward)",
+    "horizontal_axis": "+x",
+    "legend": {
+      "P": "minecraft:oak_planks",
+      "A": "minecraft:stone_bricks"
+    },
+    "rows": [
+      "AAA",
+      "APA",
+      "AAA"
+    ]
+  },
+  "cells": [
+    {
+      "position": {
+        "x": 0,
+        "y": 64,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 1,
+        "y": 64,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 2,
+        "y": 64,
+        "z": 0
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 0,
+        "y": 64,
+        "z": 1
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 1,
+        "y": 64,
+        "z": 1
+      },
+      "block": "minecraft:oak_planks"
+    },
+    {
+      "position": {
+        "x": 2,
+        "y": 64,
+        "z": 1
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 0,
+        "y": 64,
+        "z": 2
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 1,
+        "y": 64,
+        "z": 2
+      },
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "position": {
+        "x": 2,
+        "y": 64,
+        "z": 2
+      },
+      "block": "minecraft:stone_bricks"
+    }
+  ]
+}

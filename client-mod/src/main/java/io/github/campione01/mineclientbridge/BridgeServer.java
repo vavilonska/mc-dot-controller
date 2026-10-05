@@ -126,6 +126,7 @@ public final class BridgeServer {
             createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
             createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
             createdServer.createContext("/control/guarded-movement", BridgeServer::handleGuardedMovement);
+            createdServer.createContext("/control/guarded-turn", BridgeServer::handleGuardedTurn);
             createdServer.createContext("/control/look", BridgeServer::handleControlLook);
             createdServer.createContext("/control/mouse", BridgeServer::handleControlMouse);
             createdServer.createContext("/control/text", BridgeServer::handleControlText);
@@ -518,6 +519,74 @@ public final class BridgeServer {
         } catch (Exception failure) { respondJson(exchange, 500, error("movement_failed")); }
     }
 
+    private static void handleGuardedTurn(HttpExchange exchange) throws IOException {
+        final long receivedNanos = System.nanoTime();
+        final String entrySession = GuardedGameMovement.LEASES.session();
+        if (!requireControlAccess(exchange, "/control/guarded-turn", "POST")) return;
+        if (exchange.getHttpContext().getServer() != server) {
+            respondJson(exchange, 409, error("bridge_lifecycle_changed")); return;
+        }
+        if (!GuardedGameTurning.enabled()) {
+            respondJson(exchange, 409, error("guarded_turning_disabled")); return;
+        }
+        if (exchange.getRequestURI().getRawQuery() != null) {
+            respondJson(exchange, 400, error("unexpected_query")); return;
+        }
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final GuardedMovement.Request request;
+        final double targetYaw;
+        try {
+            GuardedAction.require(body.keySet().equals(java.util.Set.of("turn_schema_version", "action",
+                    "session", "request_id", "observation_id", "expected_world_generation", "expected_player_uuid", "expected_tick",
+                    "expected_x", "expected_y", "expected_z", "expected_yaw", "ttl_ms", "target_yaw")),
+                    "unexpected_or_missing_field");
+            GuardedAction.require(optionalInteger(body, "turn_schema_version", -1) == GuardedGameTurning.SCHEMA,
+                    "unsupported_turn_schema");
+            GuardedAction.require(requiredString(body, "action").equals("yaw"), "invalid_action");
+            double tick = requiredFiniteDouble(body, "expected_tick");
+            GuardedAction.require(tick >= 0 && tick <= 9_007_199_254_740_991d && tick == Math.rint(tick), "invalid_expected_tick");
+            int ttl = optionalInteger(body, "ttl_ms", -1);
+            GuardedAction.require(ttl >= 1 && ttl <= GuardedMovement.MAX_TURN_TTL_MS, "invalid_turn_ttl_ms");
+            targetYaw = requiredFiniteDouble(body, "target_yaw");
+            GuardedAction.require(targetYaw >= -180 && targetYaw < 180, "invalid_target_yaw");
+            request = new GuardedMovement.Request(requiredString(body, "session"), requiredString(body, "request_id"),
+                    requiredString(body, "observation_id"), requiredString(body, "expected_world_generation"),
+                    requiredString(body, "expected_player_uuid"), (long) tick, requiredFiniteDouble(body, "expected_x"),
+                    requiredFiniteDouble(body, "expected_y"), requiredFiniteDouble(body, "expected_z"),
+                    requiredFiniteDouble(body, "expected_yaw"), ttl, ttl);
+            GuardedAction.require(Math.abs(Math.IEEEremainder(targetYaw - request.yaw(), 360)) <= GuardedMovement.MAX_TURN_STEP,
+                    "turn_step_too_large");
+        } catch (RequestException failure) { respondRequestFailure(exchange, failure); return;
+        } catch (GuardedAction.Rejected failure) { respondJson(exchange, 400, error(failure.getMessage())); return; }
+        GuardedMovement.Ticket turnTicket = null;
+        try {
+            turnTicket = GuardedGameTurning.submit(request, targetYaw, receivedNanos, entrySession);
+            GuardedMovement.Outcome outcome = turnTicket.await();
+            boolean ok = outcome.reason().equals("turn_dispatched");
+            JsonObject response = turnOutcome(ok ? protocolOk() : error(outcome.reason()), outcome);
+            respondJson(exchange, ok ? 200 : outcome.reason().equals("movement_expired") ? 408 : 409, response);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            GuardedMovement.Outcome outcome = turnTicket == null ? null : turnTicket.result.getNow(null);
+            respondJson(exchange, 503, turnOutcome(error("request_interrupted"), outcome));
+        } catch (GuardedAction.Rejected failure) {
+            int status = failure.getMessage().equals("movement_busy") ? 429 : failure.getMessage().equals("movement_expired") ? 408 : 409;
+            respondJson(exchange, status, error(failure.getMessage()));
+        } catch (Exception failure) { respondJson(exchange, 500, error("turn_failed")); }
+    }
+
+    private static JsonObject turnOutcome(JsonObject response, GuardedMovement.Outcome outcome) {
+        if (outcome != null) {
+            response.addProperty("turn_schema_version", GuardedGameTurning.SCHEMA);
+            response.addProperty("request_id", outcome.requestId());
+            response.addProperty("dispatched", outcome.turned());
+            response.addProperty("released", outcome.released());
+            response.addProperty("turn_confirmed", false);
+        }
+        return response;
+    }
+
     private static void handleControlLook(HttpExchange exchange) throws IOException {
         if (!requireControlAccess(exchange, "/control/look", "POST")) return;
 
@@ -699,6 +768,7 @@ public final class BridgeServer {
         addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
         addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
         addOperation(operations, "POST", "/control/guarded-movement", "guarded_local_movement_sample");
+        addOperation(operations, "POST", "/control/guarded-turn", "guarded_local_player_yaw");
         addOperation(operations, "POST", "/control/look", "player_view");
         addOperation(operations, "POST", "/control/mouse", "screen_mouse_input");
         addOperation(operations, "POST", "/control/text", "focused_screen_text");
@@ -723,6 +793,7 @@ public final class BridgeServer {
         guarded.add("allowed_target_types", targets);
         obj.add("guarded_actions", guarded);
         obj.add("guarded_movement", GuardedGameMovement.status());
+        obj.add("guarded_turn", GuardedGameTurning.capabilities());
 
         JsonObject limits = new JsonObject();
         limits.addProperty("request_body_bytes", MAX_BODY_BYTES);
@@ -885,6 +956,7 @@ public final class BridgeServer {
         world.addProperty("thunder_level", mc.level.getThunderLevel(1.0F));
         obj.add("world", world);
         obj.add("guarded_movement", GuardedGameMovement.observedStatus(mc));
+        obj.add("guarded_turn", GuardedGameTurning.capabilities());
         obj.add("nearby", nearbyEntitiesSnapshot(mc, radius));
         return new EndpointResult(200, obj);
     }
@@ -1133,6 +1205,7 @@ public final class BridgeServer {
         }
         obj.add("world", world);
         obj.add("guarded_movement", GuardedGameMovement.status());
+        obj.add("guarded_turn", GuardedGameTurning.capabilities());
 
         JsonObject player = new JsonObject();
         player.addProperty("present", mc.player != null);

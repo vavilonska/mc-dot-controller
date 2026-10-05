@@ -66,7 +66,7 @@ final class GuardedGameMovement {
         Minecraft mc = Minecraft.getInstance();
         if (event.getEntity() != mc.player) return;
         Input input = event.getInput();
-        LEASES.sample(() -> snapshot(mc, input), () -> {
+        LEASES.sample(() -> snapshot(mc, input, true, enabled()), () -> {
             GuardedAction.require(mc.isSameThread() && mc.player != null && mc.player.input == input,
                     "movement_input_changed");
             // These fields are consumed by vanilla later in this same player tick. Do not set
@@ -81,21 +81,22 @@ final class GuardedGameMovement {
         });
     }
 
-    private static GuardedMovement.State snapshot(Minecraft mc, Input input) {
+    static GuardedMovement.State snapshot(Minecraft mc, Input input, boolean checkCorridor, boolean actionEnabled) {
         GuardedAction.require(mc.isSameThread(), "minecraft_thread_required");
         GuardedAction.require(mc.player != null && mc.level != null && mc.gameMode != null, "not_in_world");
         var player = mc.player;
         var level = mc.level;
         String generation = WorldGeneration.current(level);
         double x = player.getX(), y = player.getY(), z = player.getZ(), yaw = player.getYRot();
-        boolean safe = localSurvival(mc) && ready(mc) && neutral(mc, input) && corridorClear(mc);
-        // Re-read readiness and neutral state after corridor callbacks, and reject any pose change.
+        boolean safe = localSurvival(mc) && ready(mc) && neutral(mc, input) && (!checkCorridor || corridorClear(mc));
+        // Re-read readiness and neutral state after corridor callbacks, then reject any pose change.
+        GuardedAction.require(mc.player == player && mc.level == level && mc.gameMode != null, "context_changed");
+        boolean finalLocal = localSurvival(mc), finalReady = ready(mc), finalNeutral = neutral(mc, input);
         GuardedAction.require(mc.player == player && mc.level == level && mc.gameMode != null
                 && player.getX() == x && player.getY() == y && player.getZ() == z && player.getYRot() == yaw,
                 "context_changed");
         return new GuardedMovement.State(generation, player.getUUID().toString(), level.getGameTime(),
-                x, y, z, yaw, enabled() && BridgeServer.isRunning(),
-                localSurvival(mc), ready(mc), neutral(mc, input), safe);
+                x, y, z, yaw, actionEnabled && BridgeServer.isRunning(), finalLocal, finalReady, finalNeutral, safe);
     }
 
     private static boolean localSurvival(Minecraft mc) {
@@ -180,6 +181,7 @@ final class GuardedGameMovement {
         json.addProperty("enabled", enabled());
         json.addProperty("session", state.session());
         json.addProperty("owner_request_id", state.ownerRequestId());
+        json.addProperty("owner_action", state.ownerAction());
         json.addProperty("sampled", state.sampled());
         json.addProperty("released", state.released());
         json.addProperty("admission_open", state.admissionOpen());
@@ -190,7 +192,7 @@ final class GuardedGameMovement {
         json.addProperty("forward_impulse", GuardedMovement.FORWARD_IMPULSE);
         json.addProperty("local_unpublished_survival_only", true);
         json.addProperty("held_keys", false);
-        json.addProperty("turn_supported", false);
+        json.addProperty("turn_supported", true);
         return json;
     }
 

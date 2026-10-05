@@ -240,7 +240,9 @@ class GuardedMovementTest {
         assertTrue(game.contains("input.forwardImpulse = 0;")); assertTrue(game.contains("input.up = false;"));
         assertTrue(game.contains("ChunkStatus.FULL, false")); assertTrue(game.contains("!player.isAutoJumpEnabled()"));
         assertTrue(game.contains("player.autoJumpTime == 0")); assertTrue(game.contains("player.getSpeed() <= 0.10000001"));
-        assertTrue(game.contains("horizontalDistance() <= 0.001")); assertTrue(game.contains("localSurvival(mc), ready(mc), neutral(mc, input), safe"));
+        assertTrue(game.contains("horizontalDistance() <= 0.001")); assertTrue(game.contains("finalLocal, finalReady, finalNeutral, safe"));
+        int refreshedPredicates = game.indexOf("boolean finalLocal");
+        assertTrue(refreshedPredicates >= 0 && game.indexOf("player.getX() == x", refreshedPredicates) > refreshedPredicates);
         assertTrue(bridge.contains("movementTicket.result.getNow(null)"));
         assertFalse(game.contains(".setDown(")); assertFalse(game.contains(".keyPress(")); assertFalse(game.contains(".send("));
         assertTrue(bridge.contains("requireControlAccess(exchange, \"/control/guarded-movement\", \"POST\")"));
