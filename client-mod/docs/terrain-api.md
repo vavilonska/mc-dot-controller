@@ -2,8 +2,10 @@
 
 This source extension is based on upstream v1.1.5. It adds observation only. Planning,
 material bills, movement, building, and combat remain external to the Java bridge.
-It has **not yet been installed or live-tested**. Full NeoForge build verification is
-required before installation; the pure Java scan tests are not an integration test.
+The complete mod compiled and passed its Gradle test/build tasks against NeoForge
+21.1.255 on 2026-10-05 using the official binary-dependency pipeline. It has **not yet
+been installed or live-tested**. Unit/build checks are not an integration test.
+See [verification details](terrain-verification.md).
 
 ## Request
 
@@ -29,10 +31,12 @@ Expired, superseded, out-of-order, or wrong-world cursors return 409.
 Retrying the most recent continuation cursor returns the same page without rereading
 blocks. An initial request has no replay token; retrying it starts a new scan.
 
-Only one terrain request is queued/in flight at a time. New page reads are limited
+Only one terrain game-thread task is queued/in flight at a time. New page reads are limited
 to one per 50 ms. A concurrent or too-fast call returns 429 and `Retry-After: 1`.
 The response also exposes `retry_after_ms: 50` for clients pacing successful pages.
-The existing Minecraft dispatch timeout remains 5 seconds.
+The existing Minecraft dispatch timeout remains 5 seconds. A timed-out queued task is
+skipped; a running callback retains the single-request admission until it actually
+exits, so a slow callback cannot create additional queued terrain work.
 
 ## Response
 
@@ -49,6 +53,7 @@ The normal `ok`, `protocol`, and `schema_version` fields remain. Terrain adds:
 - `origin: {x,y,z}`, `radius`, `vertical`
 - `order: "x_then_z_then_y"`: X increments fastest, then Z, then Y
 - `offset`, `next_offset`, `total_cells`, `returned`, `complete`, `next_cursor`
+  (`next_cursor` is omitted once complete; consumers should treat absent/null as no continuation)
 - `read_only: true`, `loaded_chunks_only: true`
 - `budget_exhausted`, `read_elapsed_micros`, `unknown_cells`, `cells`
 
@@ -78,7 +83,10 @@ cache with `getChunk(..., ChunkStatus.FULL, false)`, never forces loads, sends s
 requests, or writes blocks. Missing chunks are explicit unknowns. Collision callbacks
 receive a read-only BlockGetter allowing at most 64 reads in a one-block neighborhood.
 Missing/outside-context/block-entity-dependent shapes are marked unknown. Runtime
-exceptions from modded collision callbacks are reported as unknown collision.
+exceptions from modded collision callbacks and nonfinite bounds are reported as
+unknown collision, without partial support/shape claims. This is not a sandbox for
+arbitrary mod code: collision context still refers to the real player, as required
+for entity-dependent shapes. The extension itself performs no world writes.
 
 Each page has a hard 128-cell limit and a **cooperative** 2 ms sampling budget checked
 between cells. A single modded callback cannot be interrupted safely, so 2 ms is not
@@ -119,3 +127,17 @@ Test first in a separate disposable local world: no-world response, auth rejecti
 loaded/unloaded boundary, cursor replay/expiry, dimension change, shape uncertainty,
 page latency, and absence of outbound/world-write behavior. Do not claim server
 compatibility until the same build is actually loaded and tested.
+
+## Memory-constrained build hosts
+
+ModDevGradle is updated to 2.0.148, matching the official Minecraft 1.21.1 template.
+The normal source/decompiler pipeline remains the default. Where Minecraft source
+decompilation exceeds available memory, use the officially supported binary pipeline:
+
+```sh
+JAVA_HOME=/path/to/jdk-21 bash gradlew -Pneo_version=21.1.255 -Pbridge.noRecompile=true test build
+```
+
+This still compiles the complete mod and runs its tests, applying the configured
+access transformers to the game dependencies. It omits rebuilding Minecraft's own
+sources. See [ModDevGradle's documented build mode](https://github.com/neoforged/ModDevGradle#disabling-decompilation-and-recompilation).

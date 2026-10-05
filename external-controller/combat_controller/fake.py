@@ -20,7 +20,7 @@ def safe_snapshot(clock, **changes):
         captured_at=clock.monotonic(), identity=('offline-fake-run', 123, 'fake-player', 'minecraft:overworld'),
         generation='offline-world-generation', tick=100, position=Vec3(0, 64, 0),
         velocity=Vec3(0, 0, 0), yaw=0, pitch=0, health=20, food=20, air=300, max_air=300,
-        on_ground=True, gamemode='survival', weapon='minecraft:iron_sword', entities=(target,),
+        on_ground=True, gamemode='survival', weapon='minecraft:iron_axe', entities=(target,),
         crosshair_uuid=target.uuid, crosshair_kind=target.kind, crosshair_location=Vec3(0, 64.9, 2),
         terrain_safe=True, terrain_reason='offline_fake_fixture',
     )
@@ -51,12 +51,12 @@ class FakeBridge:
             return self.snapshots[min(self.observe_count - 1, len(self.snapshots) - 1)]
         return safe_snapshot(self.clock, tick=100 + int((self.clock.now - 100) * 20))
 
-    def look(self, yaw, pitch):
+    def look(self, yaw, pitch, context):
         self.calls.append('look')
         self.looks.append((yaw, pitch))
 
-    def attack_click(self):
-        self.calls.append('attack_click')
+    def attack(self, context):
+        self.calls.append('attack')
         self.attack_times.append(self.clock.monotonic())
         if self.fail_attack:
             raise RuntimeError('simulated uncertain attack response')

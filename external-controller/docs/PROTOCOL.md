@@ -31,19 +31,17 @@ The controller never treats legacy crosshair.distance as blocks: it calculates
 Euclidean distance from `location` and player position instead. The terrain
 extension additionally names `distance_squared` and `distance_euclidean`.
 
-`POST /control/look` body: `yaw`, `pitch`, `relative: false`. Bridge wraps yaw and
-clamps pitch. Policy applies smaller per-step bounds before forming the request.
+## Guarded actions replace legacy input
 
-`POST /control/key` body modeled here:
-`{"mapping":"key.attack","action":"click","exact":true}`.
-Exact mapping input temporarily borrows an unused keyboard key and allows only
-click; it does not reproduce mouse-specific mod events. This avoids activating
-unrelated mappings sharing the attack binding. The adapter rejects missing,
-cancelled or unconfirmed input-event delivery in fake response testing.
+The earlier source-only controller modeled legacy look and exact attack-key
+clicks but hard-disabled real HTTP mutation. The current adapter never sends
+those routes: queued unguarded inputs can execute after a timeout/world change.
 
-A world mouse click also exists in upstream (`button: 0`, `action: click`), but is
-not exposed here. Named attack click is sufficient for this staged vanilla
-controller. No other keyboard/mouse actions are permitted by its transport.
+The companion `/control/guarded-action` endpoint supplies narrow execution-time
+validation and a synchronous ordinary attack path. This is an additive extension,
+not an upstream v1.1.5 feature. Its schema and acceptance restrictions are detailed
+in [GUARDED_ACCEPTANCE.md](GUARDED_ACCEPTANCE.md). No real automatic-combat test
+was performed by the external controller implementation task.
 
 ## Terrain evidence accepted
 
@@ -64,20 +62,12 @@ state schemas. Plain v1.1.5 lacking it and `/terrain` cannot pass this policy.
 
 ## Required live-acceptance work
 
-1. Build/install the reviewed read-only terrain extension in an isolated local
-   test client, with existing credentials kept private
-2. Verify actual status/state/terrain schemas and missing/stale/unloaded behavior
-3. Add a narrow game-thread guarded input operation. It must reject expired
-   commands, changed session/world generation, mismatched live crosshair entity,
-   changed screen/player and out-of-range targets at execution, not before queueing
-4. Verify cancellation, wrong-generation, expired-action and GUI-race tests at
-   that endpoint. Preserve normal reach and normal game attack mechanics
-5. Connect this external controller to that guarded endpoint and test a short
-   stationary local Survival session with a harmlessly bounded setup and an
-   explicit stop condition. Verify post-run key release and resulting health
-6. Only after this, consider a user-authorized server session under that server's
-   rules. A source/test pass is not a live-combat pass
+The guarded source and adapter are implemented and mock-tested. They still need
+full target-version build/review, isolated installation and actual local endpoint
+acceptance before arming the external controller. Follow the explicit gates in
+[GUARDED_ACCEPTANCE.md](GUARDED_ACCEPTANCE.md). The default scope is unpublished
+local Survival with an unenchanted vanilla axe; multiplayer remains unsupported.
 
 Movement, pathfinding and retreat need their own terrain-aware acceptance and
-are outside this stage. The thin mod should expose guarded observations/actions;
+are outside this stage. The thin mod exposes guarded observations/actions;
 combat strategy belongs in this external process.

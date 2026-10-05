@@ -1,12 +1,12 @@
-# External Minecraft combat controller, stage one
+# External Minecraft combat controller
 
-**当前阶段：外置控制逻辑 + 离线测试。尚未在游戏里自动战斗。**
+**当前阶段：外置战斗逻辑及受保护接口已接好，默认关闭；这里只完成了离线测试，尚未验收自动战斗。**
 
-A small, standard-library-only Python controller for a thin Minecraft client
-bridge. Decision-making stays outside the mod. The command line is **offline-only**.
-The real HTTP transport is **read-only**, even if a configuration says enabled.
-Live combat is deliberately blocked until input can be guarded atomically on the
-Minecraft main thread.
+A standard-library-only Python controller for a thin Minecraft client bridge.
+Decision-making stays outside the mod. The command line remains **offline-only**.
+A guarded HTTP adapter is implemented but **disabled by default**. It can be armed
+only for explicitly authorized, separately verified isolated local acceptance.
+It never falls back to legacy unguarded input routes.
 
 ## Run without Minecraft
 
@@ -18,94 +18,107 @@ python -m combat_controller          # disabled; zero I/O
 python -m combat_controller --demo   # deterministic fake session only
 ```
 
-Run these commands from this directory. No installation or third-party packages
-are needed. No command above reads an existing token or connects to a game.
+Run from this directory. No installation or third-party packages are needed.
+These commands never read an existing token or connect to a game.
 
-## What is implemented
+## Controller behavior
 
-- Disabled-by-default finite state machine: observe → acquire → bounded aim →
-  fresh crosshair check → one attack click → wait, or halt and release
+- Disabled-by-default state machine: observe → acquire → bounded aim → fresh
+  crosshair check → guarded attack attempt → wait, or halt
 - Explicit hostile allowlist: zombie, husk, drowned, skeleton, stray and bogged
+- Only vanilla axes; swords and unarmed attacks are rejected. The game-thread
+  guard additionally rejects enchantments and sword-sweep capability
 - Players, pets, villagers, neutral mobs and unknown entities are never targets;
-  nearby protected/unknown entities also block sword-sweep risk
+  nearby protected/unknown entities also stop the session
 - Extra danger stop for nearby creepers, wardens, withers, dragons, ghasts,
   blazes, witches and ravagers
 - Crosshair UUID **and type** must match the selected target in a fresh snapshot
 - Conservative 2.75-block distance guard and 1.5-second default attack cadence
-- Bounded yaw/pitch changes, a new observed game tick after every input, and
-  immutable target-type configuration
+- Bounded yaw/pitch changes and a new observed game tick after every input
 - Health below 14/20, food below 12/20, lost air, damage, displacement, GUI changes,
-  unknown terrain, stale state or a changed world all stop the session
+  unclear terrain, stale state or a changed world all stop the session
 - No walking, retreating, jumping, chat, commands, crafting, GUI control, direct
   world mutation or arbitrary input
-- Default 10-second session, 12 input attempts, 0.75-second snapshot age and
+- Default 10-second session, 12 action attempts, 0.75-second snapshot age and
   1-second observation lease; all have hard configuration maxima
-- Cleanup in `finally`, including exceptions/KeyboardInterrupt; cleanup failure
-  is reported rather than claimed successful
+- A final cleanup hook always runs. The guarded adapter only reads back neutral
+  input, because its actions never hold keys. It never sends unguarded release-all
 
-Every attack counter is an **attempted click**, not evidence of damage or a kill.
+Attack counts represent **attempts**, not confirmed damage, hits or kills.
+The result's legacy `release_confirmed` field means input-clear readback for the
+real guarded adapter, not that a release command was sent.
 
-## Terrain and adapter contract
+## Terrain and guarded adapter
 
-`MineClientBridge` understands the actual v1.1.5 `/status`, `/state`, `/look` and
-`/key` schemas, plus the companion read-only terrain extension. It pins the
-expected run ID, process ID, player UUID and dimension. The terrain extension's
-`world_generation` must agree across status, state and terrain reads.
+State/identity reads use the actual MineClient Bridge v1.1.5 schema plus the
+companion terrain/world-generation extension. The adapter pins expected run ID,
+PID, player UUID and dimension. World generation must agree across observations.
 
-It checks a complete player-centered 3×3×5 scan: a narrow allowlist of solid
-vanilla floor blocks, empty fluid, known collision and open air above. Unloaded,
-failed, truncated, incomplete or unknown observations fail closed. Slabs, stairs,
-ice, modded floors and fractional standing heights are intentionally rejected.
+It checks a complete 3×3×5 scan: a narrow allowlist of solid vanilla floor blocks,
+empty fluid, known collision and open air above. Unloaded, failed, truncated,
+incomplete or unknown data fails closed. Slabs, stairs, ice, modded floors and
+fractional standing heights are intentionally rejected. A 2 ms terrain page
+budget can cause an otherwise safe scan to be rejected; this is not proof of a
+hazard, and this version does not combine stale pages.
 
-The extension's 2 ms page budget can return fewer than 45 cells. Stage one stops
-rather than combining potentially stale pages. This can reject otherwise safe
-terrain; it is not evidence that the terrain is dangerous.
+Before action, `prepare_guarded()` verifies exact guarded capability schema 1,
+local-only restriction, axe-only scope, synchronous attack and no held input.
+Both `enabled` and `acceptance_verified` must be explicitly true in the private
+connection settings. Defaults are false. These flags are operator attestations,
+not automated evidence that build/install/live acceptance has passed.
 
-`HttpTransport` only permits three fixed read URLs and has loopback-IP-only
-validation, no proxies, no redirects, bounded JSON, socket timeouts and a total
-request deadline watchdog. All real HTTP POSTs are hard-disabled. Input schemas
-are exercised through fake transports, not sent to Minecraft.
+Only `POST /control/guarded-action` may mutate game state. Each request carries
+the observed world generation, player UUID, selected target UUID, crosshair UUID
+and a server-receipt TTL capped at 150 ms and local remaining freshness/session
+time. The exact snapshot is consumed before sending, even if delivery is
+uncertain, preventing an automatic replay. Every response identity is checked.
+There are no retries and no legacy input fallbacks.
 
-`ConnectionConfig.from_file` reads only a caller-selected, user-owned 0600 file.
-There is no token discovery, automatic credential creation, environment-secret
-lookup or reading of Minecraft's token file. `config.example.json` contains an
-empty placeholder, not a working credential. Do not put real tokens in this repo.
+The transport accepts only fixed read routes and the strict guarded schema. It
+uses numeric loopback IPs, no environment proxies, no redirects, bounded JSON,
+socket timeouts and a total request watchdog. `ConnectionConfig.from_file` reads
+only a caller-selected, user-owned 0600 file. There is no credential discovery,
+automatic credential creation or reading of Minecraft's token file.
+`config.example.json` contains an empty placeholder, not a credential.
 
-## What is not yet verified or guaranteed
+## Acceptance and limits
 
-- No live automatic-combat test has been run for this controller
-- The terrain extension must be built, installed and accepted separately
-- v1.1.5 input is queued on the game thread without target, world-generation or
-  deadline guards. A timed-out POST may execute later or after a world change.
-  Client reads and socket cancellation cannot fix this. Therefore live HTTP
-  input remains unavailable in this stage
-- A Bridge-side action must validate the expected session/world generation,
-  target UUID/type, ordinary reach, screen state and deadline **at execution**
-  before live combat is enabled; it must drop expired or invalid queued actions
-- No observed attack-cooldown field exists in v1.1.5. Fixed cadence is a fallback,
-  not proof that cooldown is full or that modded weapons are compatible
-- Entity observations have no line-of-sight filter. Only an actual matching
-  crosshair permits a fake-policy attack; merely knowing an entity exists does not
-- The terrain whitelist covers a tiny stationary area, not projectile safety,
-  all mod behavior, all status effects, fire state or comprehensive survival
-- The heartbeat is local observation freshness, **not a server-side input lease**
-- `finally` cannot run after SIGKILL, power loss or interpreter termination.
-  Only click inputs are modeled; no persistent key-down is used. Cleanup is
-  best effort and cannot guarantee release after process death
-- Stopping is safer than blind retreat, but stopping cannot guarantee survival
+- **This controller has not passed live automatic-combat acceptance**
+- Keep it disabled until the companion guard passes full build/review, isolated
+  installation and its local negative/positive endpoint acceptance gates
+- The guard is limited to an unpublished integrated local Survival world with
+  one player. No multiplayer acceptance or support is claimed
+- The game-thread guard validates current generation/player/target/crosshair,
+  ordinary range/LOS, local-world readiness and request expiry at execution
+- TTL starts at server receipt, not the controller clock. Delayed packets and
+  already-started synchronous actions cannot be undone by socket cancellation
+- A blocking game/mod callback is not safely preemptible; there is no hard
+  real-time completion or exactly-once delivery guarantee. Ambiguity means stop
+- State has no attack-cooldown or enchantment field. Fixed cadence is a fallback;
+  the guard checks the actual axe's enchantment/sweep behavior on the game thread
+- Entity lists are not line-of-sight-filtered. A matching fresh crosshair plus
+  the guarded live LOS/reach check is required before an attack attempt
+- Terrain checks cover a tiny stationary area, not every status effect,
+  projectile, fire state or arbitrary mod interaction
+- The observation heartbeat is not a server-side held-input lease. Guarded
+  actions create no held input; unrelated pre-existing input is not auto-released
+- Stopping cannot guarantee survival. Movement/pathfinding/retreat need separate
+  terrain-aware implementation and acceptance
 
-## Verification
+See [guarded integration and acceptance](docs/GUARDED_ACCEPTANCE.md) and
+[protocol evidence](docs/PROTOCOL.md).
 
-At the initial stable snapshot: **90 unit tests passed**. Tests use deterministic
-fake state, fake transport, mocked HTTP connections, temporary dummy configs and
-a mocked blocked read for the deadline watchdog. No live endpoint was contacted.
-Default-disabled and offline-demo runs passed, and Python compilation passed.
-See `docs/PROTOCOL.md` for source evidence and the squared-distance issue.
+## Verification and provenance
 
-## Source and licensing
+Current snapshot: **115 unit tests passed**, including fake state, fake
+transport, mocked HTTP, temporary dummy configs and the deadline watchdog.
+Default-disabled/offline-demo runs and Python compilation also passed. No live
+endpoint was contacted by this work.
 
-This Python implementation is original project code. Upstream MineClient Bridge
-was consulted for protocol compatibility; its Java implementation was not copied
-into this directory. No license grant has been selected for this original
-controller yet. Preserve the upstream project's license for any separately
-redistributed upstream code; see `docs/PROTOCOL.md` for provenance.
+The original published stage-one snapshot had 90 tests and hard read-only HTTP;
+this subsequent revision adds guarded-schema integration, not a live success claim.
+
+Python code here is original project code. Upstream Bridge was consulted for
+protocol compatibility; its Java implementation was not copied into this directory.
+No license grant has been selected for this original controller. Preserve the
+upstream license for any separately redistributed upstream code.

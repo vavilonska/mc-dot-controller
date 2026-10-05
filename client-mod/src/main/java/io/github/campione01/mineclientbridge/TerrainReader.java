@@ -159,17 +159,23 @@ final class TerrainReader {
                 VoxelShape shape = state.getCollisionShape(view, pos, collisionContext);
                 boolean empty = shape.isEmpty();
                 boolean topFull = !empty && Block.isFaceFull(shape, Direction.UP);
+                JsonArray box = null;
+                if (!empty) {
+                    AABB bounds = shape.bounds();
+                    if (!Double.isFinite(bounds.minX) || !Double.isFinite(bounds.minY) || !Double.isFinite(bounds.minZ)
+                            || !Double.isFinite(bounds.maxX) || !Double.isFinite(bounds.maxY) || !Double.isFinite(bounds.maxZ)) {
+                        throw new IllegalStateException("Nonfinite collision bounds");
+                    }
+                    box = new JsonArray();
+                    box.add(bounds.minX); box.add(bounds.minY); box.add(bounds.minZ);
+                    box.add(bounds.maxX); box.add(bounds.maxY); box.add(bounds.maxZ);
+                }
+                // Publish facts atomically, only after every mod-provided shape operation succeeds.
                 if (!view.unknown) {
                     obj.addProperty("collision_known", true);
                     obj.addProperty("collision_empty", empty);
                     obj.addProperty("full_top_support", topFull);
-                    if (!empty) {
-                        AABB bounds = shape.bounds();
-                        JsonArray box = new JsonArray();
-                        box.add(bounds.minX); box.add(bounds.minY); box.add(bounds.minZ);
-                        box.add(bounds.maxX); box.add(bounds.maxY); box.add(bounds.maxZ);
-                        obj.add("collision_bounds", box);
-                    }
+                    if (box != null) obj.add("collision_bounds", box);
                 } else {
                     obj.addProperty("collision_known", false);
                     obj.addProperty("collision_unknown_reason", "unavailable_shape_context");

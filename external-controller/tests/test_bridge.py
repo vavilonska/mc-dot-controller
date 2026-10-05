@@ -13,24 +13,27 @@ from combat_controller.bridge import (BridgeError, ConnectionConfig, HttpTranspo
 from combat_controller.fake import FakeClock
 
 PROTOCOL = {'ok': True, 'protocol': 'mineclient-bridge', 'schema_version': 2}
-IDENTITY = ('test-run', 123, 'test-player', 'minecraft:overworld')
+PLAYER = '00000000-0000-0000-0000-000000000002'
+TARGET = '00000000-0000-0000-0000-000000000003'
+WORLD = '00000000-0000-0000-0000-000000000001'
+IDENTITY = ('test-run', 123, PLAYER, 'minecraft:overworld')
 
 
 def fixtures():
-    world = {'dimension': 'minecraft:overworld', 'game_time': 100, 'world_generation': 'world-a'}
+    world = {'dimension': 'minecraft:overworld', 'game_time': 100, 'world_generation': WORLD}
     status = dict(PROTOCOL, process_id=123, run_id='test-run', in_world=True, bridge_running=True,
-                  world=copy.deepcopy(world), player={'uuid': 'test-player'},
+                  world=copy.deepcopy(world), player={'uuid': PLAYER},
                   screen={'present': False}, held_mappings=[],
                   mouse={'grabbed': True, 'left_pressed': False, 'right_pressed': False,
                          'middle_pressed': False, 'held_world_buttons': []})
-    player = {'uuid': 'test-player', 'dimension': 'minecraft:overworld', 'x': 0.0, 'y': 64.0, 'z': 0.0,
+    player = {'uuid': PLAYER, 'dimension': 'minecraft:overworld', 'x': 0.0, 'y': 64.0, 'z': 0.0,
               'yaw': 0.0, 'pitch': 0.0, 'health': 20.0, 'food': 20, 'air': 300, 'max_air': 300,
               'on_ground': True, 'gamemode': 'survival', 'velocity': {'x': 0.0, 'y': 0.0, 'z': 0.0},
-              'selected_slot': 0, 'inventory': [{'slot': 0, 'empty': False, 'id': 'minecraft:iron_sword'}]}
+              'selected_slot': 0, 'inventory': [{'slot': 0, 'empty': False, 'id': 'minecraft:iron_axe'}]}
     state = dict(PROTOCOL, world=copy.deepcopy(world), player=player,
-                 nearby={'entities': [{'uuid': 'test-zombie', 'type': 'minecraft:zombie', 'x': 0, 'y': 64, 'z': 2,
+                 nearby={'entities': [{'uuid': TARGET, 'type': 'minecraft:zombie', 'x': 0, 'y': 64, 'z': 2,
                                        'health': 20, 'alive': True}], 'returned': 1, 'truncated': False},
-                 crosshair={'type': 'entity', 'uuid': 'test-zombie', 'entity_type': 'minecraft:zombie',
+                 crosshair={'type': 'entity', 'uuid': TARGET, 'entity_type': 'minecraft:zombie',
                             'location': {'x': 0, 'y': 64.9, 'z': 2}, 'distance': 4.81})
     cells = []
     for y in range(62, 67):
@@ -45,7 +48,7 @@ def fixtures():
                 if floor:
                     cell['collision_bounds'] = [0., 0., 0., 1., 1., 1.]
                 cells.append(cell)
-    terrain = dict(PROTOCOL, terrain_schema_version=1, world_generation='world-a',
+    terrain = dict(PROTOCOL, terrain_schema_version=1, world_generation=WORLD,
                    dimension='minecraft:overworld', game_time=100, complete=True, next_cursor=None,
                    returned=45, total_cells=45, origin={'x': 0, 'y': 64, 'z': 0}, cells=cells)
     return status, terrain, state
@@ -79,7 +82,7 @@ class AdapterTests(unittest.TestCase):
         bridge, transport = self.adapter()
         result = bridge.observe()
         self.assertTrue(result.terrain_safe)
-        self.assertEqual('test-zombie', result.crosshair_uuid)
+        self.assertEqual(TARGET, result.crosshair_uuid)
         self.assertAlmostEqual(2.19317121994613, result.position.distance(result.crosshair_location))
         self.assertEqual(4, len(transport.calls))
 
@@ -158,32 +161,14 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(BridgeError, 'missing_selected_item'):
             bridge.observe()
 
-    def test_attack_only_exact_attack_click(self):
-        transport = FakeTransport([{'ok': True, 'mapping_down': False,
-            'mod_input_event': {'probe_installed': True, 'event_fired': True, 'event_cancelled_by_mod': False}}])
-        bridge = MineClientBridge(transport, IDENTITY, self.clock)
-        bridge.attack_click()
-        self.assertEqual([('POST', '/control/key', {'mapping': 'key.attack', 'action': 'click', 'exact': True})], transport.calls)
-
-    def test_cancelled_attack_halts(self):
-        transport = FakeTransport([{'ok': True, 'mapping_down': False,
-            'mod_input_event': {'probe_installed': True, 'event_fired': True, 'event_cancelled_by_mod': True}}])
-        with self.assertRaisesRegex(BridgeError, 'attack_delivery_unconfirmed_or_cancelled'):
-            MineClientBridge(transport, IDENTITY).attack_click()
-
-    def test_unconfirmed_release_halts(self):
-        transport = FakeTransport([{'ok': True, 'mapping_down': True}])
-        with self.assertRaisesRegex(BridgeError, 'attack_release_unconfirmed'):
-            MineClientBridge(transport, IDENTITY).attack_click()
-
     def test_cleanup_reads_back_input_state(self):
-        transport = FakeTransport([{'ok': True, 'released': True}, self.status])
+        transport = FakeTransport([self.status])
         self.assertTrue(MineClientBridge(transport, IDENTITY).release_all())
-        self.assertEqual(('POST', '/control/release-all', {}), transport.calls[0])
+        self.assertEqual([('GET', '/control/status', None)], transport.calls)
 
     def test_cleanup_does_not_claim_clear_if_mouse_held(self):
         self.status['mouse']['left_pressed'] = True
-        transport = FakeTransport([{'ok': True, 'released': True}, self.status])
+        transport = FakeTransport([self.status])
         self.assertFalse(MineClientBridge(transport, IDENTITY).release_all())
 
 
@@ -296,14 +281,14 @@ class TransportTests(unittest.TestCase):
                     transport.request(*call)
             connection.assert_not_called()
 
-    def test_enabled_config_still_cannot_send_live_input_in_stage_one(self):
+    def test_legacy_inputs_remain_forbidden_even_when_enabled(self):
         transport = HttpTransport(self.config(enabled=True))
         calls = [('/control/look', {'yaw': 1, 'pitch': 2, 'relative': False}),
                  ('/control/key', {'mapping': 'key.attack', 'action': 'click', 'exact': True}),
                  ('/control/release-all', {})]
         with patch('http.client.HTTPConnection') as constructor:
             for path, body in calls:
-                with self.subTest(path=path), self.assertRaisesRegex(BridgeError, 'live_input_requires_guarded_bridge_endpoint'):
+                with self.subTest(path=path), self.assertRaisesRegex(BridgeError, 'legacy_or_unknown_input_forbidden'):
                     transport.request('POST', path, body)
             constructor.assert_not_called()
 

@@ -79,12 +79,11 @@ class ControllerTests(unittest.TestCase):
     def test_wrong_weapon(self):
         self.stopped('weapon_not_allowed', weapon='minecraft:bow')
 
-    def test_unarmed_requires_opt_in(self):
+    def test_unarmed_rejected_for_guarded_local_scope(self):
         self.stopped('weapon_not_allowed', weapon='')
 
-    def test_unarmed_explicit_opt_in(self):
-        self.bridge.snapshots = lambda n: safe_snapshot(self.clock, weapon='', tick=100+n)
-        self.assertEqual(1, self.run_session(allow_unarmed=True).attacks)
+    def test_sword_rejected_to_avoid_sweep_damage(self):
+        self.stopped('weapon_not_allowed', weapon='minecraft:iron_sword')
 
     def test_players_pets_villagers_never_selected(self):
         for kind in ('minecraft:player', 'minecraft:wolf', 'minecraft:cat', 'minecraft:villager', 'minecraft:zombie_villager', 'minecraft:spider'):

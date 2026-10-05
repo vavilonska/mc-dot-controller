@@ -6,7 +6,7 @@
 
 The upstream MIT license and copyright notice, **Copyright (c) 2026 Campione01**, are preserved in [`client-mod/LICENSE`](client-mod/LICENSE). Upstream third-party design-reference notices remain in [`client-mod/THIRD_PARTY_REFERENCES.md`](client-mod/THIRD_PARTY_REFERENCES.md). This repository is an independently maintained development snapshot, not an official upstream release.
 
-Local development changes add bounded, read-only nearby terrain observations and world-generation identifiers, document the API, and add tests. The bridge remains the client-side I/O layer. Planning and control policy remain outside the mod. The development version is `1.1.5-terrain.1`.
+Local development changes add bounded, read-only nearby terrain observations, world-generation identifiers, timeout-safe terrain admission, and an additive default-disabled guarded local-action endpoint, with API documentation and tests. The bridge remains the client-side I/O layer. Planning and control policy remain outside the mod. The integrated development version is `1.1.5-terrain-guard.1`. The endpoint validates requests at execution time and is restricted to a separately accepted local Survival test environment; it is not multiplayer or live-combat acceptance.
 
 The source snapshot excludes upstream workflow configuration, screenshot/evidence artifacts, game files, generated build outputs, and all private runtime state. The small mod icon is the original upstream project resource, not a Minecraft game asset. Any preserved upstream changelogs and verification documents describe upstream historical results, not new verification of this snapshot.
 

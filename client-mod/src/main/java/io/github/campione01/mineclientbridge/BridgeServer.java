@@ -34,7 +34,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -84,7 +83,8 @@ public final class BridgeServer {
     private static final double MAX_GUI_COORDINATE = 1_000_000.0;
     private static final long MINECRAFT_TIMEOUT_SECONDS = 5;
     private static final long FRAME_TIMEOUT_SECONDS = 15;
-    private static final AtomicBoolean TERRAIN_IN_FLIGHT = new AtomicBoolean();
+    private static final GuardedDispatch GUARDED_ACTIONS = new GuardedDispatch(System::nanoTime, false);
+    private static final TerrainDispatch TERRAIN_DISPATCH = new TerrainDispatch();
     private static final AtomicInteger WORKER_SEQUENCE = new AtomicInteger();
     private static final LinkedHashSet<InputConstants.Key> HELD_RAW_KEYS = new LinkedHashSet<>();
     private static final LinkedHashSet<Integer> HELD_WORLD_MOUSE_BUTTONS = new LinkedHashSet<>();
@@ -124,6 +124,7 @@ public final class BridgeServer {
             createdServer.createContext("/control/screen", BridgeServer::handleControlScreen);
             createdServer.createContext("/control/key", BridgeServer::handleControlKey);
             createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
+            createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
             createdServer.createContext("/control/look", BridgeServer::handleControlLook);
             createdServer.createContext("/control/mouse", BridgeServer::handleControlMouse);
             createdServer.createContext("/control/text", BridgeServer::handleControlText);
@@ -136,10 +137,12 @@ public final class BridgeServer {
             createdServer.setExecutor(createdExecutor);
             server = createdServer;
             serverExecutor = createdExecutor;
+            GUARDED_ACTIONS.openAdmission();
             createdServer.start();
             BridgeLog.LOGGER.info("MineClient Bridge listening on http://{}:{} auth_enabled={}",
                     config.host(), config.port(), !config.token().isBlank());
         } catch (IOException | RuntimeException e) {
+            GUARDED_ACTIONS.closeAdmission();
             server = null;
             serverExecutor = null;
             if (createdServer != null) {
@@ -158,6 +161,7 @@ public final class BridgeServer {
     }
 
     public static synchronized void stop() {
+        GUARDED_ACTIONS.closeAdmission();
         releaseAllOnMinecraftThread();
 
         HttpServer currentServer = server;
@@ -271,13 +275,9 @@ public final class BridgeServer {
             respondJson(exchange, 400, error("invalid_terrain_query", e.getMessage()));
             return;
         }
-        if (!TERRAIN_IN_FLIGHT.compareAndSet(false, true)) {
-            exchange.getResponseHeaders().set("Retry-After", "1");
-            respondJson(exchange, 429, error("terrain_busy"));
-            return;
-        }
         try {
-            EndpointResult result = callOnMinecraftThread(() -> {
+            EndpointResult result = TERRAIN_DISPATCH.call(
+                    task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)), () -> {
                 try {
                     JsonObject body = protocolOk();
                     for (var entry : TerrainReader.read(query).entrySet()) body.add(entry.getKey(), entry.getValue());
@@ -285,13 +285,14 @@ public final class BridgeServer {
                 } catch (TerrainScan.Failure e) {
                     return new EndpointResult(e.status, error(e.getMessage()));
                 }
-            }, MINECRAFT_TIMEOUT_SECONDS);
+            }, MINECRAFT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (result.status() == 429) exchange.getResponseHeaders().set("Retry-After", "1");
             respondJson(exchange, result.status(), result.body());
+        } catch (TerrainScan.Failure e) {
+            exchange.getResponseHeaders().set("Retry-After", "1");
+            respondJson(exchange, e.status, error(e.getMessage()));
         } catch (Exception e) {
             respondMinecraftFailure(exchange, "terrain_failed", e);
-        } finally {
-            TERRAIN_IN_FLIGHT.set(false);
         }
     }
 
@@ -371,6 +372,82 @@ public final class BridgeServer {
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
             respondMinecraftFailure(exchange, "raw_key_action_failed", e);
+        }
+    }
+
+    private static void handleControlGuardedAction(HttpExchange exchange) throws IOException {
+        final long receivedNanos = System.nanoTime(); // Includes body parsing in the TTL.
+        final long bridgeEpoch = GUARDED_ACTIONS.epoch(); // Captured before parsing or queueing.
+        if (!requireControlAccess(exchange, "/control/guarded-action", "POST")) return;
+        if (exchange.getHttpContext().getServer() != server) {
+            respondJson(exchange, 409, error("bridge_lifecycle_changed"));
+            return;
+        }
+        if (!GuardedGameActions.enabled()) {
+            respondJson(exchange, 409, error("guarded_actions_disabled"));
+            return;
+        }
+        if (exchange.getRequestURI().getRawQuery() != null) {
+            respondJson(exchange, 400, error("unexpected_query"));
+            return;
+        }
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final GuardedAction.Request request;
+        try {
+            String action = requiredString(body, "action");
+            java.util.Set<String> fields = new java.util.HashSet<>(java.util.Set.of(
+                    "guard_schema_version", "action", "expected_world_generation", "expected_player_uuid",
+                    "expected_target_uuid", "expected_crosshair_uuid", "ttl_ms"));
+            if (action.equals("look")) { fields.add("yaw"); fields.add("pitch"); }
+            GuardedAction.require(body.keySet().equals(fields), "unexpected_or_missing_field");
+            GuardedAction.require(optionalInteger(body, "guard_schema_version", -1) == GuardedAction.SCHEMA,
+                    "unsupported_guard_schema");
+            String crosshair = body.get("expected_crosshair_uuid").isJsonNull()
+                    ? null : requiredString(body, "expected_crosshair_uuid");
+            request = new GuardedAction.Request(action,
+                    requiredString(body, "expected_world_generation"), requiredString(body, "expected_player_uuid"),
+                    requiredString(body, "expected_target_uuid"), crosshair,
+                    optionalInteger(body, "ttl_ms", -1),
+                    action.equals("look") ? requiredFiniteDouble(body, "yaw") : 0,
+                    action.equals("look") ? requiredFiniteDouble(body, "pitch") : 0);
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        } catch (GuardedAction.Rejected e) {
+            respondJson(exchange, 400, error(e.getMessage()));
+            return;
+        }
+        try {
+            GuardedDispatch.Ticket<GuardedGameActions.Outcome> ticket = GUARDED_ACTIONS.submit(
+                    Minecraft.getInstance()::execute, receivedNanos, request.ttlMs(), bridgeEpoch,
+                    active -> GuardedGameActions.apply(request, active));
+            GuardedGameActions.Outcome outcome = ticket.await();
+            JsonObject response = protocolOk();
+            response.addProperty("guard_schema_version", GuardedAction.SCHEMA);
+            response.addProperty("action", outcome.action());
+            response.addProperty("dispatched", true);
+            response.addProperty("damage_confirmed", false);
+            response.addProperty("world_generation", outcome.worldGeneration());
+            response.addProperty("player_uuid", outcome.playerUuid());
+            response.addProperty("target_uuid", outcome.targetUuid());
+            response.addProperty("yaw", outcome.yaw());
+            response.addProperty("pitch", outcome.pitch());
+            respondJson(exchange, 200, response);
+        } catch (TimeoutException e) {
+            respondJson(exchange, 408, error("guarded_action_expired"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            respondJson(exchange, 503, error("request_interrupted"));
+        } catch (Exception e) {
+            Throwable cause = e instanceof ExecutionException && e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof GuardedAction.Rejected rejected) {
+                int status = rejected.getMessage().equals("guarded_action_busy") ? 429
+                        : rejected.getMessage().equals("guarded_action_expired") ? 408 : 409;
+                respondJson(exchange, status, error(rejected.getMessage()));
+            } else {
+                respondJson(exchange, 500, error("guarded_action_failed"));
+            }
         }
     }
 
@@ -553,6 +630,7 @@ public final class BridgeServer {
         addOperation(operations, "GET", "/control/screen", "screen_snapshot");
         addOperation(operations, "POST", "/control/key", "keymap_input");
         addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
+        addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
         addOperation(operations, "POST", "/control/look", "player_view");
         addOperation(operations, "POST", "/control/mouse", "screen_mouse_input");
         addOperation(operations, "POST", "/control/text", "focused_screen_text");
@@ -560,6 +638,22 @@ public final class BridgeServer {
         addOperation(operations, "POST", "/control/release-all", "release_keymaps");
         addOperation(operations, "POST", "/control/close", "graceful_client_stop");
         obj.add("operations", operations);
+        JsonObject guarded = new JsonObject();
+        guarded.addProperty("schema_version", GuardedAction.SCHEMA);
+        guarded.addProperty("enabled", GuardedGameActions.enabled());
+        guarded.addProperty("max_ttl_ms", GuardedAction.MAX_TTL_MS);
+        guarded.addProperty("max_range", GuardedAction.MAX_RANGE);
+        guarded.addProperty("max_yaw_step", GuardedAction.MAX_YAW_STEP);
+        guarded.addProperty("max_pitch_step", GuardedAction.MAX_PITCH_STEP);
+        guarded.addProperty("local_unpublished_survival_only", true);
+        guarded.addProperty("single_flight", true);
+        guarded.addProperty("synchronous_attack_attempt", true);
+        guarded.addProperty("held_input", false);
+        guarded.addProperty("unenchanted_axe_only", true);
+        JsonArray targets = new JsonArray();
+        GuardedAction.HOSTILE_TYPES.stream().sorted().forEach(targets::add);
+        guarded.add("allowed_target_types", targets);
+        obj.add("guarded_actions", guarded);
 
         JsonObject limits = new JsonObject();
         limits.addProperty("request_body_bytes", MAX_BODY_BYTES);

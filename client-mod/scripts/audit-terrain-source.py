@@ -14,9 +14,9 @@ assert 'collision_unknown_reason' in reader and 'hazards_exhaustive", false' in 
 for forbidden in ['setBlock(', 'sendCommand(', 'getConnection(', 'getChunkAt(', 'setBlockState(']:
     assert forbidden not in reader, forbidden
 assert 'requireControlAccess(exchange, "/control/terrain", "GET")' in server
-assert 'TERRAIN_IN_FLIGHT.compareAndSet(false, true)' in server
+assert 'TERRAIN_DISPATCH.call(' in server
 assert '() -> {' in server[server.index('private static void handleControlTerrain'):server.index('private static void handleControlScreen')]
-assert 'callOnMinecraftThread' in server[server.index('private static void handleControlTerrain'):server.index('private static void handleControlScreen')]
+assert 'Minecraft.getInstance().execute' in server[server.index('private static void handleControlTerrain'):server.index('private static void handleControlScreen')]
 for bound in ['MAX_RADIUS = 16', 'MAX_VERTICAL = 8', 'MAX_LIMIT = 128', 'MAX_BLOCKS = 18_513']:
     assert bound in query, bound
 assert 'Availability.LOADED ? source.readLoaded' in scan

@@ -19,7 +19,7 @@ DANGEROUS_NEARBY = {
 }
 WEAPONS = frozenset('minecraft:' + material + '_' + tool
                     for material in ('wooden', 'stone', 'iron', 'golden', 'diamond', 'netherite')
-                    for tool in ('sword', 'axe'))
+                    for tool in ('axe',))
 
 
 @dataclass(frozen=True)
@@ -79,10 +79,17 @@ class Clock(Protocol):
     def sleep(self, seconds: float) -> None: ...
 
 
+@dataclass(frozen=True)
+class ActionContext:
+    snapshot: Snapshot
+    target: Entity
+    deadline: float  # Local monotonic latest admission, not a server clock.
+
+
 class Bridge(Protocol):
     def observe(self) -> Snapshot: ...
-    def look(self, yaw: float, pitch: float) -> None: ...
-    def attack_click(self) -> None: ...
+    def look(self, yaw: float, pitch: float, context: ActionContext) -> None: ...
+    def attack(self, context: ActionContext) -> None: ...
     def release_all(self) -> bool: ...
 
 
@@ -108,7 +115,6 @@ class Config:
     max_yaw_step: float = 20.0
     max_pitch_step: float = 12.0
     max_displacement: float = 0.35
-    allow_unarmed: bool = False
 
     def __post_init__(self) -> None:
         # A frozen dataclass does not freeze a caller-supplied mutable set.
@@ -121,7 +127,7 @@ class Config:
                for x in numeric):
             raise ValueError('configuration must contain finite numbers')
         checks = (
-            type(self.enabled) is bool, type(self.allow_unarmed) is bool,
+            type(self.enabled) is bool,
             bool(self.allowed_types) and self.allowed_types <= HOSTILE_TYPES,
             0 < self.session_seconds <= 30, type(self.action_budget) is int and 1 <= self.action_budget <= 40,
             1.25 <= self.attack_interval <= 10, 0.05 <= self.request_timeout <= 1,
@@ -270,7 +276,7 @@ class Controller:
                     self.clock.sleep(c.poll_seconds)
                     continue
 
-                # Sword sweeping and target races can injure other entities. Refuse
+                # Target races and collateral effects can injure other entities. Refuse
                 # mixed groups near the target, not merely a protected crosshair.
                 protected = [e for e in s.entities if e.alive
                              and e.kind not in c.allowed_types
@@ -298,10 +304,11 @@ class Controller:
                             break
                         r.actions += 1  # Count attempts, including uncertain delivery.
                         r.attacks += 1
-                        self.bridge.attack_click()
+                        self.bridge.attack(ActionContext(s, target, min(start + c.session_seconds,
+                                                                       s.captured_at + c.max_snapshot_age)))
                         last_action_tick = s.tick
                         last_attack_at = self.clock.monotonic()
-                        event(Phase.ATTACK, 'single_click_sent_hit_unverified', target_uuid)
+                        event(Phase.ATTACK, 'guarded_attack_requested_damage_unverified', target_uuid)
                 else:
                     yaw, pitch = bounded_aim(s, target, c)
                     if reason := boundary():
@@ -311,7 +318,8 @@ class Controller:
                         halt('stale_snapshot')
                         break
                     r.actions += 1
-                    self.bridge.look(yaw, pitch)
+                    self.bridge.look(yaw, pitch, ActionContext(s, target, min(start + c.session_seconds,
+                                                                           s.captured_at + c.max_snapshot_age)))
                     last_action_tick = s.tick
                     event(Phase.AIM, 'bounded_look_await_fresh_crosshair', target_uuid)
                 self.clock.sleep(c.poll_seconds)
@@ -365,7 +373,7 @@ class Controller:
             return 'entity_observation_truncated'
         if not s.terrain_safe:
             return s.terrain_reason
-        if s.weapon not in WEAPONS and not (c.allow_unarmed and s.weapon == ''):
+        if s.weapon not in WEAPONS:
             return 'weapon_not_allowed'
         if len({e.uuid for e in s.entities}) != len(s.entities):
             return 'duplicate_entity_identity'

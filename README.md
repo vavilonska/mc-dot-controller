@@ -1,46 +1,71 @@
-# Minecraft Dot Control
+# Minecraft Dot Controller
 
-Minecraft 客户端控制桥与外部控制器的开发源码。当前快照包含实验性代码，请先阅读验证状态；本仓库不是可直接安装的已验证发行版。
+[mc-dot-controller](https://github.com/vavilonska/mc-dot-controller) 保存 Minecraft 客户端控制桥与外部控制器源码。当前集成版为 `1.1.5-terrain-guard.1`：已完成编译和离线测试，尚未通过真实地形接口与战斗验收。
 
 ## 目录
 
-- [`client-mod/`](client-mod/)：基于 [Campione01/MineClient-Bridge v1.1.5](https://github.com/Campione01/MineClient-Bridge/tree/60e78940f7e7fa06116cf4fbc58df346ad617531) 的 NeoForge 1.21.1 客户端模组，以及有界只读地形查询扩展
-- [`client-mod/docs/terrain-api.md`](client-mod/docs/terrain-api.md)：地形分页、预算、未知区域与碰撞信息的接口契约
-- [`external-controller/`](external-controller/)：独立 Python 战斗控制器原型；真实 HTTP 适配器强制只读，战斗行为仅在模拟器中运行
+- [`client-mod/`](client-mod/)：基于 [Campione01/MineClient-Bridge v1.1.5](https://github.com/Campione01/MineClient-Bridge/tree/60e78940f7e7fa06116cf4fbc58df346ad617531) 的 NeoForge 1.21.1 客户端模组，新增有界只读地形查询与默认关闭的受保护动作接口
+- [`external-controller/`](external-controller/)：独立 Python 控制器；CLI 仅运行离线模拟，真实 HTTP 动作默认禁用
+- [`client-mod/docs/terrain-api.md`](client-mod/docs/terrain-api.md)：分页、预算、未知区域与碰撞信息
+- [`client-mod/docs/guarded-actions.md`](client-mod/docs/guarded-actions.md)：执行时校验、超时与取消语义、局部试验限制
+- [`external-controller/docs/GUARDED_ACCEPTANCE.md`](external-controller/docs/GUARDED_ACCEPTANCE.md)：真实动作启用前的验收要求
 - [`NOTICE.md`](NOTICE.md)：上游来源、修改范围和许可证说明
 
 ## 验证状态
 
-上游基础版 1.1.5 已在受控 Linux 图形客户端测试中运行于 Minecraft 1.21.1 / NeoForge 21.1.255：
+2026-10-05 的集成源码已通过：
 
-- 无认证请求被拒绝；已认证的状态、屏幕、按键映射读取成功
-- 本地生存世界可读取玩家状态、背包和位置
-- 经 HTTP 短按前进、释放按键和 release-all；停止后连续读取未观察到继续移动，持有输入为空
-- 兼容的多人服务器连接与状态读取成功；未进行服务器移动、聊天、战斗或建造测试
+- Java 21.0.12.1、Gradle 8.14.3、官方 ModDevGradle 2.0.148、NeoForge 21.1.255 下的完整模组编译、测试和打包
+- 14 项 JUnit 测试，零失败、错误或跳过
+- 地形核心 37,371 条断言、地形调度 13 项检查、动作保护 150 项检查及静态地形安全审查
+- MCP stdio framing 测试 8/8
+- 外部控制器 115 项离线单元测试、Python 编译、默认禁用和模拟演示 CLI
 
-这些结果属于基础版，不能证明本仓库的实验扩展已通过实机测试。地形扩展的纯 Java 核心已通过 37,371 条断言，4 个新增类已对实际 NeoForge 21.1.255 客户端库单独编译；但完整 Gradle 构建仍受依赖解析阻塞，扩展尚未在游戏中加载验证。MCP framing 测试 8/8 通过；其上游 Windows 路径自测在 Linux 上失败。外部控制器已通过 90 项离线单元测试及 CLI 演示；真实 HTTP 适配器强制只读，即使配置 enabled=true 也不会发送动作。瞄准、攻击和释放流程只在模拟适配器下验证；真实战斗仍需客户端主线程保护机制，尚未实现或实测。自动寻路、建造和完整自主生存不在已完成范围内。
+构建使用官方二进制依赖流程：完整编译本模组并应用访问转换，不重新编译 Minecraft 自身源码。详见[集成构建记录](client-mod/docs/integrated-verification.md)。
 
-## 构建与测试
+运行验证仍有限：
 
-客户端模组需要 Java 21，使用仓库内 Gradle wrapper（8.14.3）。首次构建需要从官方依赖源下载 Gradle、Minecraft/NeoForge 构建依赖。
+- 基础版 1.1.5 已验证认证状态读取、本地生存世界玩家状态/背包读取、短按前进和释放后的静止状态，以及兼容多人服务器连接和状态读取
+- 前一版仅地形扩展已在隔离图形客户端中加载，桥接 HTTP 服务启动；这不构成地形 HTTP 断言通过，也不验证当前集成保护动作版
+- 当前集成版尚未完成地形/保护动作的实机接口验收；没有启用或测试真实自动战斗
+- 上游完整 MCP 自测使用 Windows 路径，在 Linux 上该部分失败；这里只验证了跨平台 framing 测试
+- 尚无已完成的自动寻路、建造或完整自主生存功能
+
+## 构建与离线测试
+
+需要 Java 21。首次构建需要从官方依赖源下载 Gradle 和 Minecraft/NeoForge 构建依赖。
 
 ```sh
 cd client-mod
-./gradlew -Pneo_version=21.1.255 test build
-npm --prefix mcp test
-```
-
-有界扫描核心的独立测试：
-
-```sh
-cd client-mod
+JAVA_HOME=/path/to/jdk-21 ./gradlew --no-daemon --max-workers=1 \
+  -Dorg.gradle.parallel=false -Pneo_version=21.1.255 -Pbridge.noRecompile=true test build
 JAVA_HOME=/path/to/jdk-21 bash scripts/terrain-core-test.sh
+JAVA_HOME=/path/to/jdk-21 bash scripts/guarded-action-core-test.sh
+python3 scripts/audit-terrain-source.py
+node mcp/ndjson-framing-test.mjs
 ```
 
-控制器离线测试可在 external-controller/ 中运行 python3 -m unittest discover -v。安装、演示与安全限制见 [`external-controller/README.md`](external-controller/README.md)。不要把离线测试通过视为实机安全保证。
+控制器使用 Python 3.10+ 标准库，无需安装第三方包：
 
-## 安全边界
+```sh
+cd external-controller
+python3 -m unittest discover -v
+python3 -m combat_controller
+python3 -m combat_controller --demo
+```
 
-桥接服务默认只接受本机回环连接，每次控制请求都需要私有 bearer token。令牌只应存放于个人运行目录或本机环境，不要提交到 Git。本仓库不包含游戏客户端、模组发行 JAR、存档、会话配置、令牌、服务器地址或个人账号资料。
+上述控制器命令均不连接游戏。离线测试通过不代表真实游戏安全。
 
-地形读数可能过期、分页间变化或未知；未知区域不能当作空气或安全地面。任何真实游戏测试都应先保留已验证配置，并在单独的可丢弃本地世界中进行。发布源码不等于批准安装开发版或在服务器上执行动作。
+## 真实动作的限制
+
+Java 动作保护默认关闭。Python HTTP 适配器也默认禁止动作；只有操作者明确设置 enabled 与 acceptance_verified，并通过能力检查后，API 才允许调用新的 guarded-action 路由。这些配置是操作者的声明，代码不会自动证明验收已经完成。旧 key/look/mouse/release-all POST 不作为降级路径。
+
+首个允许验收的范围是单独、未开放局域网的本地生存试验世界，仅 NeoForge 和本桥接模组，平坦已知地面、一个允许类型的敌对生物、普通未附魔原版斧。排除其他玩家、宠物、受保护旁观者、多人服务器和任意其他模组。一次请求只尝试普通视角调整或攻击，不证明命中、伤害或击杀；不提供移动或持续按键。
+
+超时不能撤回已经开始的同步动作。任何连接结果不明、过期状态或上下文变化都应停止，不自动重试或回退到旧输入接口。必须先完成文档中的实机验收，再单独批准有限的本地控制器试验；发布源码不代表批准安装或游戏动作。
+
+## 数据与许可证
+
+桥接服务保持本机回环和私有 bearer token 认证。令牌只应存放在私有运行配置中，不能提交到 Git。本仓库不包含游戏客户端、编译后的模组、存档、运行会话、令牌、个人账号或服务器地址；已有 Gradle wrapper 仅为构建工具。
+
+上游 MIT 与 Gradle Apache 许可证保留。独立 Python 控制器尚未指定许可证授权，详见 [NOTICE](NOTICE.md)。

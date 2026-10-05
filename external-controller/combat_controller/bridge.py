@@ -1,4 +1,4 @@
-"""Read-only loopback HTTP adapter plus fake-test input schema for stage one.
+"""Default-disabled guarded loopback adapter; no legacy input fallback.
 
 No auto-discovery, token-file access, retries, redirect following or arbitrary input.
 """
@@ -16,8 +16,9 @@ import threading
 import time
 from typing import Any, Protocol
 from urllib.parse import urlsplit
+from uuid import UUID
 
-from .core import Config, Entity, RealClock, Snapshot, Vec3, Clock
+from .core import ActionContext, HOSTILE_TYPES, WEAPONS, Entity, RealClock, Snapshot, Vec3, Clock, wrap_yaw
 
 
 class BridgeError(RuntimeError):
@@ -33,6 +34,7 @@ class ConnectionConfig:
     base_url: str = 'http://127.0.0.1:38121'
     token: str = field(default='', repr=False)
     enabled: bool = False
+    acceptance_verified: bool = False
     expected_identity: tuple[str, int, str, str] | None = None
     timeout: float = 0.4
 
@@ -47,10 +49,11 @@ class ConnectionConfig:
         if (not isinstance(self.token, str) or not self.token
                 or len(self.token) > 256 or any(ord(c) < 33 or ord(c) > 126 for c in self.token)):
             raise ValueError('provide a token explicitly in the private local configuration')
-        if (type(self.enabled) is not bool or type(self.timeout) not in (int, float)
+        if (type(self.enabled) is not bool or type(self.acceptance_verified) is not bool or type(self.timeout) not in (int, float)
                 or not math.isfinite(self.timeout) or not 0.05 <= self.timeout <= 1):
             raise ValueError('invalid connection limits')
         if self.expected_identity is not None:
+            object.__setattr__(self, 'expected_identity', tuple(self.expected_identity))
             run, pid, player, dimension = self.expected_identity
             if not run or type(pid) is not int or pid <= 0 or not player or not dimension:
                 raise ValueError('invalid expected session identity')
@@ -76,7 +79,7 @@ class ConnectionConfig:
         finally:
             if fd >= 0:
                 os.close(fd)
-        if not isinstance(data, dict) or set(data) - {'base_url', 'token', 'enabled', 'expected_identity', 'timeout'}:
+        if not isinstance(data, dict) or set(data) - {'base_url', 'token', 'enabled', 'acceptance_verified', 'expected_identity', 'timeout'}:
             raise ValueError('unexpected connection configuration field')
         if data.get('expected_identity') is not None:
             data['expected_identity'] = tuple(data['expected_identity'])
@@ -89,34 +92,30 @@ def _invalid_constant(_: str) -> None:
 
 class HttpTransport:
     MAX_JSON_BYTES = 256 * 1024
-    READ_PATHS = frozenset({'/control/status', '/control/state?radius=16',
+    READ_PATHS = frozenset({'/control/capabilities', '/control/status', '/control/state?radius=16',
                             '/control/terrain?radius=1&vertical=2&limit=128'})
 
     def __init__(self, config: ConnectionConfig):
         self.config = config
         self._url = urlsplit(config.base_url)
+        self._guarded_negotiated = False
 
     def request(self, method: str, path: str, body: dict | None = None) -> dict:
         if method == 'GET':
+            if path == '/control/capabilities':
+                self._guarded_negotiated = False
             if path not in self.READ_PATHS or body is not None:
                 raise BridgeError('read_not_allowlisted')
         elif method == 'POST':
             if not self.config.enabled:
                 raise BridgeError('adapter_disabled')
-            allowed = (
-                (path == '/control/key' and body == {'mapping': 'key.attack', 'action': 'click', 'exact': True})
-                or (path == '/control/release-all' and body == {})
-                or (path == '/control/look' and isinstance(body, dict) and set(body) == {'yaw', 'pitch', 'relative'}
-                    and body['relative'] is False
-                    and all(type(body[k]) in (int, float) and math.isfinite(body[k]) for k in ('yaw', 'pitch'))
-                    and -180 <= body['yaw'] < 180 and -90 <= body['pitch'] <= 90)
-            )
-            if not allowed:
-                raise BridgeError('input_not_allowlisted')
-            # v1.1.5 may run queued input AFTER this client's timeout or a world
-            # change. Only a server-side guarded action can close that race.
-            # No flag/config can enable real HTTP mutation in this stage.
-            raise BridgeError('live_input_requires_guarded_bridge_endpoint')
+            if path != '/control/guarded-action':
+                raise BridgeError('legacy_or_unknown_input_forbidden')
+            if not self.config.acceptance_verified:
+                raise BridgeError('local_acceptance_not_verified')
+            if not self._guarded_negotiated:
+                raise BridgeError('guarded_capabilities_not_negotiated')
+            validate_guarded_request(body)
         else:
             raise BridgeError('method_not_allowlisted')
         # http.client avoids environment proxies and never follows redirects.
@@ -165,6 +164,10 @@ class HttpTransport:
                 raise BridgeError('request_deadline')
             if not isinstance(result, dict) or result.get('ok') is not True:
                 raise BridgeError('invalid_response')
+            if method == 'GET' and path == '/control/capabilities':
+                self._guarded_negotiated = False
+                validate_guarded_capabilities(result)
+                self._guarded_negotiated = True
             return result
         except BridgeError:
             raise
@@ -174,6 +177,56 @@ class HttpTransport:
             if timer is not None:
                 timer.cancel()
             connection.close()
+
+
+def _canonical_uuid(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return str(UUID(value)) == value
+    except (ValueError, AttributeError):
+        return False
+
+
+def validate_guarded_request(body: dict) -> None:
+    if not isinstance(body, dict):
+        raise BridgeError('invalid_guarded_request')
+    action = body.get('action')
+    fields = {'guard_schema_version', 'action', 'expected_world_generation', 'expected_player_uuid',
+              'expected_target_uuid', 'expected_crosshair_uuid', 'ttl_ms'}
+    if action == 'look':
+        fields |= {'yaw', 'pitch'}
+    elif action != 'attack':
+        raise BridgeError('invalid_guarded_action')
+    if set(body) != fields or type(body.get('guard_schema_version')) is not int or body['guard_schema_version'] != 1:
+        raise BridgeError('invalid_guarded_schema')
+    if any(not _canonical_uuid(body[k]) for k in ('expected_world_generation', 'expected_player_uuid', 'expected_target_uuid')):
+        raise BridgeError('invalid_guarded_identity')
+    crosshair = body['expected_crosshair_uuid']
+    if crosshair is not None and not _canonical_uuid(crosshair):
+        raise BridgeError('invalid_guarded_crosshair')
+    if type(body['ttl_ms']) is not int or not 1 <= body['ttl_ms'] <= 250:
+        raise BridgeError('invalid_guarded_ttl')
+    if action == 'attack' and crosshair != body['expected_target_uuid']:
+        raise BridgeError('guarded_attack_requires_target_crosshair')
+    if action == 'look' and (any(type(body[k]) not in (int, float) or not math.isfinite(body[k]) for k in ('yaw', 'pitch'))
+                             or not -180 <= body['yaw'] < 180 or not -90 <= body['pitch'] <= 90):
+        raise BridgeError('invalid_guarded_angles')
+
+
+def validate_guarded_capabilities(data: dict) -> None:
+    _protocol(data)
+    guard = data.get('guarded_actions', {})
+    expected = {'schema_version': 1, 'enabled': True, 'max_ttl_ms': 250,
+                'max_range': 2.75, 'max_yaw_step': 30.0, 'max_pitch_step': 20.0,
+                'local_unpublished_survival_only': True, 'single_flight': True,
+                'synchronous_attack_attempt': True, 'held_input': False, 'unenchanted_axe_only': True}
+    if not isinstance(guard, dict) or any(guard.get(k) != v or
+            (type(v) in (bool, int) and type(guard.get(k)) is not type(v)) for k, v in expected.items()):
+        raise BridgeError('guarded_capabilities_unsupported_or_disabled')
+    targets = guard.get('allowed_target_types')
+    if not isinstance(targets, list) or len(targets) != len(HOSTILE_TYPES) or set(targets) != HOSTILE_TYPES:
+        raise BridgeError('guarded_target_allowlist_mismatch')
 
 
 def _number(value: Any) -> float:
@@ -286,6 +339,16 @@ class MineClientBridge:
         self.transport = transport
         self.expected_identity = expected_identity
         self.clock = clock or RealClock()
+        self._guarded_ready = False
+        self._last_snapshot = None
+
+    def prepare_guarded(self) -> None:
+        """Read-only preflight. Caller must separately authorize local acceptance."""
+        self._guarded_ready = False
+        self._last_snapshot = None
+        capabilities = self.transport.request('GET', '/control/capabilities')
+        validate_guarded_capabilities(capabilities)
+        self._guarded_ready = True
 
     def observe(self) -> Snapshot:
         started = self.clock.monotonic()
@@ -333,7 +396,7 @@ class MineClientBridge:
             mouse_grabbed &= _boolean(status['mouse']['grabbed'])
             held |= bool(status['held_mappings']) or bool(status['mouse']['held_world_buttons'])
             held |= any(_boolean(status['mouse'][key]) for key in ('left_pressed', 'right_pressed', 'middle_pressed'))
-        return Snapshot(
+        snapshot = Snapshot(
             captured_at=started, identity=identity, generation=_text(generation), tick=state_tick,
             position=_vector(p), velocity=_vector(p['velocity']), yaw=_number(p['yaw']), pitch=_number(p['pitch']),
             health=_number(p['health']), food=_integer(p['food']), air=_integer(p['air']), max_air=_integer(p['max_air']),
@@ -345,27 +408,79 @@ class MineClientBridge:
             entities_truncated=_boolean(nearby['truncated']), terrain_safe=safe, terrain_reason=reason,
         )
 
-    def look(self, yaw: float, pitch: float) -> None:
-        result = self.transport.request('POST', '/control/look', {'yaw': yaw, 'pitch': pitch, 'relative': False})
-        if result.get('ok') is not True:
-            raise BridgeError('look_failed')
+        self._last_snapshot = snapshot
+        return snapshot
 
-    def attack_click(self) -> None:
-        result = self.transport.request('POST', '/control/key', {'mapping': 'key.attack', 'action': 'click', 'exact': True})
-        if result.get('ok') is not True or result.get('mapping_down') is not False:
-            raise BridgeError('attack_release_unconfirmed')
-        delivery = result.get('mod_input_event', {})
-        if (delivery.get('probe_installed') is not True or delivery.get('event_fired') is not True
-                or delivery.get('event_cancelled_by_mod') is not False):
-            raise BridgeError('attack_delivery_unconfirmed_or_cancelled')
-        # The acknowledgement proves input delivery only, never damage or a kill.
+    def _guarded(self, action: str, context: ActionContext, yaw=None, pitch=None) -> None:
+        if not self._guarded_ready:
+            raise BridgeError('guarded_preflight_required')
+        snapshot, target = context.snapshot, context.target
+        now = self.clock.monotonic()
+        if snapshot is not self._last_snapshot or snapshot.identity != self.expected_identity:
+            raise BridgeError('unrecognized_action_snapshot')
+        if (not math.isfinite(context.deadline) or now >= context.deadline or now < snapshot.captured_at
+                or now - snapshot.captured_at > 0.75):
+            raise BridgeError('expired_action_context')
+        if target not in snapshot.entities or target.kind not in HOSTILE_TYPES or not target.alive or target.health is None or target.health <= 0:
+            raise BridgeError('invalid_action_target')
+        if snapshot.weapon not in WEAPONS:
+            raise BridgeError('guarded_action_requires_vanilla_axe')
+        if snapshot.position.distance(target.position) > 2.75:
+            raise BridgeError('action_target_out_of_range')
+        # TTL starts at server handler receipt. Bound it by local remaining time,
+        # but do not claim this controls network delay or an already-started action.
+        ttl_ms = min(150, int((context.deadline - now) * 1000))
+        if ttl_ms < 1:
+            raise BridgeError('expired_action_context')
+        body = {
+            'guard_schema_version': 1, 'action': action,
+            'expected_world_generation': snapshot.generation,
+            'expected_player_uuid': snapshot.identity[2],
+            'expected_target_uuid': target.uuid,
+            'expected_crosshair_uuid': snapshot.crosshair_uuid,
+            'ttl_ms': ttl_ms,
+        }
+        if action == 'look':
+            if abs(wrap_yaw(yaw - snapshot.yaw)) > 30 or abs(pitch - snapshot.pitch) > 20:
+                raise BridgeError('guarded_look_step_too_large')
+            body.update(yaw=yaw, pitch=pitch)
+        validate_guarded_request(body)
+        # Consume context before sending: even an ambiguous result must never be
+        # replayed from the same observation. Controller stops on all such errors.
+        self._last_snapshot = None
+        result = self.transport.request('POST', '/control/guarded-action', body)
+        _protocol(result)
+        expected = {'guard_schema_version': 1, 'action': action, 'dispatched': True,
+                    'damage_confirmed': False, 'world_generation': snapshot.generation,
+                    'player_uuid': snapshot.identity[2], 'target_uuid': target.uuid}
+        if any(result.get(k) != v or (type(v) is bool and type(result.get(k)) is not bool)
+               for k, v in expected.items()):
+            raise BridgeError('guarded_response_mismatch')
+        result_yaw, result_pitch = _number(result['yaw']), _number(result['pitch'])
+        # Minecraft may retain an unwrapped yaw after an attack; Java float
+        # rounding may also return +180 for a look requested just below +180.
+        # Finiteness is checked above; compare look angles modulo 360 below.
+        if not -90 <= result_pitch <= 90:
+            raise BridgeError('guarded_response_invalid_angles')
+        if action == 'look' and (abs(wrap_yaw(result_yaw-yaw)) > 0.001 or abs(result_pitch-pitch) > 0.001):
+            raise BridgeError('guarded_look_result_mismatch')
+
+    def look(self, yaw: float, pitch: float, context: ActionContext) -> None:
+        self._guarded('look', context, yaw=yaw, pitch=pitch)
+
+    def attack(self, context: ActionContext) -> None:
+        self._guarded('attack', context)
 
     def release_all(self) -> bool:
-        result = self.transport.request('POST', '/control/release-all', {})
-        if result.get('released') is not True:
-            return False
+        """Compatibility cleanup hook: guarded actions cannot hold input.
+
+        Only verify neutral input; never fall back to unguarded release-all.
+        A false result needs explicit operator handling, not another legacy POST.
+        """
+        self._last_snapshot = None
         status = self.transport.request('GET', '/control/status')
-        # Release remains attempted even after a world change. Do not send actions
-        # to a new world; status verification only reports whether input is clear.
-        return (not status.get('held_mappings') and not status.get('mouse', {}).get('held_world_buttons')
+        _protocol(status)
+        if status.get('process_id') != self.expected_identity[1] or status.get('run_id') != self.expected_identity[0]:
+            return False
+        return (status.get('held_mappings') == [] and status.get('mouse', {}).get('held_world_buttons') == []
                 and all(status.get('mouse', {}).get(k) is False for k in ('left_pressed', 'right_pressed', 'middle_pressed')))
