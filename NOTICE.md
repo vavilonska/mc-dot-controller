@@ -25,6 +25,10 @@ The wrapper is build tooling. No Minecraft, NeoForge, or compiled client-mod JAR
 
 `external-controller/` is a separate original Python implementation. It consumes the bridge HTTP protocol; it does not embed Minecraft or upstream Java source. No license grant has been assigned to this original controller code; its README records that status. The presence of the upstream MIT license in `client-mod/` does not automatically license every unrelated file in this repository.
 
+## External navigation controller
+
+`navigation-controller/` is separate original Python source for bounded terrain parsing, local A* planning, and fake-only execution. It contains no live HTTP movement adapter or Minecraft source/assets. Upstream protocol references are recorded in its documentation. No license grant has been assigned to this original component; the `client-mod/` upstream license does not automatically apply to it.
+
 ## Trademarks
 
 Minecraft and other project names identify compatibility and provenance only. This project is not affiliated with or endorsed by Mojang, Microsoft, NeoForge, or the upstream MineClient Bridge author.
