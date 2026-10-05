@@ -5,8 +5,16 @@ owner-start.sh
 resident_controller/__init__.py
 resident_controller/__main__.py
 resident_controller/controller.py
+resident_controller/entity_aim_lock.py
 resident_controller/ipc.py
 resident_controller/tasks.py
 resident_controller/transport.py
 resident_controller/world.py
 tests/test_controller.py
+tests/test_entity_aim_lock.py
+resident_controller/native_combat.py
+tests/test_native_combat.py
+docs/NATIVE_COMBAT.md
+resident_controller/prospecting.py
+tests/test_prospecting.py
+docs/PROSPECTING.md

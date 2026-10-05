@@ -118,6 +118,9 @@ public final class BridgeServer {
             createdServer.createContext("/control/keymaps", BridgeServer::handleControlKeymaps);
             createdServer.createContext("/control/state", BridgeServer::handleControlState);
             createdServer.createContext("/control/terrain", BridgeServer::handleControlTerrain);
+            createdServer.createContext("/control/scan", BridgeServer::handleScanStart);
+            createdServer.createContext("/control/scan/status", BridgeServer::handleScanStatus);
+            createdServer.createContext("/control/scan/cancel", BridgeServer::handleScanCancel);
             createdServer.createContext("/control/screen", BridgeServer::handleControlScreen);
             createdServer.createContext("/control/action", BridgeServer::handleClientAction);
             createdServer.createContext("/control/action/status", BridgeServer::handleClientActionStatus);
@@ -299,6 +302,43 @@ public final class BridgeServer {
         } catch (Exception e) {
             respondMinecraftFailure(exchange, "terrain_failed", e);
         }
+    }
+
+    private static void handleScanStart(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scan", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final LoadedScanRequest request;
+        try { request = LoadedScanRequest.parse(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> LoadedWorldScanner.start(request), true);
+    }
+
+    private static void handleScanStatus(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scan/status", "GET")) return;
+        final String id;
+        try {
+            String raw = exchange.getRequestURI().getRawQuery();
+            if (raw == null || !raw.matches("id=[A-Za-z0-9_-]{1,64}")) throw new IllegalArgumentException();
+            id = raw.substring(3);
+        } catch (IllegalArgumentException failure) {
+            respondJson(exchange, 400, error("invalid_scan_id")); return;
+        }
+        respondActionOperation(exchange, () -> LoadedWorldScanner.status(id), false);
+    }
+
+    private static void handleScanCancel(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scan/cancel", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final String id;
+        try { LoadedScanRequest.keys(body, java.util.Set.of("id")); id = LoadedScanRequest.id(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> LoadedWorldScanner.cancel(id), false);
     }
 
     private static void handleControlScreen(HttpExchange exchange) throws IOException {
@@ -655,10 +695,16 @@ public final class BridgeServer {
         final double yaw;
         final double pitch;
         final boolean relative;
+        final AimViewGuard guard;
         try {
             yaw = requiredFiniteDouble(body, "yaw");
             pitch = requiredFiniteDouble(body, "pitch");
             relative = optionalBoolean(body, "relative", false);
+            guard = body.has("guard") ? AimViewGuard.parse(body.get("guard")) : null;
+            if (guard != null && relative) throw new ClientActionRequest.Rejected(400, "guard_requires_absolute_look");
+        } catch (ClientActionRequest.Rejected e) {
+            respondJson(exchange, e.httpStatus, error(e.getMessage()));
+            return;
         } catch (RequestException e) {
             respondRequestFailure(exchange, e);
             return;
@@ -666,7 +712,10 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> { ClientActions.directTakeover(); return applyLook(yaw, pitch, relative); },
+                    () -> {
+                        if (guard != null) return applyGuardedAimLook(yaw, pitch, guard);
+                        ClientActions.directTakeover(); return applyLook(yaw, pitch, relative);
+                    },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -822,6 +871,9 @@ public final class BridgeServer {
         addOperation(operations, "GET", "/control/keymaps", "keymap_discovery");
         addOperation(operations, "GET", "/control/state", "client_state_snapshot");
         addOperation(operations, "GET", "/control/terrain", "nearby_loaded_terrain");
+        addOperation(operations, "POST", "/control/scan", "read_only_loaded_world_scan");
+        addOperation(operations, "GET", "/control/scan/status", "loaded_world_scan_status");
+        addOperation(operations, "POST", "/control/scan/cancel", "cancel_read_only_scan");
         addOperation(operations, "GET", "/control/screen", "screen_snapshot");
         addOperation(operations, "POST", "/control/action", "continuous_client_action");
         addOperation(operations, "GET", "/control/action/status", "client_action_status");
@@ -850,6 +902,7 @@ public final class BridgeServer {
         ClientActionRequest.ACTIONS.stream().sorted().forEach(actionNames::add);
         actions.add("actions", actionNames);
         obj.add("client_actions", actions);
+        obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
         JsonObject guarded = new JsonObject();
         guarded.addProperty("schema_version", GuardedAction.SCHEMA);
         guarded.addProperty("enabled", GuardedGameActions.enabled());
@@ -875,6 +928,10 @@ public final class BridgeServer {
         limits.addProperty("frame_bytes", MAX_FRAME_BYTES);
         limits.addProperty("minecraft_timeout_seconds", MINECRAFT_TIMEOUT_SECONDS);
         limits.addProperty("frame_timeout_seconds", FRAME_TIMEOUT_SECONDS);
+        limits.addProperty("scan_tick_block_reads_max", LoadedScan.BLOCKS_PER_TICK);
+        limits.addProperty("scan_tick_budget_micros", LoadedScan.BUDGET_NANOS / 1000);
+        limits.addProperty("scan_results_max", 256);
+        limits.addProperty("scan_chunks_max", 8192);
         limits.addProperty("terrain_radius_max", TerrainQuery.MAX_RADIUS);
         limits.addProperty("terrain_vertical_max", TerrainQuery.MAX_VERTICAL);
         limits.addProperty("terrain_page_cells_max", TerrainQuery.MAX_LIMIT);
@@ -948,6 +1005,9 @@ public final class BridgeServer {
 
         JsonObject obj = protocolOk();
         obj.add("client_action", ClientActions.status(null));
+        obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        obj.addProperty("screen_open", mc.screen != null);
+        obj.addProperty("paused", mc.isPaused());
         obj.add("menu", menuSnapshot(mc.player.containerMenu));
         JsonObject player = new JsonObject();
         player.addProperty("uuid", mc.player.getUUID().toString());
@@ -958,6 +1018,8 @@ public final class BridgeServer {
         player.addProperty("yaw", mc.player.getYRot());
         player.addProperty("pitch", mc.player.getXRot());
         player.add("velocity", vector(mc.player.getDeltaMovement()));
+        player.add("eye_position", vector(mc.player.getEyePosition()));
+        player.addProperty("alive", mc.player.isAlive());
         player.addProperty("health", mc.player.getHealth());
         player.addProperty("max_health", mc.player.getMaxHealth());
         player.addProperty("food", mc.player.getFoodData().getFoodLevel());
@@ -1023,6 +1085,9 @@ public final class BridgeServer {
 
         JsonObject world = new JsonObject();
         world.addProperty("dimension", mc.level.dimension().location().toString());
+        // A registry fact at the player's feet, not an inference from nearby trees/blocks.
+        world.addProperty("biome_id", mc.level.getBiome(mc.player.blockPosition())
+                .unwrapKey().map(key -> key.location().toString()).orElse(null));
         world.addProperty("game_time", mc.level.getGameTime());
         world.addProperty("world_generation", WorldGeneration.current(mc.level));
         world.addProperty("day_time", mc.level.getDayTime());
@@ -1115,6 +1180,11 @@ public final class BridgeServer {
             entityJson.add("velocity", vector(entity.getDeltaMovement()));
             entityJson.addProperty("distance", entry.distance());
             entityJson.addProperty("alive", entity.isAlive());
+            var bounds = entity.getBoundingBox();
+            JsonObject box = new JsonObject();
+            box.add("min", vector(new Vec3(bounds.minX, bounds.minY, bounds.minZ)));
+            box.add("max", vector(new Vec3(bounds.maxX, bounds.maxY, bounds.maxZ)));
+            entityJson.add("bounding_box", box);
             entityJson.addProperty("on_ground", entity.onGround());
             if (entity instanceof LivingEntity living) {
                 entityJson.addProperty("health", living.getHealth());
@@ -1651,6 +1721,25 @@ public final class BridgeServer {
             throw new IllegalArgumentException("key must identify a valid GLFW keyboard key");
         }
         return key;
+    }
+
+    /** Compare and apply on the same game-thread turn, without taking any key ownership. */
+    private static EndpointResult applyGuardedAimLook(double yaw, double pitch, AimViewGuard guard) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return new EndpointResult(409, error("not_in_world"));
+        if (!mc.player.isAlive()) return new EndpointResult(409, error("player_unavailable"));
+        if (mc.screen != null) return new EndpointResult(409, error("screen_opened"));
+        if (mc.isPaused()) return new EndpointResult(409, error("game_paused"));
+        if (ClientActions.ownsInput() || GuardedGameMovement.LEASES.status().ownerRequestId() != null)
+            return new EndpointResult(409, error("action_owns_view"));
+        Entity target = mc.level.getEntity(guard.entityId());
+        String rejected = guard.rejection(WorldGeneration.current(mc.level), mc.player.getUUID().toString(),
+                ClientActions.session(), mc.level.getGameTime(), mc.player.getYRot(), mc.player.getXRot(),
+                target == null ? null : target.getUUID().toString(), target != null && target.isAlive());
+        if (rejected != null) return new EndpointResult(409, error(rejected));
+        EndpointResult result = applyLook(yaw, pitch, false);
+        result.body().addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        return result;
     }
 
     private static EndpointResult applyLook(double yawInput, double pitchInput, boolean relative) {

@@ -10,3 +10,4 @@ session.json
 observation.json
 latest.png
 *.token
+scan_cache.json

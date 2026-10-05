@@ -5,9 +5,11 @@ one task queue and one small loaded-world cache. The mod executes continuous
 movement/mining/placement on client ticks; Python does not simulate physics,
 inventory, networking, or generate 100 ms key pulses.
 
-**Current evidence: source implementation and focused offline protocol checks.
-No live socket, token, launch, install, connection, or gameplay was used to validate
-this implementation. This does not establish a working live milestone.**
+**Current source:** `1.1.6-loaded-scan.1` pairing, with 109 focused offline resident
+checks. A later bounded live scan reported 4,864 tested positions, 41 coal blocks,
+79 ms and 3 client ticks. This does not validate maximum scans, every biome/surface
+mode, aim accuracy or combat; combat has not been exercised against a live target.
+See [verification scope](../client-mod/docs/loaded-scan-verification.md).
 
 ## Owner start: once per playing session
 
@@ -99,6 +101,101 @@ returns actual screen/menu state; `frame:true` writes the native Minecraft PNG a
 `latest.png` in the shared mailbox. There is no image generation or alternate
 renderer. The command endpoint is available only for explicitly requested game
 commands; it is not used for crafting, teleporting, or building.
+
+### View-only entity lock (source implementation)
+
+The external resident can keep the view centered on **one observed entity's exact
+bounding-box center**, using the player's current eye position. It runs at a
+best-effort 10 Hz. This is camera tracking, not pathfinding or automatic combat;
+it does not require the entity to be attackable or in line of sight.
+
+```json
+{"op":"aim_lock"}
+{"op":"aim_lock","target_uuid":"OBSERVED-ENTITY-UUID","radius":16}
+{"op":"aim_unlock"}
+```
+
+- Omit `target_uuid` to lock the current entity crosshair; a miss/block fails
+  rather than silently choosing the nearest entity. `radius` is 1–32, default 16.
+  UUID comes from the current `observe` result's `nearby.entities` or `crosshair`.
+- Direct forward/back/strafe/jump, attack, use and hotbar inputs remain independent.
+  Locking, following, losing a target and `aim_unlock` send **no key releases**.
+  A previously held attack key remains held after losing the target; explicitly
+  send attack `up`, or `cancel` to release all held controls.
+- A direct `look` releases the lock before applying the requested view once.
+  A change in the actual yaw/pitch also releases it. The mod compares the freshly
+  observed view atomically before each guarded update, preventing a read/write
+  race from overwriting a newer manual view. The tolerance is 0.01 degrees.
+- Target death/disappearance (including outside the radius or a truncated nearby
+  list), player death, world/player changes, menus, pause or failed observation
+  releases the lock; it never switches targets or reconnects. A transport-ambiguous
+  write disables tracking and pauses automatic work, with no replay.
+- `cancel`, `shutdown` and direct `release-all` also clear the lock. Semantic tasks
+  release it because mining, placement and path steering need their own view.
+  Starting a lock while a task is active/queued fails without cancelling that task.
+- `session.json` and observations include `aim_lock` with target, center, update
+  count and release reason. The initial successful request means tracking was
+  admitted and one guarded look dispatched; it is not evidence of live accuracy.
+  A controller restart does not restore an old lock.
+
+Requires the updated mod state marker `aim_view_guard_schema_version:1`, exact
+`player.eye_position`, `player.alive`, `nearby.entities[].bounding_box:{min,max}`,
+`screen_open`, and `paused`. Old mods are rejected **before** any lock write.
+The additive `/control/look` `guard` contract is described in the mod's
+`docs/entity-aim-lock.md`. Ordinary direct look remains backward compatible.
+Both this resident process and the mod/client need a planned restart to load the
+new source/build. Offline checks do not establish live aim or combat behavior. The later bounded scan milestone is reported separately.
+
+### Current biome observation (same candidate mod)
+
+The unchanged `observe` operation returns `result.state.world.biome_id`: the
+actual registry key at the player's current feet block, or explicit null if
+unavailable. For example `minecraft:cherry_grove` distinguishes the biome from
+cherry trees planted elsewhere. This is a read-only current-position fact, not
+a region scan. It requires the same candidate mod/client restart as view lock;
+no separate resident operation or game action is added.
+
+### Automatic melee combat (current source)
+
+`{"op":"combat_start"}` selects and keeps one observed hostile target; optional
+`target_uuid`, `radius`, `approach` and `shield` refine that start.
+`{"op":"combat_stop"}` stops and releases its inputs. Any direct command takes
+control back immediately in the resident loop. Sword/axe swings, short flat
+approach and offhand-shield sequencing use ordinary real-client inputs, with
+exact entity view lock. Players/pets/neutral types are not chosen as targets.
+
+`session.json.combat` and observations show the phase, reason and input-attempt
+counts. These are **not confirmed hits or kills**. Current input lacks atomic
+attack target binding and observed cooldown/blocking, so live acceptance and
+last-instant collateral risk remain. See [behavior, limits and one-time loading
+steps](docs/NATIVE_COMBAT.md). No game process was controlled by the offline work.
+
+### Loaded-world prospecting (current source)
+
+```json
+{"op":"scan_start","id":"survey-1","mode":"both","max_results":64}
+{"op":"scan_status","id":"survey-1"}
+{"op":"scan_cancel","id":"survey-1"}
+```
+
+These use the existing authenticated bridge to request a tick-budgeted, read-only
+scan of client-loaded data. Optional bounds and ore IDs narrow the request. The
+start command returns immediately with a scan snapshot; poll `scan_status` to see
+its progress. These commands do not take gameplay input ownership, enter the
+semantic-task queue, stop combat/view lock, or move the player. They never replay
+an uncertain start/cancel request. Use the returned `scan_id` to check its state.
+
+`scan_cache.json` retains bounded, timestamped observations from the current
+resident session and observed world only. Moving yourself and starting another
+scan can add newly loaded observations. This is historical client knowledge, not
+a live map or a claim that unknown chunks contain nothing. See
+[options, cache boundaries, and offline evidence](docs/PROSPECTING.md).
+
+Generic `blocks`, `biomes`, and `surface_sites` modes also accept `block_ids`,
+`biome_ids`, optional water proximity, and count/density/distance sorting. For example,
+`{"op":"scan_start","id":"cherry-blocks-1","mode":"blocks","block_ids":["minecraft:cherry_log","minecraft:cherry_leaves"],"require_water":true,"water_radius":32,"sort":"count"}`
+asks about concentrations of actual cherry blocks without imposing a cherry-grove
+biome filter. Original `ores`, `cherry_sites`, and `both` presets remain available.
 
 ### Semantic tasks
 
@@ -193,8 +290,9 @@ A consumed-ID set lives only in the resident process; older expired results do n
 make the same ID executable again. Restart gives a new session ID and reports old
 inbox/working files as uncertain, with no replay. `session.json` is the current
 controller status; `observation.json` is the latest explicitly requested observation.
-An action reply includes its completion observation, but no background inventory
-mirror is maintained. A dead controller can leave stale files; updated_at and its
+An action reply includes its completion observation. Scan results may be retained
+in the bounded historical scan cache; this is not a continually refreshed world
+map. No background inventory mirror is maintained by the resident itself. A dead controller can leave stale files; updated_at and its
 actual desktop process must be checked, not a PID in another namespace.
 
 Shutdown: `{"op":"shutdown"}` or owner Ctrl-C releases inputs and stops the
@@ -209,7 +307,8 @@ bash -n owner-start.sh
 ```
 
 Checks use an in-memory fake protocol and temporary files. They establish parsing,
-queue sequencing, single dispatch, no replay, takeover, and recipe bookkeeping;
+queue sequencing, single dispatch, no replay, takeover, recipe bookkeeping, aim,
+combat sequencing and loaded-scan protocol/cache handling;
 they do not validate actual movement, vanilla crafting, server synchronization,
 placement, the native image, or network/runtime integration.
 
@@ -223,3 +322,10 @@ No license grant has been assigned to these original components. The upstream MI
 license under `client-mod/` does not automatically license this independent code.
 The public source allowlist is `PUBLIC-FILES.txt`; it excludes runtime queues,
 observations, images, credentials, and generated Python caches.
+
+## Additional gameplay helpers
+
+The separate [gameplay helpers](../gameplay-helpers/README.md) retain shaped
+crafting, local up/down route helpers and an explicit local state exporter. They
+reuse the same credential-free queue. Their source and reported live recipe
+evidence must not be read as automatic authorization to run a new action.

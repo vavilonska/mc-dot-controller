@@ -1,12 +1,13 @@
 # Minecraft Dot Controller
 
-真实 Minecraft 客户端 + 一个常驻 Python 控制器。当前主线是 `1.1.6-client-actions.1`，用于已获准加入的兼容朋友服务器；模型决定下一步，客户端执行每个游戏刻的普通动作。
+真实 Minecraft 客户端 + 一个常驻 Python 控制器。当前主线是 `1.1.6-loaded-scan.1`，用于已获准加入的兼容朋友服务器；模型决定下一步，客户端执行每个游戏刻的普通动作。
 
 ## 架构
 
 - [`client-mod/`](client-mod/)：NeoForge 1.21.1 客户端内执行连续行走、挖掘、放置和背包槽点击，提供状态、地形、菜单与原生画面
 - [`resident-controller/`](resident-controller/)：每个游玩会话由操作者启动一次的常驻进程；认证令牌只在内存中，模型通过共享文件队列提交任务和读取结果
 - [`navigation-controller/`](navigation-controller/)：保留已有 A* 与地形解析；常驻控制器直接复用，没有复制一套寻路器或模拟 Minecraft 物理
+- [`gameplay-helpers/`](gameplay-helpers/)：显式调用的制作、局部上下台阶路线与本地状态导出源码
 
 服务端不需要安装此桥接模组。使用普通客户端交互、客户端预测和服务端规则；没有协议机器人、传送或世界编辑。
 
@@ -22,9 +23,12 @@
 - `walk_to`：用已有局部 A* 生成路径；当前规划器不覆盖任意跳跃、长距离或未知区块
 - `craft_planks`：按实际菜单槽把一个观察到的原木转成四块木板，并检查背包变化
 - `pillar`：1–8 次普通跳跃与脚下放置，逐步读取结果
+- `aim_lock` / `aim_unlock`：外部视角锁定，保持原生画面与直接接管
+- `combat_start` / `combat_stop`：原生近战控制源码，尚未实战验收
+- `scan_start` / `scan_status` / `scan_cancel`：查询客户端已经加载的方块、群系、聚集区域和地表邻水候选；未知区块仍是未知，不强制加载
 - `cancel`、`resume`、`shutdown`；不会自动重连、复活、退出服务器或重放结果不明的 POST
 
-挖掉方块不等于已经拾取掉落物。动作成功表示客户端观察到结果，不是服务端最终确认；直接控制返回只证明已分发输入。完整契约见[客户端动作](client-mod/docs/client-actions.md)和[常驻控制器指南](resident-controller/README.md)。
+挖掉方块不等于已经拾取掉落物。动作成功表示客户端观察到结果，不是服务端最终确认；直接控制返回只证明已分发输入。挖掘现含保留真实 pick/目标/距离检查的可见面回退。完整契约见[客户端动作](client-mod/docs/client-actions.md)、[已加载世界扫描](client-mod/docs/loaded-world-scans.md)和[常驻控制器指南](resident-controller/README.md)。
 
 ## 使用方式
 
@@ -41,12 +45,14 @@ python3 -m resident_controller --queue /path/to/shared/mailbox submit \
 
 ## 验证状态
 
-- 模组最终构建：Minecraft 1.21.1 / NeoForge 21.1.255，Java 21，75 项 JUnit 通过（64 项保留检查 + 11 项客户端动作检查）
-- 发布时已核对最终源文件、JAR 与 sources JAR 的哈希及构建报告
-- 常驻控制器：12 项针对性离线协议/队列检查、Python 编译与 shell 语法检查通过；发布目录中的实际寻路依赖导入通过
-- 本次交付是源码和离线验证；原生客户端恢复、安装及实际运行里程碑另行推进。尚不能宣称此实现已完成真实行走、挖矿拾取、合成或垫高
+- 当前构建：Minecraft 1.21.1 / NeoForge 21.1.255、Java 21，114 项 Java 测试通过；公开默认版本已与该构建对齐
+- 常驻控制器：109 项离线协议/状态机/缓存测试通过
+- 制作 helper：23 项离线检查；其余可移植包装检查见对应文档
+- 本轮已完成一次小范围实机扫描：4,864 格、41 块煤，结果报告 79 ms、3 个客户端 tick。不是最大规模性能保证，也不代表所有群系/水边模式均已验收
+- 实际制作成功的范围：工作台、木镐、石镐、炉子、木棍、石斧、火把。铁工具、铁甲、盾等其他形状仍只有离线检查
+- 战斗没有实战验收；单位测试、输入分发和客户端观察不能冒充命中、击杀或服务端确认
 
-构建命令与验证边界见[客户端动作验证](client-mod/docs/client-actions-verification.md)。离线检查不替代真实客户端画面和服务器上的实际结果。
+公开验证摘要见[当前版本记录](client-mod/docs/loaded-scan-verification.md)。本仓库更新不会操作游戏，也不包含原始现场结果、真实方块位置或玩家身份。
 
 ## 保留的旧工作
 

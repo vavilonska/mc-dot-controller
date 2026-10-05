@@ -29,12 +29,28 @@ final class BridgeJson {
                 writer.setSerializeNulls(((entry.getKey().equals("guarded_movement")
                         || entry.getKey().equals("client_action")) && entry.getValue().isJsonObject())
                         || entry.getKey().equals("action_id"));
-                ELEMENTS.write(writer, entry.getValue());
+                if (entry.getKey().equals("world") && entry.getValue().isJsonObject()) {
+                    writeWorld(writer, entry.getValue().getAsJsonObject());
+                } else {
+                    ELEMENTS.write(writer, entry.getValue());
+                }
                 writer.setSerializeNulls(false);
             }
             writer.endObject();
         }
         return buffer.toString();
+    }
+
+    private static void writeWorld(JsonWriter writer, JsonObject world) throws IOException {
+        writer.beginObject();
+        for (Map.Entry<String, JsonElement> field : world.entrySet()) {
+            writer.name(field.getKey());
+            // Missing biome_id means an older endpoint; explicit null means unavailable.
+            writer.setSerializeNulls(field.getKey().equals("biome_id"));
+            ELEMENTS.write(writer, field.getValue());
+            writer.setSerializeNulls(false);
+        }
+        writer.endObject();
     }
 
     private BridgeJson() { }

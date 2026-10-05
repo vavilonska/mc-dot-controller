@@ -24,12 +24,14 @@ class WorldCache:
         self.grid = None
         self.cells = {}
         self.received_at = 0.0
+        self.terrain_received_at = 0.0
 
     def observe(self, bridge):
         state = bridge.request('GET', '/control/state?radius=8')
         old_world = self.state.get('world', {}) if self.state else {}
         if old_world.get('world_generation') != state['world'].get('world_generation'):
             self.grid, self.cells = None, {}
+            self.terrain_received_at = 0.0
         self.state, self.received_at = state, time.monotonic()
         return state
 
@@ -54,6 +56,7 @@ class WorldCache:
         last = self.observe(bridge)
         self.grid = assembler.finish(WorldStamp.parse(last['world']), time.monotonic())
         self.cells = cells  # At most 2,601 local cells; no inventory or entity simulation.
+        self.terrain_received_at = time.monotonic()
         return {'origin': vars(self.grid.origin), 'radius': radius, 'vertical': vertical,
                 'world_generation': self.grid.world.generation,
                 'cells': list(cells.values()), 'complete': self.grid.complete}

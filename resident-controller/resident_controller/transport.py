@@ -7,9 +7,11 @@ import re
 from urllib.parse import urlsplit
 
 READS = {'/control/status', '/control/capabilities', '/control/state', '/control/screen',
-         '/control/keymaps', '/control/terrain', '/control/action/status', '/control/frame'}
+         '/control/keymaps', '/control/terrain', '/control/action/status', '/control/frame',
+         '/control/scan/status'}
 DIRECT = {'key', 'raw-key', 'look', 'mouse', 'text', 'command', 'release-all'}
-WRITES = {'/control/' + x for x in DIRECT} | {'/control/action', '/control/action/cancel'}
+WRITES = {'/control/' + x for x in DIRECT} | {
+    '/control/action', '/control/action/cancel', '/control/scan', '/control/scan/cancel'}
 
 
 class BridgeError(RuntimeError):

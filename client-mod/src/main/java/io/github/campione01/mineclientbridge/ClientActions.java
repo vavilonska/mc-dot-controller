@@ -194,8 +194,7 @@ final class ClientActions {
         if (mc.level.getBlockState(pos).isAir()) { finish("succeeded", "block_absent"); return; }
         if (a.initialBlock == null) a.initialBlock = mc.level.getBlockState(pos).getBlock();
         else if (mc.level.getBlockState(pos).getBlock() != a.initialBlock) { finish("failed", "target_changed"); return; }
-        aim(mc, Vec3.atCenterOf(pos));
-        BlockHitResult hit = pick(mc, pos, null);
+        BlockHitResult hit = aimMiningTarget(mc, pos);
         if (hit == null) { finish("failed", "target_not_in_reach_or_visible"); return; }
         // One continuous ordinary attack hold; the client's keybind loop runs continueAttack.
         // Its block ray, NeoForge hooks, mining progress and server prediction remain vanilla.
@@ -214,6 +213,26 @@ final class ClientActions {
             }
         }
         a.entry.result.addProperty("destroy_stage", mc.gameMode.getDestroyStage());
+    }
+
+    private static BlockHitResult aimMiningTarget(Minecraft mc, BlockPos pos) {
+        Vec3 center = Vec3.atCenterOf(pos);
+        aim(mc, center);
+        BlockHitResult hit = pick(mc, pos, null);
+        if (hit != null) return hit; // Preserve the existing fast path.
+        Vec3 eye = mc.player.getEyePosition();
+        for (MiningAimPoints.Point point : MiningAimPoints.facingFaces(
+                pos.getX(), pos.getY(), pos.getZ(), eye.x, eye.y, eye.z)) {
+            aim(mc, new Vec3(point.x(), point.y(), point.z()));
+            // Candidate coordinates never authorize mining: real picking must hit the
+            // same block within ordinary reach, with intervening blocks/entities intact.
+            hit = pick(mc, pos, null);
+            if (hit != null) return hit;
+        }
+        // All candidates were occluded/out of range. Keep the old failed-action view.
+        aim(mc, center);
+        pick(mc, pos, null);
+        return null;
     }
 
     private static void observeBreak(Minecraft mc, RuntimeAction a) {

@@ -26,6 +26,34 @@ class BridgeJsonTest {
     }
     private JsonObject roundTrip(JsonObject root) throws Exception { return JsonParser.parseString(BridgeJson.toJson(root)).getAsJsonObject(); }
 
+    @Test void biomeRegistryIdOrExplicitUnavailableNullSurvivesWireEncoding() throws Exception {
+        JsonObject root = new JsonObject();
+        JsonObject world = new JsonObject();
+        world.addProperty("dimension", "minecraft:overworld");
+        world.addProperty("biome_id", "minecraft:cherry_grove");
+        world.addProperty("legacy_null", (String) null);
+        root.add("world", world);
+        JsonObject decoded = roundTrip(root).getAsJsonObject("world");
+        assertEquals("minecraft:cherry_grove", decoded.get("biome_id").getAsString());
+        assertFalse(decoded.has("legacy_null"));
+        world.addProperty("biome_id", (String) null);
+        decoded = roundTrip(root).getAsJsonObject("world");
+        assertTrue(decoded.has("biome_id"));
+        assertTrue(decoded.get("biome_id").isJsonNull());
+        assertFalse(decoded.has("legacy_null"));
+        world.remove("biome_id");
+        assertFalse(roundTrip(root).getAsJsonObject("world").has("biome_id"));
+    }
+
+    @Test void biomeComesFromCurrentPlayerRegistryKeyNotTerrainInference() throws Exception {
+        Path project = Path.of(System.getProperty("mineclientBridge.projectDir"));
+        String source = Files.readString(project.resolve("src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java"));
+        String state = source.substring(source.indexOf("private static EndpointResult createStateSnapshot("),
+                source.indexOf("private static JsonObject crosshairSnapshot("));
+        assertTrue(state.contains("world.addProperty(\"biome_id\", mc.level.getBiome(mc.player.blockPosition())"));
+        assertTrue(state.contains(".unwrapKey().map(key -> key.location().toString()).orElse(null)"));
+    }
+
     @Test void reproducesLegacyWireOmissionRatherThanTestingOnlyJsonTree() {
         JsonObject root=envelope(guard(null,null));assertTrue(root.getAsJsonObject("guarded_movement").has("owner_request_id"));
         JsonObject decoded=JsonParser.parseString(LEGACY.toJson(root)).getAsJsonObject().getAsJsonObject("guarded_movement");

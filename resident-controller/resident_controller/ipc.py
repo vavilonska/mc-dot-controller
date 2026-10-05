@@ -49,6 +49,10 @@ class QueueClient:
     def session(self):
         return read_json(self.root / 'session.json')
 
+    def scan_cache(self):
+        """Historical observations only; file freshness is not world freshness."""
+        return read_json(self.root / 'scan_cache.json', 1024 * 1024)
+
     def submit(self, command, request_id=None):
         session = self.session()
         if session.get('state') not in ('ready', 'busy', 'paused'):

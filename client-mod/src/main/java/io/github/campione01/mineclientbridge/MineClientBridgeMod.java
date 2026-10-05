@@ -14,6 +14,7 @@ public final class MineClientBridgeMod {
         InputEventProbe.install();
         GuardedGameMovement.install();
         ClientActions.install();
+        LoadedWorldScanner.install();
         BridgeServer.start();
         Runtime.getRuntime().addShutdownHook(new Thread(
                 BridgeServer::stop,

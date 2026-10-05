@@ -52,3 +52,9 @@ Thumbs.db
 **/mailbox/
 **/observation.json
 **/latest.png
+
+# Loaded-world observations are private runtime cache data
+**/scan_cache.json
+**/state.json
+**/state.tmp
+**/state-exporter.pid
