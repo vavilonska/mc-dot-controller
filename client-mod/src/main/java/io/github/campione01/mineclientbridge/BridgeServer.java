@@ -119,6 +119,9 @@ public final class BridgeServer {
             createdServer.createContext("/control/state", BridgeServer::handleControlState);
             createdServer.createContext("/control/terrain", BridgeServer::handleControlTerrain);
             createdServer.createContext("/control/screen", BridgeServer::handleControlScreen);
+            createdServer.createContext("/control/action", BridgeServer::handleClientAction);
+            createdServer.createContext("/control/action/status", BridgeServer::handleClientActionStatus);
+            createdServer.createContext("/control/action/cancel", BridgeServer::handleClientActionCancel);
             createdServer.createContext("/control/key", BridgeServer::handleControlKey);
             createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
             createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
@@ -311,6 +314,65 @@ public final class BridgeServer {
         }
     }
 
+    private static void handleClientAction(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/action", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final ClientActionRequest request;
+        try { request = ClientActionRequest.parse(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> ClientActions.start(request), true);
+    }
+
+    private static void handleClientActionStatus(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/action/status", "GET")) return;
+        String id = null;
+        try {
+            String query = exchange.getRequestURI().getRawQuery();
+            if (query != null) for (String part : query.split("&")) {
+                String[] pair = part.split("=", 2);
+                if (!URLDecoder.decode(pair[0], StandardCharsets.UTF_8).equals("action_id") || id != null || pair.length != 2)
+                    throw new IllegalArgumentException();
+                id = URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
+            }
+        } catch (IllegalArgumentException failure) {
+            respondJson(exchange, 400, error("invalid_query")); return;
+        }
+        final String actionId = id;
+        respondActionOperation(exchange, () -> ClientActions.status(actionId), false);
+    }
+
+    private static void handleClientActionCancel(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/action/cancel", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final String id;
+        try { id = ClientActionRequest.string(body, "action_id"); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> ClientActions.cancelId(id), false);
+    }
+
+    private static void respondActionOperation(HttpExchange exchange, Callable<JsonObject> operation, boolean start) throws IOException {
+        try {
+            EndpointResult result = callOnMinecraftThread(() -> {
+                try {
+                    JsonObject response = operation.call();
+                    response.addProperty("protocol", PROTOCOL_NAME);
+                    response.addProperty("schema_version", PROTOCOL_SCHEMA_VERSION);
+                    boolean running = response.has("status") && response.get("status").getAsString().equals("running");
+                    return new EndpointResult(start && running ? 202 : 200, response);
+                } catch (ClientActionRequest.Rejected failure) {
+                    return new EndpointResult(failure.httpStatus, error(failure.getMessage()));
+                }
+            }, MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception failure) { respondMinecraftFailure(exchange, "client_action_failed", failure); }
+    }
+
     private static void handleControlKey(HttpExchange exchange) throws IOException {
         if (!requireControlAccess(exchange, "/control/key", "POST")) return;
 
@@ -337,7 +399,7 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> applyKeyAction(mapping, action, exact),
+                    () -> { ClientActions.directTakeover(); return applyKeyAction(mapping, action, exact); },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -369,7 +431,7 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> applyRawKeyAction(key, action),
+                    () -> { ClientActions.directTakeover(); return applyRawKeyAction(key, action); },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -604,7 +666,7 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> applyLook(yaw, pitch, relative),
+                    () -> { ClientActions.directTakeover(); return applyLook(yaw, pitch, relative); },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -654,7 +716,7 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> applyMouseAction(x, y, button, action, scrollY),
+                    () -> { ClientActions.directTakeover(); return applyMouseAction(x, y, button, action, scrollY); },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -681,7 +743,7 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> applyScreenText(text, submit),
+                    () -> { ClientActions.directTakeover(); return applyScreenText(text, submit); },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -705,7 +767,7 @@ public final class BridgeServer {
 
         try {
             EndpointResult result = callOnMinecraftThread(
-                    () -> applyCommand(command),
+                    () -> { ClientActions.directTakeover(); return applyCommand(command); },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception e) {
@@ -761,6 +823,9 @@ public final class BridgeServer {
         addOperation(operations, "GET", "/control/state", "client_state_snapshot");
         addOperation(operations, "GET", "/control/terrain", "nearby_loaded_terrain");
         addOperation(operations, "GET", "/control/screen", "screen_snapshot");
+        addOperation(operations, "POST", "/control/action", "continuous_client_action");
+        addOperation(operations, "GET", "/control/action/status", "client_action_status");
+        addOperation(operations, "POST", "/control/action/cancel", "cancel_client_action");
         addOperation(operations, "POST", "/control/key", "keymap_input");
         addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
         addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
@@ -773,6 +838,18 @@ public final class BridgeServer {
         addOperation(operations, "POST", "/control/release-all", "release_keymaps");
         addOperation(operations, "POST", "/control/close", "graceful_client_stop");
         obj.add("operations", operations);
+        JsonObject actions = new JsonObject();
+        actions.addProperty("schema_version", 1);
+        actions.addProperty("session", ClientActions.session());
+        actions.addProperty("single_flight", true);
+        actions.addProperty("multiplayer", true);
+        actions.addProperty("tick_driven", true);
+        actions.addProperty("direct_input_takeover", true);
+        actions.addProperty("deduplicate_action_ids", true);
+        JsonArray actionNames = new JsonArray();
+        ClientActionRequest.ACTIONS.stream().sorted().forEach(actionNames::add);
+        actions.add("actions", actionNames);
+        obj.add("client_actions", actions);
         JsonObject guarded = new JsonObject();
         guarded.addProperty("schema_version", GuardedAction.SCHEMA);
         guarded.addProperty("enabled", GuardedGameActions.enabled());
@@ -870,6 +947,8 @@ public final class BridgeServer {
         }
 
         JsonObject obj = protocolOk();
+        obj.add("client_action", ClientActions.status(null));
+        obj.add("menu", menuSnapshot(mc.player.containerMenu));
         JsonObject player = new JsonObject();
         player.addProperty("uuid", mc.player.getUUID().toString());
         player.addProperty("name", boundedText(mc.player.getGameProfile().getName()));
@@ -1057,6 +1136,7 @@ public final class BridgeServer {
         Minecraft mc = Minecraft.getInstance();
         JsonObject obj = protocolOk();
         Screen screen = mc.screen;
+        if (mc.player != null) obj.add("menu", menuSnapshot(mc.player.containerMenu));
         obj.addProperty("open", screen != null);
         if (screen == null) {
             obj.addProperty("children_total", 0);
@@ -1127,6 +1207,35 @@ public final class BridgeServer {
         return obj;
     }
 
+    static JsonObject menuSnapshot(AbstractContainerMenu menu) {
+        Minecraft mc = Minecraft.getInstance();
+        JsonObject obj = new JsonObject();
+        obj.addProperty("menu_class", menu.getClass().getName());
+        obj.addProperty("container_id", menu.containerId);
+        obj.addProperty("state_id", menu.getStateId());
+        obj.add("carried", itemSnapshot(menu.getCarried()));
+        JsonArray slots = new JsonArray();
+        int limit = Math.min(menu.slots.size(), MAX_CONTAINER_SLOTS);
+        for (int i = 0; i < limit; i++) {
+            Slot slot = menu.slots.get(i);
+            JsonObject entry = new JsonObject();
+            entry.addProperty("menu_index", i);
+            entry.addProperty("slot_index", slot.index);
+            entry.addProperty("container_slot", slot.getContainerSlot());
+            boolean inventory = mc.player != null && slot.container == mc.player.getInventory();
+            entry.addProperty("player_inventory", inventory);
+            if (inventory) entry.addProperty("inventory_index", slot.getContainerSlot());
+            entry.addProperty("active", slot.isActive());
+            entry.add("item", itemSnapshot(slot.getItem()));
+            slots.add(entry);
+        }
+        obj.add("slots", slots);
+        obj.addProperty("slots_total", menu.slots.size());
+        obj.addProperty("slots_returned", limit);
+        obj.addProperty("slots_truncated", menu.slots.size() > limit);
+        return obj;
+    }
+
     private static void addChildRectangle(JsonObject childJson, GuiEventListener child) {
         try {
             ScreenRectangle rectangle = child.getRectangle();
@@ -1190,6 +1299,7 @@ public final class BridgeServer {
         obj.addProperty("evidence_root", identityValue(
                 "mineclientBridge.evidenceRoot",
                 "MINECLIENT_BRIDGE_EVIDENCE_ROOT"));
+        obj.add("client_action", ClientActions.status(null));
         obj.addProperty("bridge_running", isRunning());
         obj.addProperty("in_world", mc.level != null && mc.player != null);
 
@@ -2204,7 +2314,8 @@ public final class BridgeServer {
 
     static boolean hasHeldInputs() { return !HELD_RAW_KEYS.isEmpty() || !HELD_WORLD_MOUSE_BUTTONS.isEmpty(); }
 
-    private static int releaseAllInputs() {
+    static int releaseAllInputs() {
+        ClientActions.cancel("inputs_released");
         GuardedGameMovement.cancelOnGameThread("inputs_released");
         Minecraft mc = Minecraft.getInstance();
         if (!mc.isSameThread()) {

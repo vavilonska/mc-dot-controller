@@ -22,6 +22,7 @@ final class GuardedGameActions {
 
     static Outcome apply(GuardedAction.Request request, GuardedDispatch.Ticket<?> ticket) {
         Minecraft mc = Minecraft.getInstance();
+        GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
         GuardedAction.require(mc.isSameThread(), "minecraft_thread_required");
         GuardedAction.require(enabled() && BridgeServer.isRunning(), "guarded_actions_disabled");
         GuardedAction.require(GuardedGameMovement.LEASES.status().ownerRequestId() == null, "movement_busy");

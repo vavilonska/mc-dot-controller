@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.runtime/
+
+# Owner-selected mailbox data is runtime-only
+inbox/
+working/
+results/
+session.json
+observation.json
+latest.png
+*.token

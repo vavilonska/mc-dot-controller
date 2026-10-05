@@ -1,136 +1,59 @@
 # Minecraft Dot Controller
 
-[mc-dot-controller](https://github.com/vavilonska/mc-dot-controller) 保存 Minecraft 客户端控制桥与外部控制器源码。当前集成版为 `1.1.5-terrain-guard-navigation.2`：已完成编译和离线测试；小范围只读地形实机检查已通过，当前移动/转向扩展和自动战斗/导航仍未通过实机验收。
+真实 Minecraft 客户端 + 一个常驻 Python 控制器。当前主线是 `1.1.6-client-actions.1`，用于已获准加入的兼容朋友服务器；模型决定下一步，客户端执行每个游戏刻的普通动作。
 
+## 架构
 
-当前自定义桥接路线已暂停。本次仅保存已完成并验证的缺陷修正，不继续一般功能或实机验收。之前一次真实只读探测以笼统错误失败，确切原因尚不清楚；没有执行受保护转向或前进，游戏已保存并关闭。新的 navigation.2 编码修正尚未安装，不能当作上述失败的已确认原因或修复结果。
+- [`client-mod/`](client-mod/)：NeoForge 1.21.1 客户端内执行连续行走、挖掘、放置和背包槽点击，提供状态、地形、菜单与原生画面
+- [`resident-controller/`](resident-controller/)：每个游玩会话由操作者启动一次的常驻进程；认证令牌只在内存中，模型通过共享文件队列提交任务和读取结果
+- [`navigation-controller/`](navigation-controller/)：保留已有 A* 与地形解析；常驻控制器直接复用，没有复制一套寻路器或模拟 Minecraft 物理
 
-## 目录
+服务端不需要安装此桥接模组。使用普通客户端交互、客户端预测和服务端规则；没有协议机器人、传送或世界编辑。
 
-- [`client-mod/`](client-mod/)：基于 [Campione01/MineClient-Bridge v1.1.5](https://github.com/Campione01/MineClient-Bridge/tree/60e78940f7e7fa06116cf4fbc58df346ad617531) 的 NeoForge 1.21.1 客户端模组，新增有界只读地形查询、默认关闭的受保护战斗动作、单次前进采样与导航专用水平转向接口
-- [`external-controller/`](external-controller/)：独立 Python 战斗控制器；CLI 仅运行离线模拟，真实 HTTP 动作默认禁用
-- [`navigation-controller/`](navigation-controller/)：独立有界地形解析、A* 路径规划与离线导航模拟；新增可选回环 HTTP/单次验收工具源码，尚未连接真实游戏验证
-- [`building-controller/`](building-controller/)：离线地板/墙体蓝图、材料统计与几何支撑顺序；所有计划均不可执行
-- [`client-mod/docs/terrain-api.md`](client-mod/docs/terrain-api.md)：分页、预算、未知区域与碰撞信息
-- [`client-mod/docs/guarded-actions.md`](client-mod/docs/guarded-actions.md)：执行时校验、超时与取消语义、局部试验限制
-- [`external-controller/docs/GUARDED_ACCEPTANCE.md`](external-controller/docs/GUARDED_ACCEPTANCE.md)：真实战斗动作启用前的验收要求
-- [`client-mod/docs/guarded-movement.md`](client-mod/docs/guarded-movement.md)：单次前进采样、观察凭据、释放和剩余限制
-- [`client-mod/docs/guarded-turning.md`](client-mod/docs/guarded-turning.md)：独立默认关闭的水平转向、共享观察凭据及角度边界
-- [`navigation-controller/docs/ONE_SAMPLE_ADAPTER.md`](navigation-controller/docs/ONE_SAMPLE_ADAPTER.md)：单次采样/转向适配、动作后回读和静止检查
-- [`navigation-controller/docs/OWNER_PROBE.md`](navigation-controller/docs/OWNER_PROBE.md)：默认只读探测、单次本地验收的前置条件与操作者命令
-- [`NOTICE.md`](NOTICE.md)：上游来源、修改范围和许可证说明
+## 已实现的源码
+
+客户端动作接口包含 `follow_path`、`break_block`、`place_block`、`click_slot`，以及状态查询和按 ID 取消。连续输入由客户端每刻执行，不靠外部反复发送 100 ms 按键片段。
+
+原有 look/key/raw-key/mouse/text/command 直接控制保留。直接操作在客户端线程上原子接管输入：取消当前任务、释放它的输入，再执行本次请求；后续直接按键组合仍可持续保持。
+
+常驻进程提供：
+
+- `observe`、直接控制与上述客户端动作
+- `walk_to`：用已有局部 A* 生成路径；当前规划器不覆盖任意跳跃、长距离或未知区块
+- `craft_planks`：按实际菜单槽把一个观察到的原木转成四块木板，并检查背包变化
+- `pillar`：1–8 次普通跳跃与脚下放置，逐步读取结果
+- `cancel`、`resume`、`shutdown`；不会自动重连、复活、退出服务器或重放结果不明的 POST
+
+挖掉方块不等于已经拾取掉落物。动作成功表示客户端观察到结果，不是服务端最终确认；直接控制返回只证明已分发输入。完整契约见[客户端动作](client-mod/docs/client-actions.md)和[常驻控制器指南](resident-controller/README.md)。
+
+## 使用方式
+
+操作者在实际运行 Java 客户端的桌面终端中启动一次常驻进程，明确提供本次验证过的回环 URL 和共享队列目录。令牌通过隐藏提示或操作者明确选择的既有文件提供，不放进模型命令、队列或仓库。
+
+模型侧在 resident-controller/ 中提交请求，不需要令牌或访问桌面的回环端口：
+
+```sh
+python3 -m resident_controller --queue /path/to/shared/mailbox submit \
+  --json '{"op":"observe","terrain":true,"frame":true}' --wait 10
+```
+
+共享目录必须实际由两侧共享；共享源文件不代表共享进程、回环网络或临时目录。启动、任务示例和恢复规则见[指南](resident-controller/README.md)。
 
 ## 验证状态
 
-2026-10-05 的集成源码已通过：
+- 模组最终构建：Minecraft 1.21.1 / NeoForge 21.1.255，Java 21，75 项 JUnit 通过（64 项保留检查 + 11 项客户端动作检查）
+- 发布时已核对最终源文件、JAR 与 sources JAR 的哈希及构建报告
+- 常驻控制器：12 项针对性离线协议/队列检查、Python 编译与 shell 语法检查通过；发布目录中的实际寻路依赖导入通过
+- 本次交付是源码和离线验证；原生客户端恢复、安装及实际运行里程碑另行推进。尚不能宣称此实现已完成真实行走、挖矿拾取、合成或垫高
 
-- Java 21.0.12.1、Gradle 8.14.3、官方 ModDevGradle 2.0.148、NeoForge 21.1.255 下的完整模组编译、测试和打包
-- 64 项 JUnit 测试，包含先前 54 项与新增 10 项序列化回归，零失败、错误或跳过
-- 地形核心 37,371 条断言、地形调度 13 项检查、动作保护 150 项检查及静态地形安全审查
-- Gson 2.10.1 与 2.11.0 各通过 1,018 项兼容比较，含并发编码检查；只有 guarded_movement 子对象保留显式 null
-- MCP stdio framing 测试 8/8
-- 外部战斗控制器 115 项离线单元测试、Python 编译、默认禁用和模拟演示 CLI
-- 导航控制器 254 项离线单元测试、Python 编译；保留先前 244 项并新增 10 项安全诊断/失败报告回归，没有使用真实凭据或游戏连接。两个离线演示均通过：原绕行模拟为 13 次模拟脉冲，新 3 格路径演示为 28 次前进采样与 6 次受限转向，清理检查成功
+构建命令与验证边界见[客户端动作验证](client-mod/docs/client-actions-verification.md)。离线检查不替代真实客户端画面和服务器上的实际结果。
 
-- 建筑规划器 83 项离线测试（含 18 项独立审查回归）、Python 编译、示例 CLI 输出校验
+## 保留的旧工作
 
-构建使用官方二进制依赖流程：完整编译本模组并应用访问转换，不重新编译 Minecraft 自身源码。详见[当前编码修正构建记录](client-mod/docs/serialization-verification.md)。
+原来的战斗原型、建筑蓝图、地形查询、受保护单步实验及其文档都保留，历史不覆盖。旧的单人世界、满血和半步限制只属于对应实验接口，不是新的 client-actions 执行策略。
 
-运行验证仍有限：
+- [`external-controller/`](external-controller/)：旧战斗原型
+- [`building-controller/`](building-controller/)：地板/墙体蓝图、材料统计与几何支撑顺序；规划结果本身不等于已经施工
+- [`navigation-controller/`](navigation-controller/)：复用的寻路/地形算法及旧探测实验
 
-- 基础版 1.1.5 已验证认证状态读取、本地生存世界玩家状态/背包读取、短按前进和释放后的静止状态，以及兼容多人服务器连接和状态读取
-- 只读地形接口已通过小范围实机验证：27 格立方体、等价 7 页读取、17 格垂直世界边界；脱敏采集另通过离线解析/规划回归。最大规模扫描、动作新鲜度与导航/战斗不在已验证范围内，见[有限实机记录](client-mod/docs/terrain-live-validation.md)
-- 先前自定义客户端的真实只读探测失败，原因仍未确定；没有执行受保护转向或前进，客户端已保存并关闭。新 navigation.2 修正只完成源码/离线验证、尚未安装；自定义路线的后续实机验收已暂停
-- 上游完整 MCP 自测使用 Windows 路径，在 Linux 上该部分失败；这里只验证了跨平台 framing 测试
-- 导航已有离线解析、路径规划与平面模拟执行；可选 HTTP 传输仅有模拟测试，仍没有实机寻路验收，建筑只有不可执行的离线蓝图/几何规划，完整自主生存尚未完成
-
-## 构建与离线测试
-
-需要 Java 21。首次构建需要从官方依赖源下载 Gradle 和 Minecraft/NeoForge 构建依赖。
-
-```sh
-cd client-mod
-JAVA_HOME=/path/to/jdk-21 ./gradlew --no-daemon --max-workers=1 \
-  -Dorg.gradle.parallel=false -Pneo_version=21.1.255 -Pbridge.noRecompile=true test build
-JAVA_HOME=/path/to/jdk-21 bash scripts/terrain-core-test.sh
-JAVA_HOME=/path/to/jdk-21 bash scripts/guarded-action-core-test.sh
-python3 scripts/audit-terrain-source.py
-node mcp/ndjson-framing-test.mjs
-```
-
-控制器使用 Python 3.10+ 标准库，无需安装第三方包：
-
-```sh
-cd external-controller
-python3 -m unittest discover -v
-python3 -m combat_controller
-python3 -m combat_controller --demo
-```
-
-导航解析、规划与绕行模拟也完全离线：
-
-```sh
-cd navigation-controller
-python3 -m unittest discover -v
-python3 -m navigation_controller
-python3 -m navigation_controller.sample_demo
-python3 -m navigation_controller.live_probe --help
-```
-
-建筑蓝图与规划同样只读本地文件：
-
-```sh
-cd building-controller
-python3 -m unittest discover -q
-python3 -m building_controller --help
-python3 -m building_controller plan --blueprint examples/floor-blueprint.json \
-  --terrain examples/fake-world.json --terrain-key pages --state-key state
-```
-
-以上 cd 路径均相对于仓库根目录。上述控制器命令均不连接游戏。离线测试通过不代表真实游戏安全。
-
-## 战斗动作的限制
-
-Java 战斗动作保护默认关闭。Python 战斗 HTTP 适配器也默认禁止动作；只有操作者明确设置 enabled 与 acceptance_verified，并通过能力检查后，API 才允许调用新的 guarded-action 路由。这些配置是操作者的声明，代码不会自动证明验收已经完成。旧 key/look/mouse/release-all POST 不作为降级路径。
-
-首个允许验收的范围是单独、未开放局域网的本地生存试验世界，仅 NeoForge 和本桥接模组，平坦已知地面、一个允许类型的敌对生物、普通未附魔原版斧。排除其他玩家、宠物、受保护旁观者、多人服务器和任意其他模组。一次请求只尝试普通视角调整或攻击，不证明命中、伤害或击杀；不提供移动或持续按键。
-
-超时不能撤回已经开始的同步动作。任何连接结果不明、过期状态或上下文变化都应停止，不自动重试或回退到旧输入接口。必须先完成文档中的实机验收，再单独批准有限的本地控制器试验；发布源码不代表批准安装或游戏动作。
-
-## 导航当前边界
-
-导航规划只使用当前观测范围内、已加载且已知安全的地面和净空。未知/未加载区域、流体、危险方块及截断信息均不可作为通路；对角移动检查两侧拐角，一格下降仅可规划，暂不执行。A* 的搜索、边界队列、时间和路径长度均有上限。
-
-路线执行器默认关闭，并拒绝真实传输；独立验收工具默认只读。演示没有 Minecraft 物理模型，不能证明真实停止距离、坠落或对角移动安全。脱敏采集缺少完整状态前后对照，且不满足动作新鲜度、附近实体观测范围和居中姿态要求，因此不能用于执行导航。
-
-客户端新移动接口也默认关闭，且与战斗开关分开。一次请求最多提供一次 0.5 强度的普通前进输入采样，并在释放其拥有的输入字段后才确认。100 ms 是请求处理入口到采样的有效期限，不是持键时长、行进时间或制动保证。清除输入不会消除 Minecraft 惯性；游戏线程停滞时，清理和确认可能一直等待。
-
-导航专用水平转向已在源码实现，开关独立且默认关闭；一次至多 30°，不改变俯仰或位置，并按实际 float32 角度验证。转向和前进共享占用、一次性观察凭据与防重放预算，每次转向后必须重新读取状态。
-
-外部适配器现在包含可选数字回环 HTTP 源码和操作者验收 CLI，默认只读，测试全部使用模拟套接字/传输。它不发现端点、不读取已有令牌文件或环境凭据、不保存令牌、不安装模组或选择世界。令牌只由操作者在隐藏终端提示中输入；不要放在命令行、聊天或仓库。
-
-验收 CLI 的单次输入必须先完成并明确批准隔离本地验收前置条件，提供会话指纹及显式接受标志。每个 HTTP 传输实例最多准入一次 POST，即使失败或结果不明也不重试。CLI 只能选一次转向或一次半前进采样；完整路线跟随仍拒绝真实传输，不能靠标志开启。
-
-验收工具增加可选的 --start-delay（默认 0，有限值 0–15 秒）：在隐藏令牌输入之后、任何 HTTP 和新鲜度计时之前暂停，让操作者自行把焦点交回游戏。中断暂停不会发送请求，也不会放宽验收标志或单次动作限制。
-
-每次前进后，适配器等待两个不同游戏刻的近静止回读，再重新读取地形和状态。错误、结果不明或不安全观察会锁定停止。源码和模拟测试不能证明真实 Minecraft 惯性、制动距离、静止门槛或实际 HTTP 行为；本次缺陷修正没有进行新的真实探测或输入。
-
-旧 duration 模拟器的 pulse_forward(100) 没有映射到该接口，不能沿用其速度/距离假设。真实安装、输入、释放、转向和静止行为仍需单独批准的可丢弃本地世界验收；不能回退到旧 key/look/release 路由。详见[单次采样适配契约](navigation-controller/docs/ONE_SAMPLE_ADAPTER.md)和[导航验收边界](navigation-controller/docs/ACCEPTANCE.md)。
-
-## 建筑当前边界
-
-只实现地板/墙体模板、纯色/棋盘/边框图案、预览与材料数量，目标区域必须显式指定，蓝图最多 512 格。规划会扣除已经正确的方块；冲突、未知地形、危险、实体/玩家重叠或材料不足会阻止整份放置提案。支撑顺序只证明几何相邻依赖，不证明能走到、看见或够到放置面。
-
-所有输出明确标记 executable=false。没有放置原语、执行适配器、真实输入或自动收集/合成/破坏/替换。合成示例仅展示几何规划；脱敏真实采集会因实体覆盖、玩家重叠与空背包产生零提案。未来仍需单块放置保护、实际站位/视线/物品选择校验和单独的实机验收，见[建筑验收边界](building-controller/docs/ACCEPTANCE.md)。
-
-## 本次仅保留的缺陷修正
-
-Java HTTP 编码只在 guarded_movement 对象中保留已明确给出的 null 占用/观察字段；缺失字段仍然未知，其他响应对象及配置文件编码行为不变，所有保护条件不变。离线复现证明这是一个协议编码缺陷，但尚不能把它认定为之前笼统只读失败的原因。
-
-探测工具只输出固定阶段、白名单错误码和经验证的数字 HTTP 状态，不输出响应正文、认证值、缺失字段名或任意异常文本。正常可写时，失败与中断也保存 JSON 诊断结果；若写入被中断，会报告未保存，文件可能只有部分内容，不能把它当作有效结果。stdout 关闭或 Ctrl+C 不会重复追加第二个 JSON 或丢掉已经记录的动作计数。不能把报告失败当作动作未发送或可重试的证明。
-
-## 数据与许可证
-
-桥接服务保持本机回环和私有 bearer token 认证。令牌只应存放在私有运行配置中，不能提交到 Git。本仓库不包含游戏客户端、编译后的模组、存档、运行会话、令牌、个人账号或服务器地址；已有 Gradle wrapper 仅为构建工具。导航回归中只包含明确脱敏的地形测试夹具：身份标识被替换、水平坐标平移、时间刻重设，没有原始会话信息。
-
-上游 MIT 与 Gradle Apache 许可证保留。独立 Python 战斗、导航与建筑组件尚未指定许可证授权，详见 [NOTICE](NOTICE.md)。
+认证和回环限制保留。仓库只放源码、测试与合成/脱敏夹具，不包含令牌、私人队列、运行报告、截图、存档、安装配置或新编译的模组二进制。来源与许可证见 [NOTICE](NOTICE.md)。

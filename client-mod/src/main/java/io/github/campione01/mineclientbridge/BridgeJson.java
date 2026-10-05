@@ -26,7 +26,9 @@ final class BridgeJson {
                 writer.name(entry.getKey());
                 // Ownership and an unavailable observation are explicitly nullable protocol facts.
                 // An absent field must remain distinguishable from an explicit idle/unavailable null.
-                writer.setSerializeNulls(entry.getKey().equals("guarded_movement") && entry.getValue().isJsonObject());
+                writer.setSerializeNulls(((entry.getKey().equals("guarded_movement")
+                        || entry.getKey().equals("client_action")) && entry.getValue().isJsonObject())
+                        || entry.getKey().equals("action_id"));
                 ELEMENTS.write(writer, entry.getValue());
                 writer.setSerializeNulls(false);
             }

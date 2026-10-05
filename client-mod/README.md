@@ -1,169 +1,42 @@
-# MineClient Bridge: integrated development snapshot
+# MineClient Bridge: client-actions source
 
-> Based on upstream 1.1.5, with experimental terrain, guarded combat and guarded forward samples (`1.1.5-terrain-guard-navigation.2`). The current full mod build and 64 JUnit cases pass, and small read-only live terrain checks pass; guarded combat/movement and navigation acceptance remain incomplete. Read [the repository status](../README.md#验证状态) and [current encoding correction verification](docs/serialization-verification.md). Historical upstream checks below do not verify these extensions.
+Current development version: `1.1.6-client-actions.1`, based on [Campione01/MineClient-Bridge v1.1.5](https://github.com/Campione01/MineClient-Bridge/tree/60e78940f7e7fa06116cf4fbc58df346ad617531). Original MIT notices are preserved.
 
+## Current path
 
-MineClient Bridge is a client-side NeoForge 1.21.1 mod that exposes an authenticated HTTP interface on the local loopback address. External tools can inspect the active Minecraft client, capture its current framebuffer, and operate configured keys and GUI controls. Isolated background sessions use process-local virtual input rather than the operating system cursor and clipboard.
+This client-only NeoForge mod runs ordinary Minecraft movement and interaction each tick. The external resident process chooses tasks and routes; it does not simulate game physics or inventory.
 
-The repository also includes an optional MCP server and a reusable Codex skill for isolated client acceptance workflows. MineClient Bridge is independent of any gameplay mod.
+The authenticated loopback API adds:
 
-## Supported Environment
+- `POST /control/action`: `follow_path`, `break_block`, `place_block`, `click_slot`
+- `GET /control/action/status`: current or named action status
+- `POST /control/action/cancel`: cancel exactly the named action
+- Observed menu/slot data for external crafting decisions
 
-- Minecraft 1.21.1
-- NeoForge 21.1.197 or newer within the 21.1 line
-- Java 21
-- Client installation only; no server installation is required
+Existing key/raw-key/look/mouse/text/command controls remain available with atomic direct-input takeover. Action IDs, recorded outcomes and process-session identity prevent blind replay. Outcomes are client-observed; `server_confirmed:false` is deliberate.
 
-The mod itself has no gameplay-mod dependency. The optional prepared-root launcher in the bundled MCP currently targets Windows because it launches clients on native background desktops. Direct HTTP clients can use the mod without the MCP.
+The new action path supports ordinary compatible multiplayer. It does not impose the older guarded-local experiments' singleplayer, full-health or half-forward-sample policies. Minecraft's normal reach, interactions and server permissions still apply. Old experimental classes/routes remain separate and cannot own input while a new client action owns it.
 
-## Capabilities
+Read [the complete action contract](docs/client-actions.md) and [the resident controller guide](../resident-controller/README.md).
 
-- Read bridge and client session status.
-- Capture the presented framebuffer as PNG without writing a screenshot first.
-- Inspect configured key mappings and held state.
-- Inspect bounded player, world, inventory, effect, crosshair, weather, nearby-entity, GUI-widget, and container-slot state.
-- Press, release, or tap a named Minecraft `KeyMapping`, or send an internal keyboard event for keys such as Enter, Escape, and F1.
-- Change player view, send normal in-world mouse buttons and scroll through Minecraft's native mouse callback, operate GUI pointer controls, and submit bounded text through the active screen.
-- Submit a Minecraft command directly without opening the chat screen.
-- Release all held mappings and request a graceful client shutdown.
+## Build and evidence
 
-MineClient Bridge does not expose arbitrary shell commands, scripts, filesystem operations, or direct world-edit endpoints. Its input endpoints can still trigger normal gameplay and GUI actions, just as a player can.
+Requires Java 21. From this directory:
 
-## Security And Privacy
-
-- The HTTP server binds to `127.0.0.1` by default and rejects non-loopback callers again on every request.
-- Every `/control/*` request requires `Authorization: Bearer <token>`.
-- A 256-bit token is generated with `SecureRandom`, stored in `config/mineclient-bridge.token`, restricted to the current owner where the platform supports it, and never logged.
-- `config/mineclient-bridge.json` contains only `enabled`, `host`, and `port`.
-- Request bodies, JSON responses, framebuffer PNGs, queries, GUI entries, and text input all have fixed upper bounds.
-- Text and command input reject control characters and enforce fixed length limits.
-- Authorized command input uses Minecraft's normal client command path; the connected server still decides command permissions.
-- Held mappings are released when the bridge or client stops.
-- The mod contains no telemetry and sends no data to an external service.
-
-Any local program that receives the token can operate the exposed client actions. Do not publish or share the token. See [SECURITY.md](SECURITY.md) for the threat model and reporting instructions.
-
-## Installation
-
-1. Install NeoForge for Minecraft 1.21.1.
-2. Only after separately approving experimental installation, place `mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.2.jar` in a disposable test client's `mods` directory. Preserve the known-working client; never install two bridge versions together. Follow the guarded-action acceptance gates before enabling that route.
-3. Start the client. The mod creates its config and token files on first launch.
-4. Connect an authorized loopback client to `http://127.0.0.1:38121` using the generated token.
-
-The bridge is enabled by default. Set `"enabled": false` in `config/mineclient-bridge.json` to turn it off. The host is always constrained to loopback. Runtime overrides are available through `mineclientBridge.*` system properties or `MINECLIENT_BRIDGE_*` environment variables for `enabled`, `host`, `port`, and `token`.
-
-## Background Input Isolation
-
-Version 1.1.3 virtualizes mouse capture/release, keyboard polling and clipboard
-access in isolated sessions. Physical keyboard and mouse callbacks are ignored
-there; authenticated Bridge input still runs through Minecraft's handlers.
-Normal foreground Minecraft sessions retain their native input behavior.
-
-Version 1.1.5 also lets an isolated session grab the mouse without operating system
-focus. Minecraft refuses to continue an attack or to turn the player while the mouse is
-ungrabbed, and `MouseHandler.grabMouse()` is gated on window focus that such a client
-never receives. The bypass is scoped to that one method, so window focus keeps its normal
-meaning everywhere else, and the native cursor is still never captured.
-
-Enable isolation with `-DmineclientBridge.isolatedInput=true` or
-`MINECLIENT_BRIDGE_ISOLATED_INPUT=true`. A supplied non-Default
-`mineclientBridge.desktopName` or `MINECLIENT_BRIDGE_DESKTOP_NAME` also enables
-it by default. The bundled background launcher explicitly enables it and checks
-the installed isolation classes before launch and the live capability before
-input. `/control/status` reports `input_isolation` and its suppression counters.
-
-An independent Windows Desktop alone does not isolate the shared Windows cursor.
-These hooks cover Minecraft's input APIs; they are not an operating-system
-sandbox for arbitrary third-party native code. Gameplay mods that directly warp
-the OS pointer must use a process-local path in their background integration.
-
-## HTTP Endpoints
-
-`GET /control/status`, `GET /control/capabilities`, `GET /control/frame`, `GET /control/keymaps`, `GET /control/state`, `GET /control/terrain`, `GET /control/screen`, `POST /control/key`, `POST /control/raw-key`, `POST /control/look`, `POST /control/mouse`, `POST /control/text`, `POST /control/command`, `POST /control/release-all`, and `POST /control/close`.
-
-All Minecraft state reads and input changes are dispatched to the client main thread. A named mapping is driven through the handler its bound key would use, so `InputEvent.Key` and `InputEvent.MouseButton` are published and gameplay mods that read their controls from those events respond; like a real device, every mapping sharing that key reacts. Send `"exact": true` to activate only the requested `KeyMapping` instead, by borrowing an unused keyboard key for the length of one event; an unbound mapping always uses that route. A borrowed key cannot be held, and a mouse-bound mapping is refused while a screen is open, because the screen route would click whatever the pointer sits on rather than activate the mapping. World mouse buttons use Minecraft's native `MouseHandler` callback so NeoForge and gameplay-mod input events receive the same press/release sequence as a real client mouse; world scroll passes through NeoForge's mouse-scroll event before normal hotbar behavior. `POST /control/command` accepts up to 256 command characters with or without a leading slash. `POST /control/text` keeps normal chat-screen behavior, so submitted slash-prefixed text is handled as a command by Minecraft. Raw keys are delivered through Minecraft's own `KeyboardHandler`; the bridge never injects operating-system input. Raw-key and world-mouse `down` and `up` actions are idempotent. A `click` on a held input completes that press; otherwise it sends a new press/release pair, so every click ends released and repeated clicks remain independent. Release-all, close, and bridge shutdown emit native releases for every tracked raw key and world mouse button, including when a screen opened while a world button was held.
-
-Every key, raw-key and world-mouse response carries `mod_input_event`, listing each event that dispatch published and whether a mod cancelled it, and `/control/status` reports `mouse` and `mod_input_events`. Together they separate a gameplay mod deliberately taking over a button from input that never arrived. `event_fired: false` is not by itself proof of the latter: Minecraft returns before publishing a key event when a screen consumes the key, exactly as it does for a physical keyboard. The screen-scope `mouse`, `look`, `text`, `command` and `release-all` routes do not drive a device handler and carry no `mod_input_event`.
-
-## MCP And Codex Integration
-
-The optional MCP server lives in [`mcp/`](mcp/). It exposes seven `minecraft_client_*` tools for launch/register, status, framebuffer capture, structured queries, bounded input, and exact-session shutdown. See [mcp/README.md](mcp/README.md) for installation and its Windows prepared-root contract.
-
-The reusable skill at [`integrations/codex/minecraft-client-acceptance`](integrations/codex/minecraft-client-acceptance) describes evidence-based client testing and disjoint multi-agent background-client batches.
-
-## Historical Upstream Live Client Verification
-
-
-The upstream project documented a real 960x540 framebuffer from its NeoForge 1.21.1 smoke session. The gameplay model belongs to a separate compatibility-test mod; MineClient Bridge adds no in-game overlay. In the same session the MCP verified exact process/desktop/root identity, queried client state and 46 key mappings, captured PNG pixels, exercised view and `key.sneak` press/release, cleared held input, and confirmed exact PID and background Desktop cleanup. The machine-readable summary is in [`docs/evidence/1.0.0-client-smoke.json`](https://github.com/Campione01/MineClient-Bridge/blob/60e78940f7e7fa06116cf4fbc58df346ad617531/docs/evidence/1.0.0-client-smoke.json).
-
-## Build And Test
-
-```powershell
-.\gradlew.bat clean build
-npm --prefix .\mcp test
+```sh
+JAVA_HOME=/path/to/jdk-21 GRADLE_USER_HOME=/path/to/gradle-cache \
+  bash gradlew --no-daemon --max-workers=1 -Dorg.gradle.parallel=false \
+  -Pneo_version=21.1.255 -Pbridge.noRecompile=true test build
 ```
 
-The development artifact is `build/libs/mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.2.jar`. No compiled mod is distributed in this source repository. See [the verified build command](docs/serialization-verification.md).
+Use `--offline` only when the official dependencies are already cached. The binary-dependency pipeline compiles the complete mod without rebuilding Minecraft's own sources.
 
-## License And References
+The final source build passed 75 JUnit cases against Minecraft 1.21.1 / NeoForge 21.1.255. No installed profile, token, client launch or live gameplay was used by the source implementation task. Installation/native-client restoration and real gameplay milestones are separate. See [verification](docs/client-actions-verification.md).
 
-MineClient Bridge is licensed under the [MIT License](LICENSE). MCPFabric and DebugBridge were consulted as design references only; no source, assets, or binaries from either project are included. See [THIRD_PARTY_REFERENCES.md](THIRD_PARTY_REFERENCES.md).
+No compiled mod JAR is published here. The unchanged Gradle wrapper is build tooling.
 
-The bundled mod icon is an original upstream AI-assisted illustration and does not depict a separate in-game UI.
+## Existing observation and experiments
 
-## Experimental terrain extension
+[Terrain API](docs/terrain-api.md), [limited earlier live terrain reads](docs/terrain-live-validation.md), MCP integration, previous guarded-local prototypes and their verification records remain available. Their historical acceptance boundaries should not be treated as the new client-actions contract.
 
-See [the bounded terrain API](docs/terrain-api.md) for paging, limits, unknown-cell semantics, validation, and current verification limits. This integrated development source uses version `1.1.5-terrain-guard-navigation.2`; it is not a live-tested release.
-
-The terrain extension passed a complete Gradle compile/test/build against NeoForge 21.1.255 using the official memory-efficient binary dependency pipeline. See [verification details](docs/terrain-verification.md). The earlier terrain-only extension passed limited live reads of a 27-cell cube, equivalent seven-page scan and 17-cell vertical boundary. Sanitized offline schema/planner regressions also pass. Maximum scans, navigation and combat remain unvalidated; this does not live-accept the current navigation-primitives build. See [the limited live record](docs/terrain-live-validation.md) and [captured-data limits](../navigation-controller/docs/PROTOCOL.md#captured-schema-regression).
-
-## Experimental guarded local actions
-
-The additive, default-disabled [guarded action endpoint](docs/guarded-actions.md)
-is an experimental interface for bounded look and ordinary attack attempts in an
-unpublished local Survival world. Planning stays external. Its dependency-free
-guard/cancellation checks do not establish a full NeoForge build or live-combat
-acceptance, and existing upstream input routes are unchanged.
-
-The preceding terrain + guard build passed all 14 Gradle/JUnit cases. It is still disabled for guarded input by default and has no live acceptance. See [integrated verification](docs/integrated-verification.md).
-
-## Experimental guarded forward sample
-
-The current source adds a separate **default-disabled, unaccepted**
-[guarded forward sample](docs/guarded-movement.md). It offers at most one ordinary
-half-forward input sample, clears its owned fields at tick end, and waits for
-release before acknowledging. Its 100 ms bound is a handler-entry-to-sample lease,
-not held-key duration or a physical stopping guarantee. It does not brake vanilla
-momentum, and stalled cleanup can block acknowledgement. A separately default-disabled yaw primitive and offline one-sample adapter now exist;
-optional numeric-loopback HTTP/probe source now exists but has only mocked tests;
-real navigation route-following remains blocked.
-
-The preceding movement-only build passed 35 JUnit cases, including 21 movement tests.
-No installation or live input was part of that earlier source build. The current
-previous navigation.1 JAR was used for a read-only attempt that failed generically;
-no guarded turn/forward action ran, and the client was saved and closed. The new
-navigation.2 correction is not installed. See
-[movement build verification](docs/movement-verification.md).
-
-## Experimental guarded player-only yaw
-
-A separate default-disabled [yaw-only primitive](docs/guarded-turning.md) changes
-at most 30 degrees using validated float32 angles. It shares movement admission,
-one-use state observations and replay protection; every turn needs fresh state
-before any following action. It changes no pitch and applies no movement impulse.
-
-The preceding navigation-primitives build passed 54 JUnit cases (35 prior plus 19
-yaw cases). The external adapter has fake coverage and an optional default-read-only HTTP
-probe implementation. The latter was tested with mocked sockets only. A prior real read-only attempt failed with an unresolved generic error; no guarded
-turn or forward action ran, and the client was saved and closed. The new correction
-has not been installed. Custom-bridge acceptance is now paused. See [current verification](docs/turning-verification.md).
-
-## Frozen encoding correction
-
-Source revision `navigation.2` preserves explicit null facts only within the
-`guarded_movement` response object; unrelated encoding and all guard policies stay
-unchanged. Full offline build/tests pass 64 JUnit cases, with 1,018 independent
-compatibility comparisons for each of Gson 2.10.1 and 2.11.0. This is not a
-confirmed diagnosis or live fix of the earlier generic read-only failure.
-The new JAR is uninstalled, and custom-bridge live work is paused. See
-[serialization verification](docs/serialization-verification.md).
+[Security](SECURITY.md), [MIT license](LICENSE), [design references](THIRD_PARTY_REFERENCES.md) and [repository provenance](../NOTICE.md).

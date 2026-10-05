@@ -1,5 +1,7 @@
 # External local navigation controller (experimental)
 
+This directory retains the earlier prototype and algorithm work. The current real-client execution path is [resident-controller](../resident-controller/README.md) with [client-actions](../client-mod/docs/client-actions.md). The A*/terrain helpers here are reused unchanged; prototype-specific runtime gates apply only to their own adapters.
+
 **Custom-bridge live work is paused.** This preservation snapshot contains 254
 offline/mock tests and narrow diagnostic/report fixes. A prior real read-only
 probe failed generically; its exact cause remains unknown. No guarded turn or

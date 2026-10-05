@@ -13,6 +13,7 @@ final class GuardedGameTurning {
         Minecraft mc = Minecraft.getInstance();
         return GuardedGameMovement.LEASES.submitTurn(request, receivedNanos, entrySession, targetYaw, mc::execute,
                 () -> {
+                    GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
                     GuardedAction.require(mc.player != null && enabled(), "guarded_turning_disabled");
                     return GuardedGameMovement.snapshot(mc, mc.player.input, false, enabled());
                 }, yaw -> {

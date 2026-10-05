@@ -46,3 +46,9 @@ venv/
 *.iml
 .DS_Store
 Thumbs.db
+
+# Resident controller mailbox files are never source artifacts
+**/.runtime/
+**/mailbox/
+**/observation.json
+**/latest.png

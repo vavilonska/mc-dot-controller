@@ -65,6 +65,7 @@ final class GuardedGameMovement {
     private static void sample(MovementInputUpdateEvent event) {
         Minecraft mc = Minecraft.getInstance();
         if (event.getEntity() != mc.player) return;
+        if (ClientActions.ownsInput()) { cancelOnGameThread("action_input_owned"); return; }
         Input input = event.getInput();
         LEASES.sample(() -> snapshot(mc, input, true, enabled()), () -> {
             GuardedAction.require(mc.isSameThread() && mc.player != null && mc.player.input == input,
@@ -83,6 +84,7 @@ final class GuardedGameMovement {
 
     static GuardedMovement.State snapshot(Minecraft mc, Input input, boolean checkCorridor, boolean actionEnabled) {
         GuardedAction.require(mc.isSameThread(), "minecraft_thread_required");
+        GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
         GuardedAction.require(mc.player != null && mc.level != null && mc.gameMode != null, "not_in_world");
         var player = mc.player;
         var level = mc.level;

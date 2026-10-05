@@ -13,6 +13,7 @@ public final class MineClientBridgeMod {
     public MineClientBridgeMod(IEventBus modEventBus) {
         InputEventProbe.install();
         GuardedGameMovement.install();
+        ClientActions.install();
         BridgeServer.start();
         Runtime.getRuntime().addShutdownHook(new Thread(
                 BridgeServer::stop,

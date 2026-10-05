@@ -1,5 +1,7 @@
 # External Minecraft combat controller
 
+This directory retains the earlier prototype and algorithm work. The current real-client execution path is [resident-controller](../resident-controller/README.md) with [client-actions](../client-mod/docs/client-actions.md). The A*/terrain helpers here are reused unchanged; prototype-specific runtime gates apply only to their own adapters.
+
 **当前阶段：外置战斗逻辑及受保护接口已接好，默认关闭；这里只完成了离线测试，尚未验收自动战斗。**
 
 A standard-library-only Python controller for a thin Minecraft client bridge.
