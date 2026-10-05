@@ -1,14 +1,16 @@
 # Live navigation acceptance remains outstanding
 
 This component contains source, protocol parsers, a bounded planner and fake tests.
-There is no live HTTP movement adapter, hidden enable flag, token reader or
-fallback to legacy key/look/release routes. `Navigator` defaults to disabled and
+The optional HTTP transport is source-tested with mocks only. There is no token
+discovery, saved credential configuration or fallback to legacy input routes. `Navigator` defaults to disabled and
 also rejects adapters without the explicit simulation-only marker. This marker is
 an interface contract for the included fake, not a sandbox against malicious Python.
 
 The companion source now supplies separate default-disabled guarded forward-sample
 and yaw primitives. The new `sample_adapter.py` and wire fake implement their
-external contract without a live transport. The original combat look/attack
+external contract. An optional numeric-loopback transport now connects this
+contract only when caller-supplied credentials and both explicit acceptance gates
+are provided; it was not used against any game during implementation. The original combat look/attack
 endpoint is not reused for navigation. Legacy queued key input could execute
 after a timeout, world switch or newer observation and remains forbidden.
 
@@ -17,7 +19,7 @@ or 100 ms of travel. The original `executor.py` duration fake is not wired to it
 See [the one-sample contract](ONE_SAMPLE_ADAPTER.md) for implemented source checks
 and settling behavior; neither fake establishes Minecraft physics acceptance.
 
-## Required before a real adapter
+## Required before owner-run live acceptance
 
 1. Obtain explicit user approval for a separate live navigation acceptance session
    in a disposable, unpublished local Survival world, preserving the working mod,
@@ -64,3 +66,7 @@ python -m navigation_controller.sample_demo
 The independent source review identified and regressions now cover observation
 bracket drift, elapsed deadlines between look and pulse, and A* cost/depth pruning
 under a finite route-length cap. All were fixed before the source handoff.
+
+See [the owner-run probe guide](OWNER_PROBE.md) for read-only default commands,
+exactly-one-action opt-ins, hidden token entry and nonsecret report handling.
+No guarded movement/yaw runtime acceptance was performed by this source task.

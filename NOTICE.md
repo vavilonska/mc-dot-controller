@@ -27,7 +27,7 @@ The wrapper is build tooling. No Minecraft, NeoForge, or compiled client-mod JAR
 
 ## External navigation controller
 
-`navigation-controller/` is separate original Python source for bounded terrain parsing, local A* planning, and fake-only execution, including a separate one-sample/yaw wire adapter and settling-readback simulation. It contains no live HTTP movement adapter or Minecraft source/assets. Upstream protocol references are recorded in its documentation. Its one explicitly sanitized captured-terrain JSON fixture replaces identities, translates horizontal coordinates, and rebases ticks; it contains no names, inventories, credentials, URLs, private paths, or raw session data. No license grant has been assigned to this original component; the `client-mod/` upstream license does not automatically apply to it.
+`navigation-controller/` is separate original Python source for bounded terrain parsing, local A* planning, and fake-only route-following, including a separate one-sample/yaw wire adapter and settling-readback simulation. It includes optional numeric-loopback HTTP/probe source, default read-only and limited to one explicitly accepted local action per transport instance. It has not been used against a game; live route-following remains blocked. No Minecraft source/assets are included. Upstream protocol references are recorded in its documentation. Its one explicitly sanitized captured-terrain JSON fixture replaces identities, translates horizontal coordinates, and rebases ticks; it contains no names, inventories, credentials, URLs, private paths, or raw session data. No license grant has been assigned to this original component; the `client-mod/` upstream license does not automatically apply to it.
 
 ## External building planner
 

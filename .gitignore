@@ -26,6 +26,8 @@ venv/
 **/assets/
 *.log
 *.token
+# Owner-run probe reports are local runtime evidence
+**/probe-*.json
 .env
 .env.*
 !.env.example

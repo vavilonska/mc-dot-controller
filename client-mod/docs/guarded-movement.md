@@ -168,7 +168,9 @@ The original external duration fake remains separate and must not map
 `pulse_forward(100)` to this route assuming 100 ms of held movement or its fake
 4-block/s displacement. A new [offline one-sample adapter](../../navigation-controller/docs/ONE_SAMPLE_ADAPTER.md)
 now checks fresh observations, leases/results and near-rest readback using an
-explicitly simulated transport. There is no live HTTP implementation. Actual
+explicitly simulated transport. Optional [owner-run HTTP/probe source](../../navigation-controller/docs/OWNER_PROBE.md)
+now exists, with read-only defaults and a one-POST maximum after explicit local-test
+acceptance. It has only mocked tests; live routes remain blocked. Actual HTTP,
 progress, displacement and settling thresholds still need game acceptance.
 
 A separate default-disabled [guarded player-only yaw route](guarded-turning.md)

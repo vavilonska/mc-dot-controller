@@ -150,9 +150,12 @@ float-representable target. Turning and moving cannot reuse one observation ID.
 The separate movement primitive still means one half-forward sample, not a
 100 ms held key; settling and progress thresholds need real physics acceptance.
 
-The external source adapter and fake transport can exercise this wire contract
-without an HTTP implementation, token handling or game input. Successful fake
-execution does not establish real turning/navigation acceptance. Before any live
+The external source adapter and fake transport exercise this wire contract
+offline. Optional [owner-run HTTP/probe source](../../navigation-controller/docs/OWNER_PROBE.md)
+is also available, default read-only and restricted to one explicitly accepted
+local test; it has only mocked-socket coverage. No real token, HTTP or input was
+used during implementation. Successful fake execution does not establish real
+turning/navigation acceptance. Before any live
 use, preserve the working profile, obtain separate install/input permission and
 run isolated disposable-arena tests with only NeoForge and this bridge, covering
 all stop/timeout/identity/observation transitions and actual yaw/momentum readback.

@@ -3,9 +3,10 @@
 A Python standard-library, source-only companion to the thin MineClient Bridge
 terrain extension. Planning and navigation policy run outside Minecraft.
 
-**No live movement transport exists. The executor is disabled by default and only
-accepts the offline simulation adapter contract.** Running the demo cannot connect
-to Minecraft, discover credentials, or move a player. Fake tests are not live
+**All action paths are disabled by default.** An optional explicit loopback HTTP
+transport and owner-run acceptance CLI are now available as source, but have not
+been connected to a game in this implementation task. The demos remain offline
+and cannot discover credentials or move a real player. Mock tests are not live
 navigation acceptance or a Minecraft physics simulation.
 
 ## Run offline
@@ -34,7 +35,8 @@ travel duration or a displacement guarantee. The two fake models are distinct.
 - Bounded, ordered paging with a fixed scan generation/origin/bounds, exact cell
   coverage, world generation, monotonic tick and wall-clock freshness checks
 - Read-only collection through explicitly supplied callbacks; 50 ms page spacing,
-  finite scan/page budgets and no automatic HTTP retries or transport implementation
+  finite scan/page budgets and no automatic HTTP retries; the collector is separate
+  from the optional explicit HTTP transport
 - A* over known loaded support and headroom, with expansion/frontier/time/path budgets
 - Flat cardinal and diagonal walking, with both corner columns checked for diagonals
 - One-block cardinal descent planning with swept headroom at the original height;
@@ -60,13 +62,17 @@ not extrapolate a route through an unseen chunk or provide global navigation.
 - `observation.py`: actual status/state parsing and safe observation gates
 - `executor.py`: fake-only finite-pulse navigation state machine
 - `fake.py`: deterministic terrain and original duration-based fixtures; not game physics
-- `sample_adapter.py`: guarded one-sample/turn contract, default disabled, offline transport only
+- `sample_adapter.py`: guarded one-sample/turn contract with dual live-acceptance gates
 - `sample_fake.py`, `sample_demo.py`: wire-shaped fake and separate one-sample demonstration
+- `http_transport.py`: explicit numeric-loopback HTTP, strict schemas, auth and response budgets
+- `live_probe.py`: owner-run read-only report or exactly one explicitly approved local action
 - `tests/`: positive paths and failure-mode regression tests
 
 Read [protocol and evidence rules](docs/PROTOCOL.md), the
 [one-sample adapter contract](docs/ONE_SAMPLE_ADAPTER.md), and the
-[live acceptance boundary](docs/ACCEPTANCE.md) before implementing any live transport.
+[live acceptance boundary](docs/ACCEPTANCE.md). The
+[owner-run probe guide](docs/OWNER_PROBE.md) explains prerequisites and commands;
+reading it does not authorize a game action.
 
 ## Status
 

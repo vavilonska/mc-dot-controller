@@ -1,6 +1,7 @@
-"""Default-disabled guarded one-sample contract over an OFFLINE transport only.
+"""Default-disabled guarded one-sample contract over an explicitly selected transport.
 
-No HTTP client, credentials or legacy input routes. The included fake is not
+Live transport requires separate explicit acceptance in both adapter and transport.
+No credentials or legacy input routes are handled here. The included fake is not
 Minecraft physics; 100 ms is an admission lease, never a movement duration.
 """
 from dataclasses import dataclass
@@ -27,6 +28,7 @@ class OfflineTransport(Protocol):
 @dataclass(frozen=True)
 class SampleConfig:
     enabled: bool = False
+    acceptance_verified: bool = False
     max_actions: int = 192
     max_samples: int = 96
     max_seconds: float = 30.0
@@ -34,7 +36,7 @@ class SampleConfig:
     settle_reads: int = 16
 
     def __post_init__(self):
-        if type(self.enabled) is not bool:
+        if type(self.enabled) is not bool or type(self.acceptance_verified) is not bool:
             raise ValueError('invalid_enabled')
         integer(self.max_actions, 1, 512)
         integer(self.max_samples, 1, 256)
@@ -124,7 +126,7 @@ class GuardedSampleAdapter:
                            '/control/terrain?radius=1&vertical=1&limit=128'})
     WRITE_PATHS = frozenset({'/control/guarded-movement', '/control/guarded-turn'})
 
-    def __init__(self, transport, clock, expected_identity, config=None, nonce_factory=None):
+    def __init__(self, transport, clock, expected_identity, config=None, nonce_factory=None, expected_movement_session=None):
         self.transport, self.clock = transport, clock
         self.config = config or SampleConfig()
         if len(expected_identity) != 4:
@@ -134,6 +136,7 @@ class GuardedSampleAdapter:
             raise ValueError('invalid_expected_run')
         integer(pid, 1); uuid(player); uuid(world)
         self.expected_identity = tuple(expected_identity)
+        self.expected_movement_session = (None if expected_movement_session is None else uuid(expected_movement_session))
         self.nonce_factory = nonce_factory or (lambda: str(uuid4()))
         self._session = None
         self._latest = None
@@ -144,11 +147,26 @@ class GuardedSampleAdapter:
 
     def _request(self, method, path, body=None):
         if getattr(self.transport, 'simulation_only', None) is not True:
-            raise SampleError('live_transport_not_implemented')
+            live_config = getattr(self.transport, 'config', None)
+            if (self.config.acceptance_verified is not True
+                    or getattr(live_config, 'acceptance_verified', None) is not True
+                    or self.expected_movement_session is None):
+                raise SampleError('live_acceptance_required')
+            if method == 'POST' and getattr(live_config, 'enabled', None) is not True:
+                raise SampleError('live_transport_disabled')
         if self._faulted:
             raise SampleError('adapter_fault_latched')
         if method == 'GET':
-            if path not in self.READ_PATHS or body is not None:
+            cursor_path = False
+            if isinstance(path,str) and path.startswith('/control/terrain?cursor='):
+                cursor = path.removeprefix('/control/terrain?cursor=')
+                try:
+                    generation, offset = cursor.rsplit(':',1)
+                    uuid(generation)
+                    cursor_path = str(integer(int(offset),1,18_513)) == offset
+                except (ValueError,TypeError):
+                    cursor_path = False
+            if (path not in self.READ_PATHS and not cursor_path) or body is not None:
                 raise SampleError('read_not_allowlisted')
         elif method == 'POST':
             if not self.config.enabled:
@@ -169,10 +187,22 @@ class GuardedSampleAdapter:
                 raise SampleError('ambiguous_action_response') from None
             raise SampleError('read_failed') from None
 
+    def stop(self):
+        """Close local admission; never send an unguarded network release.
+
+        A sent action may remain ambiguous. Bridge cleanup still owns release;
+        this method does not brake a player or prove remote input is neutral.
+        """
+        self._latest = None
+        self._faulted = True
+        close = getattr(self.transport, 'close', None)
+        if callable(close):
+            close()
+
     def prepare(self):
         data = self._request('GET', '/control/capabilities')
         try:
-            self._session = movement_status(data.get('guarded_movement'))
+            self._session = movement_status(data.get('guarded_movement'), self.expected_movement_session)
             turn_status(data.get('guarded_turn'))
         except (TerrainError, KeyError, TypeError):
             self._faulted = True
@@ -248,7 +278,21 @@ class GuardedSampleAdapter:
         try:
             before = self._request('GET', '/control/status')
             before_world = self._status(before)
-            page = self._request('GET', '/control/terrain?radius=1&vertical=1&limit=128')
+            assembler = TerrainAssembler(before_world,started,max_pages=27,max_scan_ticks=2,max_scan_seconds=.3)
+            path = '/control/terrain?radius=1&vertical=1&limit=128'
+            floor_ids = {}
+            while True:
+                if number(self.clock.monotonic())-started >= .3:
+                    raise SampleError('terrain_observation_deadline')
+                page = self._request('GET',path)
+                assembler.add(page,self.clock.monotonic())
+                floor_ids.update({Block.parse(c): c.get('id') for c in page['cells']})
+                if assembler.complete:
+                    break
+                if number(self.clock.monotonic())+.05-started >= .3:
+                    raise SampleError('terrain_observation_deadline')
+                self.clock.sleep(.05)
+                path = '/control/terrain?cursor='+assembler.next_cursor
             state_started = number(self.clock.monotonic())
             state = self._request('GET', '/control/state?radius=4')
             after = self._request('GET', '/control/status')
@@ -256,23 +300,27 @@ class GuardedSampleAdapter:
             now = number(self.clock.monotonic())
             if not 0 <= now - state_started < .1:
                 raise SampleError('observation_local_deadline')
-            assembler = TerrainAssembler(before_world, started, max_scan_ticks=2, max_scan_seconds=.3)
-            assembler.add(page, now)
             grid = assembler.finish(WorldStamp.parse(after['world']), now)
             obs = from_wire(before, state, after, grid, started)
             obs.require_safe(now)
             gm = state['guarded_movement']
             context = SampleContext(obs, self._session, gm['observation_id'], yaw, state_started,
                                     integer(gm['requests_remaining'], 1, 4096),
-                                    MappingProxyType({Block.parse(c): c.get('id') for c in page['cells']}))
+                                    MappingProxyType(floor_ids))
             self._latest = context
             return context
         except Exception:
             self._latest = None
             self._faulted = True
+            if self.actions:
+                self.cleanup_verified = False
             raise SampleError('invalid_or_unsafe_observation') from None
 
     def _envelope(self, context, deadline):
+        if (getattr(self.transport,'simulation_only',None) is not True
+                and (self.config.max_actions != 1 or self.config.max_samples != 1
+                     or self.config.max_seconds > 5)):
+            raise SampleError('live_single_action_scope_required')
         if not self.config.enabled:
             raise SampleError('sample_adapter_disabled')
         now = number(self.clock.monotonic())
@@ -329,6 +377,7 @@ class GuardedSampleAdapter:
         except Exception:
             self._latest = None
             self._faulted = True
+            self.cleanup_verified = False
             raise
 
     def forward_sample(self, context, deadline):
@@ -346,6 +395,7 @@ class GuardedSampleAdapter:
         except Exception:
             self._latest = None
             self._faulted = True
+            self.cleanup_verified = False
             raise
 
     def _verify_readback(self, old, new, max_distance=.35, expected_yaw=None):
@@ -405,6 +455,8 @@ class SampleNavigator:
         adapter = self.adapter
         if not adapter.config.enabled:
             return SampleResult('sample_adapter_disabled')
+        if getattr(adapter.transport,'simulation_only',None) is not True:
+            return SampleResult('live_route_following_not_accepted')
         if self._busy:
             return SampleResult('navigator_busy')
         self._busy = True

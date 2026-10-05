@@ -135,7 +135,8 @@ half-forward input sample, clears its owned fields at tick end, and waits for
 release before acknowledging. Its 100 ms bound is a handler-entry-to-sample lease,
 not held-key duration or a physical stopping guarantee. It does not brake vanilla
 momentum, and stalled cleanup can block acknowledgement. A separately default-disabled yaw primitive and offline one-sample adapter now exist;
-there is still no live HTTP navigation transport.
+optional numeric-loopback HTTP/probe source now exists but has only mocked tests;
+real navigation route-following remains blocked.
 
 The preceding movement-only build passed 35 JUnit cases, including 21 movement tests.
 No installation or live input was performed for this extension. See
@@ -149,6 +150,6 @@ one-use state observations and replay protection; every turn needs fresh state
 before any following action. It changes no pitch and applies no movement impulse.
 
 The complete navigation-primitives build passes 54 JUnit cases (35 prior plus 19
-yaw cases). The external adapter exercises the wire contract only through a fake
-transport. No installation, live HTTP, actual input or physical settling has been
-accepted. See [current verification](docs/turning-verification.md).
+yaw cases). The external adapter has fake coverage and an optional default-read-only HTTP
+probe implementation. The latter was tested with mocked sockets only. No
+installation, live HTTP, actual input or physical settling has been accepted. See [current verification](docs/turning-verification.md).

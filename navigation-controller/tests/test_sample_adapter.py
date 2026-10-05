@@ -34,7 +34,7 @@ class SampleAdapterTests(unittest.TestCase):
 
     def test_no_live_transport_route(self):
         self.transport.simulation_only=False
-        with self.assertRaisesRegex(SampleError,'live_transport_not_implemented'):
+        with self.assertRaisesRegex(SampleError,'live_acceptance_required'):
             self.adapter.prepare()
         self.assertEqual(self.transport.calls,[])
 
