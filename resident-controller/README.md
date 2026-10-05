@@ -8,7 +8,10 @@ inventory, networking, or generate 100 ms key pulses.
 **Current source:** `1.1.6-loaded-scan.1` pairing, with 109 focused offline resident
 checks. A later bounded live scan reported 4,864 tested positions, 41 coal blocks,
 79 ms and 3 client ticks. This does not validate maximum scans, every biome/surface
-mode, aim accuracy or combat; combat has not been exercised against a live target.
+mode or general aim/combat reliability. A later short sword/shield script reported
+one successful zombie encounter: four attack dispatches, observed target death,
+and player health remaining 20. This is not server hit attribution or acceptance
+of persistent watchdog threat preemption.
 See [verification scope](../client-mod/docs/loaded-scan-verification.md).
 
 ## Owner start: once per playing session
@@ -322,6 +325,23 @@ No license grant has been assigned to these original components. The upstream MI
 license under `client-mod/` does not automatically license this independent code.
 The public source allowlist is `PUBLIC-FILES.txt`; it excludes runtime queues,
 observations, images, credentials, and generated Python caches.
+
+## Independent defense and persistent navigation
+
+The separate [v5 defense watchdog](../defense-watchdog/README.md) is the sole
+resident-queue writer while running; ordinary tasks use its IntentClient. It
+observes allowlisted hostiles, cancels stale navigation, and requests melee
+approach with bounded progress. This resident includes its required
+`melee_closing_schema_version:2`: actual eye-to-hit reach and full swept-corridor
+clearance. No mod change is needed for that correction.
+
+The [v2 route cursor](../navigation-cursor/README.md) retains a full local path,
+its next waypoint and pending request across calls. A defense-epoch change
+requires a fresh observation/replan; interrupted paths are not blindly replayed.
+The operator confirmed the loaded resident marker and one armed v5 watchdog.
+Earlier heartbeats/navigation and a separate single encounter do not establish
+all v5 approach, retreat or continuous-defense behavior. Published-layout checks:
+102 watchdog/reach cases, 109 resident cases and 38 navigator/gateway cases.
 
 ## Additional gameplay helpers
 

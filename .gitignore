@@ -58,3 +58,14 @@ Thumbs.db
 **/state.json
 **/state.tmp
 **/state-exporter.pid
+
+# Independent defense watchdog control data
+**/owner.lock
+**/STOP
+**/inbox/
+**/working/
+**/results/
+
+# Route checkpoints contain private session and world observations
+**/*route-checkpoint*.json
+**/checkpoints/

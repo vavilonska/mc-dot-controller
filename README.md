@@ -8,6 +8,8 @@
 - [`resident-controller/`](resident-controller/)：每个游玩会话由操作者启动一次的常驻进程；认证令牌只在内存中，模型通过共享文件队列提交任务和读取结果
 - [`navigation-controller/`](navigation-controller/)：保留已有 A* 与地形解析；常驻控制器直接复用，没有复制一套寻路器或模拟 Minecraft 物理
 - [`gameplay-helpers/`](gameplay-helpers/)：显式调用的制作、局部上下台阶路线与本地状态导出源码
+- [`defense-watchdog/`](defense-watchdog/)：v5 防御协调进程，对允许列表中的敌对生物使用有进度期限的近战接近；普通任务经 IntentClient 排队
+- [`navigation-cursor/`](navigation-cursor/)：v2 持久局部路线与游标；保留路径尾段，用实际位置确认进度，并通过 defense_epoch 防止战斗后执行旧路线
 
 服务端不需要安装此桥接模组。使用普通客户端交互、客户端预测和服务端规则；没有协议机器人、传送或世界编辑。
 
@@ -24,7 +26,7 @@
 - `craft_planks`：按实际菜单槽把一个观察到的原木转成四块木板，并检查背包变化
 - `pillar`：1–8 次普通跳跃与脚下放置，逐步读取结果
 - `aim_lock` / `aim_unlock`：外部视角锁定，保持原生画面与直接接管
-- `combat_start` / `combat_stop`：原生近战控制源码，尚未实战验收
+- `combat_start` / `combat_stop`：原生近战；射程改为眼部到实际命中点距离，接近通道检查覆盖完整扫过区域。一次旧短脚本剑盾遭遇成功，当前 v5 的完整防御循环仍待实机验收
 - `scan_start` / `scan_status` / `scan_cancel`：查询客户端已经加载的方块、群系、聚集区域和地表邻水候选；未知区块仍是未知，不强制加载
 - `cancel`、`resume`、`shutdown`；不会自动重连、复活、退出服务器或重放结果不明的 POST
 
@@ -41,7 +43,7 @@ python3 -m resident_controller --queue /path/to/shared/mailbox submit \
   --json '{"op":"observe","terrain":true,"frame":true}' --wait 10
 ```
 
-共享目录必须实际由两侧共享；共享源文件不代表共享进程、回环网络或临时目录。启动、任务示例和恢复规则见[指南](resident-controller/README.md)。
+共享目录必须实际由两侧共享；共享源文件不代表共享进程、回环网络或临时目录。启动、任务示例和恢复规则见[指南](resident-controller/README.md)。启用独立 watchdog 后，它应是唯一的 resident 队列写入者；普通任务须走 [IntentClient](defense-watchdog/README.md)，停止并确认输入释放后才恢复直接队列控制。
 
 ## 验证状态
 
@@ -50,7 +52,9 @@ python3 -m resident_controller --queue /path/to/shared/mailbox submit \
 - 制作 helper：23 项离线检查；其余可移植包装检查见对应文档
 - 本轮已完成一次小范围实机扫描：4,864 格、41 块煤，结果报告 79 ms、3 个客户端 tick。不是最大规模性能保证，也不代表所有群系/水边模式均已验收
 - 实际制作成功的范围：工作台、木镐、石镐、炉子、木棍、石斧、火把。铁工具、铁甲、盾等其他形状仍只有离线检查
-- 战斗没有实战验收；单位测试、输入分发和客户端观察不能冒充命中、击杀或服务端确认
+- 一次短脚本剑盾测试成功击杀僵尸：观察到 4 次攻击分发后目标死亡，玩家保持 20 血；这不是服务端命中归因或持续生存保证
+- 当前 v5 防御与 resident 近战标记 2 已由操作者换载，并确认唯一 v5 进程已 armed；本次公开副本通过 102 项防御/近战检查、109 项 resident 回归和 38 项寻路/实际 adapter 合同检查
+- 更早版本已观察心跳、多段短步导航与上述单次战斗；v5 的完整自然遇敌接近、受阻脱离、退路和持续生存仍未完成实机验收。部署成功不能替代这些结果
 
 公开验证摘要见[当前版本记录](client-mod/docs/loaded-scan-verification.md)。本仓库更新不会操作游戏，也不包含原始现场结果、真实方块位置或玩家身份。
 

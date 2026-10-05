@@ -1,8 +1,10 @@
 # Native-client melee combat source
 
 Integration for the Minecraft 1.21.1 resident controller paired with
-`1.1.6-loaded-scan.1`. Combat has not been exercised against a live target; source
-tests use temporary queues and in-memory fake bridges. A successful read-only
+`1.1.6-loaded-scan.1`. Source tests use temporary queues and in-memory fake
+bridges. A later short sword/shield script completed one observed zombie
+encounter: four attack dispatches, then target-dead, with player health still 20.
+Persistent watchdog threat preemption remains unverified; a successful read-only
 scan is not combat acceptance.
 
 ## Commands after the coordinated update
@@ -36,13 +38,16 @@ scan is not combat acceptance.
 2. Keeps a selected vanilla sword/axe if available. Otherwise selects an observed
    hotbar sword/axe and waits for a newer state confirming that selection. It
    never fabricates inventory, swaps storage, or crafts equipment.
-3. Outside ordinary melee reach, checks a short flat collision/support corridor
-   and holds forward. It releases forward before refreshing paginated terrain.
+3. Until the target is actually picked or its nearest AABB is within 2.5 blocks,
+   checks a short flat collision/support corridor and holds forward. It releases forward before refreshing paginated terrain.
    This accepts known full support rather than the old restricted floor-name
    allowlist. Holes, fluid, obstruction, stairs/slabs, jumps or unknown terrain
-   stop this minimal approach. It does not implement pursuit around obstacles.
-4. Within reach, releases forward and requires a fresh entity crosshair matching
-   UUID, entity ID and type before each ordinary `key.attack` click. No held
+   stop this minimal approach. Every column in the swept body rectangle is checked,
+   including columns that point samples could skip. It does not implement pursuit
+   around obstacles.
+4. After closing, releases forward and requires a fresh entity crosshair matching
+   UUID, entity ID and type, plus actual eye-to-hit distance within melee reach,
+   before each ordinary `key.attack` click. No held
    auto-attack key or synthetic hit/damage result is used.
 5. Spaces sword attempts by at least 0.7 seconds and axe attempts by at least
    1.35 seconds. These are deliberate fixed pacing values, not observed attack
@@ -109,7 +114,9 @@ session workflow remains; do not run a competing resident or invent new access.
 The current combined resident suite passes 109 offline checks. Its earlier combat
 subset had 81 cases (34 existing/aim + 47 combat). These tests establish protocol
 and control sequencing, not live combat, server hit confirmation, shield blocking
-or gameplay success. Real combat remains untested.
+or gameplay success. The separate live script result above is limited to one
+encounter; it does not validate every target, approach, menu interruption or
+continuous-defense transition.
 
 ```sh
 python3 -m compileall -q resident_controller tests
@@ -117,6 +124,14 @@ python3 -m unittest discover -s tests -v
 bash -n owner-start.sh
 ```
 
-A separately authorized encounter must verify actual equipment, target records,
+The independent [v5 watchdog](../../defense-watchdog/README.md) uses these existing
+operations and has been deployed as the sole defense queue coordinator. This
+resident includes `melee_closing_schema_version:2`: entity reach is measured from
+observed eye position to the actual hit point; approach checks every swept body
+column and keeps closing until the target is picked or the nearest AABB is within
+2.5 blocks. Correct identity and the actual eye-to-hit range still gate attacks.
+The gateway gives every admitted hostile bounded progress/departure rules. Its
+full natural-encounter, blocked-approach and retreat sequence still needs live evidence.
+Further separately authorized encounters must verify actual equipment, target records,
 ordinary swings, approach, shield release and direct/manual takeover. Dispatch
 counts must never be reported as confirmed hits or kills.

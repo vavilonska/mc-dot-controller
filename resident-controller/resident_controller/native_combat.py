@@ -52,6 +52,20 @@ def box_distance(eye, entity):
     return math.sqrt(result)
 
 
+def crosshair_target_in_reach(state, target_uuid, entity_id, entity_type):
+    """Minecraft 1.21.1 entity picking measures from the eye, not player feet."""
+    hit = state.get('crosshair', {})
+    if (hit.get('type') != 'entity' or hit.get('uuid') != target_uuid
+            or hit.get('entity_id') != entity_id or hit.get('entity_type') != entity_type):
+        return False
+    try:
+        eye, point = state['player']['eye_position'], hit['location']
+        distance = math.sqrt(sum((number(eye[k]) - number(point[k])) ** 2 for k in ('x', 'y', 'z')))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return distance <= MELEE_REACH
+
+
 def sweep_near_protected(state, target):
     """Observed sword-sweep overlap precaution, not an atomic protection guarantee."""
     if state['nearby'].get('truncated') is not False:
@@ -86,18 +100,14 @@ def flat_corridor_clear(state, target, cells):
     distance = math.hypot(dx, dz)
     if distance < 0.01:
         return False
-    checked = set()
-    for step in range(9):
-        travel = min(distance, 1.6) * step / 8
-        cx, cz = x + dx / distance * travel, z + dz / distance * travel
-        # Cover the ordinary 0.6-block player width, including corner columns.
-        for ox, oz in ((-.31, -.31), (-.31, .31), (.31, -.31), (.31, .31)):
-            key = math.floor(cx + ox), round(y), math.floor(cz + oz)
-            if key in checked:
-                continue
-            checked.add(key)
+    travel = min(distance, 1.6)
+    end_x, end_z = x + dx / distance * travel, z + dz / distance * travel
+    # Cover the full swept rectangle. Point samples can miss a corner column
+    # between simultaneous X/Z grid crossings, including an unknown/lava cell.
+    for cell_x in range(math.floor(min(x, end_x) - .31), math.floor(max(x, end_x) + .31) + 1):
+        for cell_z in range(math.floor(min(z, end_z) - .31), math.floor(max(z, end_z) + .31) + 1):
             for offset in (-1, 0, 1):
-                cell = cells.get((key[0], key[1] + offset, key[2]))
+                cell = cells.get((cell_x, round(y) + offset, cell_z))
                 if (not cell or cell.get('status') != 'loaded' or cell.get('known') is not True
                         or cell.get('collision_known') is not True
                         or cell.get('fluid') != 'minecraft:empty' or cell.get('hazards') != []):
@@ -139,7 +149,8 @@ class NativeCombat:
         self.release_confirmed = True
 
     def status(self):
-        return {'schema_version': 1, 'active': self.active, 'phase': self.phase,
+        return {'schema_version': 1, 'melee_closing_schema_version': 2,
+                'active': self.active, 'phase': self.phase,
                 'request_id': self.request_id,
                 'target_radius': self.target_radius, 'observation_radius': self.radius,
                 'reason': self.reason, 'target_uuid': self.target_uuid,
@@ -291,7 +302,10 @@ class NativeCombat:
         if self.weapon_selected_tick is not None and tick <= self.weapon_selected_tick:
             return
         distance = box_distance(state['player']['eye_position'], target)
-        in_reach = distance <= MELEE_REACH
+        crosshair_ready = crosshair_target_in_reach(state, self.target_uuid, self.target_id, self.target_type)
+        # AABB nearest distance alone can stop short of the actual aim ray.
+        # Keep closing until the current target is picked, or within 2.5 blocks.
+        in_reach = crosshair_ready or distance <= 2.5
         crosshair = state.get('crosshair', {})
         shield_crosshair = (crosshair.get('type') == 'miss'
                             or (crosshair.get('type') == 'entity' and crosshair.get('uuid') == self.target_uuid
@@ -331,11 +345,7 @@ class NativeCombat:
             return
         if self.shield_released_tick is not None and tick <= self.shield_released_tick:
             return
-        crosshair_distance = crosshair.get('distance_euclidean')
-        if (crosshair.get('type') != 'entity' or crosshair.get('uuid') != self.target_uuid
-                or crosshair.get('entity_id') != self.target_id or crosshair.get('entity_type') != self.target_type
-                or type(crosshair_distance) not in (int, float)
-                or not 0 <= crosshair_distance <= MELEE_REACH):
+        if not crosshair_ready:
             self.set_key(resident, 'key.use', shield_available)
             self.phase = 'waiting_target_crosshair'
             return

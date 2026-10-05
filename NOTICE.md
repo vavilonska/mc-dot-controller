@@ -25,6 +25,26 @@ The wrapper is build tooling. No Minecraft, NeoForge, or compiled client-mod JAR
 
 `resident-controller/` is original Python standard-library source for one owner-started process, an authenticated loopback connection and a credential-free shared task queue. It imports this repository's unchanged `navigation_controller/__init__.py`, `terrain.py` and `planner.py`; no duplicate algorithm package or third-party game code is bundled. No license grant has been assigned to this original Python code or those original navigation helpers. The upstream MIT license in `client-mod/` does not automatically license independent components. Aim/combat decisions and the bounded historical scan cache also stay external to the mod. No Aoi, minecraft-data, Minecraft assets, runtime mailbox or credentials are included.
 
+## Independent defense watchdog
+
+`defense-watchdog/` is original Python standard-library source for an explicitly
+started queue coordinator and an IntentClient adapter. It imports the existing
+resident queue implementation and hostile/weapon constants. The bundled v5
+coordinates bounded approach/retreat with the integrated eye-reach and swept-corridor
+resident correction; no vendor code or
+new protocol dependency is copied. No license grant has been assigned to this
+original component. The upstream client-mod MIT license does not automatically
+apply. Public files contain no deployed control directory or live observations.
+
+## Persistent route cursor
+
+`navigation-cursor/` is original Python standard-library source for a retained
+local path/cursor, checkpoint identity and guarded watchdog admission. Its
+fixtures are synthetic geometry, not published game captures. It does not copy
+Minecraft code or claim global pathfinding. No license grant has been assigned
+to this original component. Optional uninstalled patches and private checkpoints
+are omitted from this source snapshot.
+
 ## Gameplay helpers
 
 `gameplay-helpers/` preserves original source for explicit shaped crafting and portable local queue wrappers. Live mailbox paths are caller-supplied; no runtime observations, personal relay configuration, images or credentials are embedded. Reported live evidence is limited to the documented recipes and does not cover every recipe or combat. No new license grant is selected for this original component.

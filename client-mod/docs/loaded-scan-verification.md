@@ -34,10 +34,17 @@ The crafting helper's reported successful live recipes are crafting table,
 wooden pickaxe, stone pickaxe, furnace, sticks, stone axe and torches. Other listed
 recipe shapes, including iron tools/armor and shield, have offline evidence only.
 
+A later short sword/shield script reported one successful zombie encounter:
+four attack dispatches, observed target-dead stop, and player health staying 20.
+This is a bounded observed gameplay result, not a server-confirmed attribution.
+The independent v5 defense watchdog and external resident melee correction were
+later deployed; the loaded melee marker 2 and one armed v5 process were confirmed.
+No mod source change was required. Complete v5 natural-encounter, blocked-approach
+and retreat acceptance is still pending; the earlier script is not that evidence.
+
 ## Not established
 
-Combat has not been exercised against a live target. Aim/combat dispatch counts
-are not hit or kill confirmations. Maximum-scale scan latency, frame-time bounds,
+Aim/combat dispatch counts are not hit or kill confirmations. Maximum-scale scan latency, frame-time bounds,
 every biome/surface/water filter, world-wide completeness and universal mining
 visibility are not established by the small query or geometry fixtures.
 

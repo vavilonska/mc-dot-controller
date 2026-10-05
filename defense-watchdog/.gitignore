@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.log
+*.token
+.env*
+runtime/
+control/
+inbox/
+working/
+results/
+state.json
+observation.json
+owner.lock
+STOP

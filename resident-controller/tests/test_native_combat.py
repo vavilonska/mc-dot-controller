@@ -21,7 +21,7 @@ def state():
     e.update(type='minecraft:zombie', x=.5, y=64, z=2.5, distance=2,
              bounding_box={'min': {'x': .2, 'y': 64, 'z': 2.2},
                            'max': {'x': .8, 'y': 65.95, 'z': 2.8}})
-    s['crosshair'].update(entity_id=e['entity_id'], entity_type=e['type'], distance_euclidean=1.8)
+    s['crosshair'].update(entity_id=e['entity_id'], entity_type=e['type'], distance_euclidean=1.8, location={'x':.5,'y':65.0,'z':2.2})
     return s
 
 

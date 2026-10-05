@@ -156,3 +156,12 @@ retrieval, intermediate verification, exact counts, and stop/no-replay behavior.
 Additional focused smoke tests check explicit client/output paths, imports without
 queue or write side effects, and CLI help. They do not expand the live evidence
 listed above.
+
+## Running with the defense watchdog
+
+When the independent v5 watchdog owns the resident queue, use its `IntentClient`
+with these helpers instead of constructing a second direct queue writer. The
+watchdog may defer ordinary tasks while combat is active; pending is not failure
+and must not trigger a duplicate submission. Persistent walking is provided by
+the separate [route cursor](../navigation-cursor/README.md), which retains pending
+IDs, route tails and the mandatory defense-epoch guard.
