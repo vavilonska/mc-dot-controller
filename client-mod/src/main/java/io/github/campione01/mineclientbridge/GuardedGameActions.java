@@ -24,6 +24,7 @@ final class GuardedGameActions {
         Minecraft mc = Minecraft.getInstance();
         GuardedAction.require(mc.isSameThread(), "minecraft_thread_required");
         GuardedAction.require(enabled() && BridgeServer.isRunning(), "guarded_actions_disabled");
+        GuardedAction.require(GuardedGameMovement.LEASES.status().ownerRequestId() == null, "movement_busy");
         String generation = WorldGeneration.current(mc.level);
         GuardedAction.require(mc.player != null && mc.level != null && mc.gameMode != null,
                 "not_in_world");

@@ -1,11 +1,14 @@
 # Bounded nearby terrain API (experimental)
 
-This source extension is based on upstream v1.1.5. It adds observation only. Planning,
-material bills, movement, building, and combat remain external to the Java bridge.
+This terrain endpoint is based on upstream v1.1.5 and adds observation only.
+Planning, material bills, navigation and combat policy remain external to the Java
+bridge; separately documented guarded input primitives do not change this read API.
 The complete mod compiled and passed its Gradle test/build tasks against NeoForge
-21.1.255 on 2026-10-05 using the official binary-dependency pipeline. It has **not yet
-been installed or live-tested**. Unit/build checks are not an integration test.
-See [verification details](terrain-verification.md).
+21.1.255 on 2026-10-05 using the official binary-dependency pipeline. The preceding
+terrain-only extension passed small read-only live checks: a 27-cell cube, equivalent
+seven-page scan, and 17-cell vertical boundary. Maximum scans, navigation, combat
+and the current movement extension remain unvalidated. See [build verification](terrain-verification.md)
+and [limited live terrain evidence](terrain-live-validation.md).
 
 ## Request
 

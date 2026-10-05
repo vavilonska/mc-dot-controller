@@ -87,3 +87,24 @@ requires no nearby entities within an observation radius of at least four blocks
 No claim is made that `nearby` is an exhaustive server-side perception system.
 The status schema does not prove unpublished singleplayer mode; this is one of
 several reasons no live movement adapter is provided.
+
+## Captured schema regression
+
+A sanitized actual-game capture is included at
+`tests/fixtures/captured_terrain_schema1.json`. It contains one cell, a 27-cell
+cube, the same cube over seven pages (4/4/4/4/4/4/3), and a 17-cell vertical boundary.
+The strict parser accepts all four scans unchanged. Actual coordinate order agrees
+with `x_then_z_then_y`, and concatenated page cells exactly equal the cube cells.
+Both cube forms produce matching cardinal and diagonal local plans offline.
+The four out-of-world cells remain unknown and blocked.
+
+World/scan UUIDs are replaced, X/Z are translated, ticks are rebased, and personal
+state fields are omitted. Tests supply synthetic monotonic receipt times because
+the historical file does not contain a trustworthy full monotonic capture span.
+This verifies captured wire-format compatibility, not current action freshness.
+
+The final captured state is 14–16 ticks newer than the oldest cube samples, so the
+stricter movement freshness gate rejects them. The captured nearby-entity radius
+is zero, and the player is outside the centered starting corridor. Full status
+brackets are absent. The capture therefore cannot establish a safe execution
+observation or live navigation acceptance, despite passing planning/schema checks.

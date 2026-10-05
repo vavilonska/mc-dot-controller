@@ -64,3 +64,7 @@ Source and offline checks only. The included test suite passes, including flat
 paths, obstacle detours, diagonals/corners, ledges, unknown/no-path terrain,
 generation resets, stale snapshots, finite budgets and emergency-release behavior.
 No live navigation endpoint has been called or accepted by this implementation.
+
+A sanitized actual-game terrain fixture also passes offline parser/planner
+regressions: one-cell, 27-cell cube, seven-page equivalent and world-height boundary.
+This establishes wire-format compatibility; it does not enable live movement.

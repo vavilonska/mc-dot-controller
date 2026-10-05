@@ -125,6 +125,7 @@ public final class BridgeServer {
             createdServer.createContext("/control/key", BridgeServer::handleControlKey);
             createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
             createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
+            createdServer.createContext("/control/guarded-movement", BridgeServer::handleGuardedMovement);
             createdServer.createContext("/control/look", BridgeServer::handleControlLook);
             createdServer.createContext("/control/mouse", BridgeServer::handleControlMouse);
             createdServer.createContext("/control/text", BridgeServer::handleControlText);
@@ -138,11 +139,13 @@ public final class BridgeServer {
             server = createdServer;
             serverExecutor = createdExecutor;
             GUARDED_ACTIONS.openAdmission();
+            GuardedGameMovement.LEASES.openAdmission();
             createdServer.start();
             BridgeLog.LOGGER.info("MineClient Bridge listening on http://{}:{} auth_enabled={}",
                     config.host(), config.port(), !config.token().isBlank());
         } catch (IOException | RuntimeException e) {
             GUARDED_ACTIONS.closeAdmission();
+            GuardedGameMovement.LEASES.closeAdmission();
             server = null;
             serverExecutor = null;
             if (createdServer != null) {
@@ -162,6 +165,7 @@ public final class BridgeServer {
 
     public static synchronized void stop() {
         GUARDED_ACTIONS.closeAdmission();
+        GuardedGameMovement.LEASES.closeAdmission();
         releaseAllOnMinecraftThread();
 
         HttpServer currentServer = server;
@@ -451,6 +455,69 @@ public final class BridgeServer {
         }
     }
 
+    private static void handleGuardedMovement(HttpExchange exchange) throws IOException {
+        final long receivedNanos = System.nanoTime();
+        final String entrySession = GuardedGameMovement.LEASES.session();
+        if (!requireControlAccess(exchange, "/control/guarded-movement", "POST")) return;
+        if (exchange.getHttpContext().getServer() != server) {
+            respondJson(exchange, 409, error("bridge_lifecycle_changed")); return;
+        }
+        if (!GuardedGameMovement.enabled()) {
+            respondJson(exchange, 409, error("guarded_movement_disabled")); return;
+        }
+        if (exchange.getRequestURI().getRawQuery() != null) {
+            respondJson(exchange, 400, error("unexpected_query")); return;
+        }
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final GuardedMovement.Request request;
+        try {
+            GuardedAction.require(body.keySet().equals(java.util.Set.of("movement_schema_version", "action",
+                    "session", "request_id", "observation_id", "expected_world_generation", "expected_player_uuid", "expected_tick",
+                    "expected_x", "expected_y", "expected_z", "expected_yaw", "ttl_ms", "duration_ms")),
+                    "unexpected_or_missing_field");
+            GuardedAction.require(optionalInteger(body, "movement_schema_version", -1) == GuardedMovement.SCHEMA,
+                    "unsupported_movement_schema");
+            GuardedAction.require(requiredString(body, "action").equals("forward_sample"), "invalid_action");
+            double tick = requiredFiniteDouble(body, "expected_tick");
+            GuardedAction.require(tick >= 0 && tick <= 9_007_199_254_740_991d && tick == Math.rint(tick), "invalid_expected_tick");
+            request = new GuardedMovement.Request(requiredString(body, "session"), requiredString(body, "request_id"), requiredString(body, "observation_id"),
+                    requiredString(body, "expected_world_generation"), requiredString(body, "expected_player_uuid"),
+                    (long) tick, requiredFiniteDouble(body, "expected_x"), requiredFiniteDouble(body, "expected_y"),
+                    requiredFiniteDouble(body, "expected_z"), requiredFiniteDouble(body, "expected_yaw"),
+                    optionalInteger(body, "ttl_ms", -1), optionalInteger(body, "duration_ms", -1));
+        } catch (RequestException failure) { respondRequestFailure(exchange, failure); return;
+        } catch (GuardedAction.Rejected failure) { respondJson(exchange, 400, error(failure.getMessage())); return; }
+        GuardedMovement.Ticket movementTicket = null;
+        try {
+            movementTicket = GuardedGameMovement.LEASES.submit(request, receivedNanos, entrySession);
+            GuardedMovement.Outcome outcome = movementTicket.await();
+            boolean ok = outcome.reason().equals("sample_released");
+            JsonObject response = ok ? protocolOk() : error(outcome.reason());
+            response.addProperty("movement_schema_version", GuardedMovement.SCHEMA);
+            response.addProperty("request_id", outcome.requestId());
+            response.addProperty("sampled", outcome.sampled());
+            response.addProperty("released", outcome.released());
+            response.addProperty("movement_confirmed", false);
+            respondJson(exchange, ok ? 200 : outcome.reason().equals("movement_expired") ? 408 : 409, response);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            JsonObject response = error("request_interrupted");
+            GuardedMovement.Outcome outcome = movementTicket == null ? null : movementTicket.result.getNow(null);
+            if (outcome != null) {
+                response.addProperty("movement_schema_version", GuardedMovement.SCHEMA);
+                response.addProperty("request_id", outcome.requestId());
+                response.addProperty("sampled", outcome.sampled());
+                response.addProperty("released", outcome.released());
+                response.addProperty("movement_confirmed", false);
+            }
+            respondJson(exchange, 503, response);
+        } catch (GuardedAction.Rejected failure) {
+            int status = failure.getMessage().equals("movement_busy") ? 429 : failure.getMessage().equals("movement_expired") ? 408 : 409;
+            respondJson(exchange, status, error(failure.getMessage()));
+        } catch (Exception failure) { respondJson(exchange, 500, error("movement_failed")); }
+    }
+
     private static void handleControlLook(HttpExchange exchange) throws IOException {
         if (!requireControlAccess(exchange, "/control/look", "POST")) return;
 
@@ -631,6 +698,7 @@ public final class BridgeServer {
         addOperation(operations, "POST", "/control/key", "keymap_input");
         addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
         addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
+        addOperation(operations, "POST", "/control/guarded-movement", "guarded_local_movement_sample");
         addOperation(operations, "POST", "/control/look", "player_view");
         addOperation(operations, "POST", "/control/mouse", "screen_mouse_input");
         addOperation(operations, "POST", "/control/text", "focused_screen_text");
@@ -654,6 +722,7 @@ public final class BridgeServer {
         GuardedAction.HOSTILE_TYPES.stream().sorted().forEach(targets::add);
         guarded.add("allowed_target_types", targets);
         obj.add("guarded_actions", guarded);
+        obj.add("guarded_movement", GuardedGameMovement.status());
 
         JsonObject limits = new JsonObject();
         limits.addProperty("request_body_bytes", MAX_BODY_BYTES);
@@ -815,6 +884,7 @@ public final class BridgeServer {
         world.addProperty("rain_level", mc.level.getRainLevel(1.0F));
         world.addProperty("thunder_level", mc.level.getThunderLevel(1.0F));
         obj.add("world", world);
+        obj.add("guarded_movement", GuardedGameMovement.observedStatus(mc));
         obj.add("nearby", nearbyEntitiesSnapshot(mc, radius));
         return new EndpointResult(200, obj);
     }
@@ -1062,6 +1132,7 @@ public final class BridgeServer {
             world.addProperty("world_generation", WorldGeneration.current(mc.level));
         }
         obj.add("world", world);
+        obj.add("guarded_movement", GuardedGameMovement.status());
 
         JsonObject player = new JsonObject();
         player.addProperty("present", mc.player != null);
@@ -2061,7 +2132,10 @@ public final class BridgeServer {
         }
     }
 
+    static boolean hasHeldInputs() { return !HELD_RAW_KEYS.isEmpty() || !HELD_WORLD_MOUSE_BUTTONS.isEmpty(); }
+
     private static int releaseAllInputs() {
+        GuardedGameMovement.cancelOnGameThread("inputs_released");
         Minecraft mc = Minecraft.getInstance();
         if (!mc.isSameThread()) {
             throw new IllegalStateException("Input cleanup must run on the Minecraft thread");

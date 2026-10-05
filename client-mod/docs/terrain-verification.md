@@ -60,8 +60,11 @@ bounds, unavailable context, full cube, and empty shape.
 
 - At the time of this build record, no runtime check had been performed. A later
   isolated graphical-client load of this terrain-only JAR reached bridge HTTP startup.
-  Live terrain HTTP assertions, server behavior, and frame-time measurements remain
-  unverified; this does not validate the newer integrated guard build
+  Subsequent limited live read-only tests passed: 27-cell cube, equivalent seven-page
+  scan and 17-cell world-height boundary. Sanitized offline schema/planner regressions
+  also passed. Maximum-volume scans, navigation/combat, the newer movement build,
+  current action freshness and frame-time guarantees remain unvalidated; see the
+  [limited live record](terrain-live-validation.md) and [capture limits](../../navigation-controller/docs/PROTOCOL.md#captured-schema-regression)
 - The unchanged upstream MCP full self-test is Windows-oriented and fails Linux
   normalized-Windows-path validation; only its 8 cross-platform framing tests passed here
 - Terrain is available through authenticated HTTP; the upstream MCP query wrapper

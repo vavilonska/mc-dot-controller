@@ -3,7 +3,7 @@
 This is an **experimental additive guard**, not a completed combat controller or a
 live-accepted release. Combat strategy remains in the external process. The mod
 only checks the request and attempts one ordinary look or attack. The endpoint is
-disabled by default, even when this source is built. There is no movement,
+disabled by default, even when this source is built. This action endpoint has no movement,
 pathfinding, target selection, repeated attack, held input, world editing,
 inventory manipulation, extra reach, or new command interface.
 
@@ -186,3 +186,5 @@ The complete integrated terrain + guard mod compiled and passed all 14 Gradle/JU
 test cases against NeoForge 21.1.255 on 2026-10-05, including 150 dependency-free
 guard checks. This does not establish runtime or combat acceptance. See
 [integrated verification](integrated-verification.md).
+
+A separate default-disabled [forward-sample primitive](guarded-movement.md) now exists in source. It does not add navigation-only look to this combat endpoint. Guarded combat rejects movement ownership observed at its dispatch check; this is not an atomic cross-primitive admission lock.

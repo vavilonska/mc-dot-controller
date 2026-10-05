@@ -11,12 +11,21 @@ It does not support navigation movement, a player-only look action, or held-key
 leases. Reusing legacy queued key input would permit a stale request to execute
 after a timeout, world switch or newer observation. It is not a safe substitution.
 
+## Companion source progress
+
+The companion mod now contains a separately default-disabled
+[guarded forward sample](../../client-mod/docs/guarded-movement.md). Its build/tests
+pass, but it has not been installed or live-accepted. It supplies one half-forward
+input sample with release-before-acknowledgement, not the fake adapter's duration-
+based pulse. Navigation-only turning and this component's live transport remain
+missing. The existing fake cannot establish physical settling or stopping distance.
+
 ## Required before a real adapter
 
 1. Obtain explicit user approval for a separate live navigation acceptance session
    in a disposable, unpublished local Survival world, preserving the working mod,
    profile and worlds. Multiplayer remains outside scope
-2. Implement and review a narrow bridge-side guarded movement primitive with
+2. Complete, review and live-accept the narrow bridge-side movement contract with
    execution-time world/player identity, expected position/pose, expiry, single-flight
    and replay checks; prove local unpublished Survival scope at execution time
 3. Make each pulse independently time-bounded at no more than 100 ms. Release held
