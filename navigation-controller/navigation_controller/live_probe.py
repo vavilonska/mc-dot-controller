@@ -167,6 +167,8 @@ def parser():
     p.add_argument('--expected-session',help='Fingerprint from your immediately preceding read-only report')
     p.add_argument('--turn-degrees',type=float,default=0)
     p.add_argument('--max-seconds',type=float,default=2)
+    p.add_argument('--start-delay',type=float,default=0,
+                   help='Owner-selected 0–15 seconds after hidden token entry, before any reads; return focus to the game yourself')
     p.add_argument('--accept-local-test',action='store_true')
     p.add_argument('--accept-installed-guard-build',action='store_true')
     p.add_argument('--accept-unpublished-survival',action='store_true')
@@ -180,6 +182,8 @@ def main(argv=None):
     report_handle=None
     try:
         args=parser().parse_args(argv)
+        if not math.isfinite(args.start_delay) or not 0 <= args.start_delay <= 15:
+            raise ProbeError('invalid_start_delay')
         action=args.action!='read-only'
         if action and not (args.accept_local_test and args.accept_installed_guard_build and args.accept_unpublished_survival):
             raise ProbeError('explicit_acceptance_flags_required')
@@ -213,6 +217,12 @@ def main(argv=None):
         transport=LoopbackHttpTransport(LoopbackConfig(base_url=args.url,token=token,
             enabled=action,acceptance_verified=action))
         token=None
+        if args.start_delay:
+            # No connection/observation yet. This is only a manual focus handoff;
+            # all fresh-read and action clocks begin afterward with unchanged limits.
+            print(f'Starting in {args.start_delay:g} seconds; return focus to Minecraft yourself.',
+                  file=sys.stderr,flush=True)
+            time.sleep(args.start_delay)
         if action:
             output=one_action_test(transport,RealClock(),action=args.action,expected_session=args.expected_session,
                 turn_degrees=args.turn_degrees,max_seconds=args.max_seconds,

@@ -42,6 +42,7 @@ From `navigation-controller/`, replace `PORT` with the bridge's explicit port:
 ```sh
 python -m navigation_controller.live_probe \
   --url http://127.0.0.1:PORT \
+  --start-delay 5 \
   --report probe-readonly.json
 ```
 
@@ -54,6 +55,16 @@ any inability to suppress terminal echo are rejected. The token is never saved,
 read from a file/environment variable, included in a report or shown in errors.
 The report path must be new; an existing/unwritable path is rejected before a token
 prompt or any request. Without `--report`, the same nonsecret JSON is printed.
+
+`--start-delay` is optional and defaults to zero. An explicitly chosen finite
+value from 0 to 15 seconds waits **after hidden token entry and before any HTTP
+request**. Return focus to Minecraft yourself during this interval, close its
+screens and release all controls; actions require its mouse to be grabbed.
+The tool does not press keys, click, focus windows or change mouse/input settings.
+Its brief focus notice goes to stderr, leaving stdout as JSON. Fresh observations
+and all existing scan/action deadlines begin after the wait, without being relaxed.
+Interrupting the wait sends no request; conditions may change during the wait and
+are checked afresh afterward. The delay grants no action permission.
 
 The read-only probe checks capabilities, state/status identity, bounded ordered
 terrain pages and cleanup metadata. Its report includes a session fingerprint,
@@ -75,6 +86,7 @@ with that report's full session fingerprint. This example requests a single
 ```sh
 python -m navigation_controller.live_probe \
   --url http://127.0.0.1:PORT \
+  --start-delay 5 \
   --action turn --turn-degrees 15 \
   --expected-session FINGERPRINT \
   --accept-local-test \
@@ -97,6 +109,7 @@ Then, only after separately deciding the forward test is appropriate:
 ```sh
 python -m navigation_controller.live_probe \
   --url http://127.0.0.1:PORT \
+  --start-delay 5 \
   --action forward-sample \
   --expected-session FINGERPRINT \
   --accept-local-test \

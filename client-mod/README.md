@@ -139,7 +139,8 @@ optional numeric-loopback HTTP/probe source now exists but has only mocked tests
 real navigation route-following remains blocked.
 
 The preceding movement-only build passed 35 JUnit cases, including 21 movement tests.
-No installation or live input was performed for this extension. See
+No installation or live input was part of that earlier source build. The current
+verified navigation JAR is now installed in an isolated profile but has not been launched. See
 [movement build verification](docs/movement-verification.md).
 
 ## Experimental guarded player-only yaw
@@ -151,5 +152,6 @@ before any following action. It changes no pitch and applies no movement impulse
 
 The complete navigation-primitives build passes 54 JUnit cases (35 prior plus 19
 yaw cases). The external adapter has fake coverage and an optional default-read-only HTTP
-probe implementation. The latter was tested with mocked sockets only. No
-installation, live HTTP, actual input or physical settling has been accepted. See [current verification](docs/turning-verification.md).
+probe implementation. The latter was tested with mocked sockets only. The verified JAR has since been installed in an isolated test profile, which has
+not been launched. Live HTTP, actual input and physical settling remain unaccepted;
+a separate local acceptance session is still required. See [current verification](docs/turning-verification.md).

@@ -228,6 +228,97 @@ class ProbeTests(unittest.TestCase):
             self.assertEqual(main(['--url','http://127.0.0.1:1234','--token','NOT-TO-LOG']),1)
             self.assertNotIn('NOT-TO-LOG',output.getvalue())
 
+    def test_invalid_start_delay_rejected_before_prompt_or_transport(self):
+        for delay in ('-0.01','15.01','nan','inf','-inf'):
+            with self.subTest(delay=delay),\
+                 patch('navigation_controller.live_probe.getpass.getpass') as secret,\
+                 patch('navigation_controller.http_transport.LoopbackHttpTransport') as client,\
+                 patch('navigation_controller.live_probe.time.sleep') as sleep,\
+                 patch('sys.stdout',new_callable=io.StringIO):
+                self.assertEqual(main(['--url','http://127.0.0.1:1234','--start-delay='+delay]),1)
+                secret.assert_not_called();client.assert_not_called();sleep.assert_not_called()
+
+    def test_start_delay_occurs_after_hidden_prompt_before_any_reads(self):
+        order=[]
+        def prompt(*args,**kwargs):
+            order.append('prompt');return 'FAKE-ONLY'
+        def sleep(seconds):
+            self.assertEqual(seconds,5)
+            self.assertEqual(order,['prompt'])
+            self.assertFalse(self.transport.calls)
+            order.append('delay')
+        with patch('sys.stdin.isatty',return_value=True),\
+             patch('navigation_controller.live_probe.getpass.getpass',side_effect=prompt),\
+             patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+             patch('navigation_controller.live_probe.RealClock',return_value=self.clock),\
+             patch('navigation_controller.live_probe.time.sleep',side_effect=sleep),\
+             patch('sys.stdout',new_callable=io.StringIO) as output,\
+             patch('sys.stderr',new_callable=io.StringIO) as notice:
+            self.assertEqual(main(['--url','http://127.0.0.1:1234','--start-delay','5']),0)
+            result=json.loads(output.getvalue())
+            self.assertEqual(result['result'],'read_only_observations_verified')
+            self.assertFalse(result['input_sent'])
+            self.assertTrue(all(m=='GET' for m,p,b in self.transport.calls))
+            self.assertEqual(order,['prompt','delay'])
+            self.assertIn('return focus to Minecraft yourself',notice.getvalue())
+            self.assertNotIn('FAKE-ONLY',output.getvalue()+notice.getvalue())
+
+    def test_default_or_zero_start_delay_does_not_sleep(self):
+        for arguments in ([],['--start-delay','0']):
+            self.setUp()
+            with patch('sys.stdin.isatty',return_value=True),\
+                 patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+                 patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+                 patch('navigation_controller.live_probe.RealClock',return_value=self.clock),\
+                 patch('navigation_controller.live_probe.time.sleep') as sleep,\
+                 patch('sys.stdout',new_callable=io.StringIO):
+                self.assertEqual(main(['--url','http://127.0.0.1:1234',*arguments]),0)
+                sleep.assert_not_called()
+
+    def test_interrupted_start_delay_makes_no_requests(self):
+        with patch('sys.stdin.isatty',return_value=True),\
+             patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+             patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+             patch('navigation_controller.live_probe.time.sleep',side_effect=KeyboardInterrupt),\
+             patch('sys.stdout',new_callable=io.StringIO) as output,\
+             patch('sys.stderr',new_callable=io.StringIO):
+            self.assertEqual(main(['--url','http://127.0.0.1:1234','--start-delay','5']),130)
+            self.assertEqual(json.loads(output.getvalue())['result'],'interrupted')
+            self.assertFalse(self.transport.calls)
+            self.assertTrue(self.transport.closed)
+
+    def test_maximum_start_delay_precedes_unchanged_one_action_budget(self):
+        expected=self.arm()
+        def sleep(seconds):
+            self.assertEqual(seconds,15)
+            self.assertFalse(self.transport.calls)
+            self.clock.sleep(seconds)
+        args=['--url','http://127.0.0.1:1234','--start-delay','15',
+              '--action','turn','--turn-degrees','15','--expected-session',expected,
+              '--accept-local-test','--accept-installed-guard-build','--accept-unpublished-survival']
+        with patch('sys.stdin.isatty',return_value=True),\
+             patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+             patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+             patch('navigation_controller.live_probe.RealClock',return_value=self.clock),\
+             patch('navigation_controller.live_probe.time.sleep',side_effect=sleep),\
+             patch('sys.stdout',new_callable=io.StringIO) as output,\
+             patch('sys.stderr',new_callable=io.StringIO):
+            self.assertEqual(main(args),0)
+            result=json.loads(output.getvalue())
+            self.assertEqual(result['result'],'readback_verified')
+            self.assertEqual(result['actions'],1)
+            self.assertEqual(result['samples'],0)
+            self.assertLess(result['elapsed_seconds'],2)
+            self.assertEqual(len(self.transport.actions),1)
+
+    def test_start_delay_does_not_relax_acceptance_flags(self):
+        with patch('navigation_controller.live_probe.getpass.getpass') as secret,\
+             patch('navigation_controller.live_probe.time.sleep') as sleep,\
+             patch('sys.stdout',new_callable=io.StringIO):
+            self.assertEqual(main(['--url','http://127.0.0.1:1234','--start-delay','5',
+                                  '--action','forward-sample']),1)
+            secret.assert_not_called();sleep.assert_not_called()
+
     def test_action_observation_accepts_fast_two_page_scan(self):
         self.arm()
         original=self.transport.request
