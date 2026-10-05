@@ -444,8 +444,12 @@ class RequestTests(MockedNetworkCase):
     def test_non_200_errors_never_read_body_or_follow_redirect(self):
         for status in (201, 204, 301, 302, 307, 308, 400, 401, 403, 408, 409, 429, 500, 503, True):
             self.response.status = status
-            with self.subTest(status=status), self.assertRaisesRegex(TransportError, '^unexpected_http_status$'):
+            with self.subTest(status=status), self.assertRaisesRegex(TransportError, '^unexpected_http_status$') as raised:
                 self.transport.request('GET', '/control/status')
+            if type(status) is int and 100 <= status <= 599:
+                self.assertEqual(raised.exception.http_status,status)
+            else:
+                self.assertFalse(hasattr(raised.exception,'http_status'))
         self.response.read.assert_not_called()
         self.assertEqual(self.connection.request.call_count, 15)
 

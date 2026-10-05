@@ -337,7 +337,10 @@ class LoopbackHttpTransport:
             remaining()
             if type(response.status) is not int or response.status != 200:
                 # Do not read/include error bodies or follow any Location header.
-                raise TransportError('unexpected_http_status')
+                error = TransportError('unexpected_http_status')
+                if type(response.status) is int and 100 <= response.status <= 599:
+                    error.http_status = response.status
+                raise error
             expected_length = _validate_headers(response)
             raw = response.read(MAX_JSON_BYTES + 1)
             remaining(update_timeout=False)

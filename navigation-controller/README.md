@@ -1,5 +1,11 @@
 # External local navigation controller (experimental)
 
+**Custom-bridge live work is paused.** This preservation snapshot contains 254
+offline/mock tests and narrow diagnostic/report fixes. A prior real read-only
+probe failed generically; its exact cause remains unknown. No guarded turn or
+forward sample ran, and the client was saved and closed. Retained commands are
+reference material, not authorization to resume installation or live testing.
+
 A Python standard-library, source-only companion to the thin MineClient Bridge
 terrain extension. Planning and navigation policy run outside Minecraft.
 

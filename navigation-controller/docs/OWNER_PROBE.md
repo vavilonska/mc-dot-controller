@@ -1,5 +1,12 @@
 # Owner-run loopback probe and single-action acceptance
 
+**Current status: custom-bridge acceptance is paused.** These commands are retained
+for reference only. The earlier real read-only attempt failed with a generic error;
+its cause is unknown. No guarded turn/forward action ran, and the client was saved
+and closed. The new serialization correction is uninstalled and is not a confirmed
+fix for that failure. Do not resume a token prompt, request, installation or game
+input from this preserved guide without a separately approved new plan.
+
 ## Current evidence and scope
 
 These tools are implemented and tested with mocked sockets and offline transports.
@@ -131,6 +138,19 @@ and a deadline timer. These limits are not hard real-time physics guarantees.
 
 ## Failures, stopping and reports
 
+- A reserved report file is not evidence of success. Inspect its JSON `result`.
+  Earlier CLI versions could leave an empty file on a read failure. The current
+  CLI writes sanitized failures and interruptions into the reserved report too
+- Read-only failure reports identify a fixed stage such as `configure_transport`,
+  `capabilities`, `terrain_page`, `player_state` or `validate_observations`, plus
+  an allowlisted local error code. Non-200 responses may include only their
+  validated numeric `http_status`; bodies, headers, authentication values,
+  missing-key names and arbitrary exception messages are never included
+- `invalid_caller_token` at configuration means the entered value failed local
+  syntax checks before a connection. An HTTP 401/403 reports an access rejection;
+  it does not establish why access was rejected. Do not change credentials or
+  repeatedly retry. Read-only `input_sent: false` does not imply authentication
+  or observation success. An uncertain action failure never receives that claim
 - Any ambiguous POST, unsafe readback, stale identity, unknown terrain, damage,
   unsettled movement or contradictory cleanup stops and latches the adapter
 - No action is retried, including with a new request ID. There is no legacy
@@ -146,6 +166,13 @@ and a deadline timer. These limits are not hard real-time physics guarantees.
 - If a report write fails after an action, stdout preserves its action count and
   cleanup result and adds `report_saved: false`. A report-file failure never means
   the action was not sent or may safely be repeated
+- If stdout is closed or interrupted, an already saved report is left intact instead of having
+  a second error object appended. A nonzero exit code still requires inspecting
+  the recorded action count and cleanup result before any next step
+- Ctrl+C during report writing returns 130 and prints the existing outcome with
+  `report_saved: false` when stdout is available. It never appends a second object
+  to a potentially partial file, retries an action or replaces a known action
+  count with a new interruption result
 
 Reports distinguish `input_sent: false` read-only evidence, one-action attempts,
 release/readback results and `live_navigation_accepted: false`. Even a successful

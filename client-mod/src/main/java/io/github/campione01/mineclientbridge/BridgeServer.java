@@ -1,7 +1,5 @@
 package io.github.campione01.mineclientbridge;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -62,7 +60,6 @@ import net.neoforged.neoforge.client.ClientHooks;
 import org.lwjgl.glfw.GLFW;
 
 public final class BridgeServer {
-    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final String PROTOCOL_NAME = "mineclient-bridge";
     private static final int PROTOCOL_SCHEMA_VERSION = 2;
     private static final int HTTP_BACKLOG = 16;
@@ -1969,10 +1966,10 @@ public final class BridgeServer {
     }
 
     private static void respondJson(HttpExchange exchange, int status, JsonObject body) throws IOException {
-        byte[] bytes = GSON.toJson(body).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = BridgeJson.toJson(body).getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_JSON_BYTES) {
             status = 500;
-            bytes = GSON.toJson(error("response_too_large",
+            bytes = BridgeJson.toJson(error("response_too_large",
                     "JSON response exceeds " + MAX_JSON_BYTES + " bytes"))
                     .getBytes(StandardCharsets.UTF_8);
         }

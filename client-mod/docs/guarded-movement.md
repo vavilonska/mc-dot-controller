@@ -187,3 +187,10 @@ with only NeoForge and the bridge, and verify disabled/auth behavior, obs/sessio
 staleness, queued expiry, every lifecycle cancellation, actual sample/cleanup,
 settling displacement and event compatibility. No HTTP controller, installation,
 game launch, input, network probe or credential handling was performed here.
+
+## Explicit nulls on the wire
+
+From source version `1.1.5-terrain-guard-navigation.2`, HTTP encoding explicitly
+preserves null `owner_request_id`, `owner_action` and unavailable `observation_id`
+inside `guarded_movement`. Missing keys remain unknown/malformed and must never be
+assumed to mean idle. See the [wire correction verification](serialization-verification.md).

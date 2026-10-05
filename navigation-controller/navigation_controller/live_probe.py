@@ -17,11 +17,85 @@ from .executor import wrap_yaw
 from .observation import Position
 from .reader import collect_terrain
 from .sample_adapter import GuardedSampleAdapter, SampleConfig, SampleError
-from .terrain import WorldStamp, integer, number, protocol, uuid
+from .terrain import TerrainError, WorldStamp, integer, number, protocol, uuid
 
 
 class ProbeError(ValueError):
     pass
+
+
+# Explicit local codes only. Never copy arbitrary exception text, missing-key
+# values, server bodies, token strings, raw URLs or authentication headers.
+SAFE_ERROR_CODES = frozenset('''
+invalid_start_delay invalid_arguments_use_help explicit_acceptance_flags_required
+read_only_mode_has_action_arguments expected_session_fingerprint_required
+invalid_acceptance_duration invalid_turn_degrees invalid_acceptance_action
+transport_acceptance_required session_fingerprint_mismatch not_in_world
+invalid_session_identity session_changed state_identity_mismatch
+report_destination_unavailable interactive_hidden_token_prompt_required
+secure_token_prompt_unavailable invalid_loopback_base_url invalid_caller_token
+invalid_transport_flags invalid_transport_timeout invalid_transport_config
+transport_closed transport_busy operation_deadline request_failed
+unexpected_http_status invalid_response_headers invalid_response_content_type
+invalid_response_encoding invalid_response_length invalid_response_json
+invalid_response_type response_too_large truncated_response read_not_allowlisted
+invalid_integer invalid_number invalid_uuid invalid_coordinate
+unsupported_protocol unsupported_dimension unsupported_terrain_schema
+invalid_or_stale_terrain_page invalid_cell_count invalid_cell_status invalid_known_flag
+invalid_unknown_flag invalid_unknown_count invalid_total invalid_completion
+invalid_budget_flag invalid_cursor mixed_scan cell_order_mismatch noncontiguous_page
+page_tick_mismatch invalid_scan_duration scan_budget_or_completed scan_invalidated
+scan_tick_budget stale_terrain_clock stale_terrain_ticks terrain_from_future
+world_generation_changed incomplete_scan incomplete_or_invalidated_scan
+scan_wall_budget_exhausted scan_page_budget_exhausted position_out_of_bounds
+'''.split())
+
+
+def safe_failure(exc, progress, *, action=False):
+    from .http_transport import TransportError
+    code='probe_or_transport_failed'
+    if isinstance(exc,(ProbeError,TransportError,TerrainError)):
+        if len(exc.args)==1 and type(exc.args[0]) is str and exc.args[0] in SAFE_ERROR_CODES:
+            code=exc.args[0]
+        elif isinstance(exc,TerrainError):
+            code='terrain_validation_failed'
+    elif isinstance(exc,KeyError):
+        code='missing_response_field'
+    elif isinstance(exc,(TypeError,AttributeError)):
+        code='invalid_response_shape'
+    result={'result':'stopped','code':code,'stage':progress['stage'],'input_retried':False}
+    if action:
+        result.update(mode='one_action_local_test',cleanup_verified=False,further_actions_allowed=False)
+    else:
+        result.update(mode='read_only',input_sent=False)
+    status=getattr(exc,'http_status',None) if isinstance(exc,TransportError) else None
+    if code=='unexpected_http_status' and type(status) is int and 100 <= status <= 599:
+        result['http_status']=status
+    return result
+
+
+def emit_report(output, report_handle):
+    """Preserve a sanitized success or failure report; never imply a safe retry."""
+    text=json.dumps(output,indent=2,allow_nan=False)+'\n'
+    failed=False
+    interrupted=False
+    if report_handle is not None:
+        try:
+            report_handle.write(text)
+            report_handle.flush()
+        except (Exception,KeyboardInterrupt) as exc:
+            failed=True
+            interrupted=isinstance(exc,KeyboardInterrupt)
+            output=dict(output,report_saved=False,report_error='report_write_failed')
+            text=json.dumps(output,indent=2,allow_nan=False)+'\n'
+    try:
+        print(text,end='')
+    except (Exception,KeyboardInterrupt) as exc:
+        # A closed output stream must not cause a second report append or hide
+        # an already recorded action count behind a fresh generic failure.
+        failed=True
+        interrupted=interrupted or isinstance(exc,KeyboardInterrupt)
+    return 130 if interrupted else int(failed)
 
 
 class RealClock:
@@ -59,9 +133,12 @@ def cleanup_summary(status):
             'ordinary_inputs_neutral':neutral}
 
 
-def read_only_probe(transport, clock):
+def read_only_probe(transport, clock, progress=None):
     """Bounded observations only. No POST or external state/configuration changes."""
+    progress={} if progress is None else progress
+    progress['stage']='capabilities'
     capability=transport.request('GET','/control/capabilities');protocol(capability)
+    progress['stage']='initial_status'
     initial=transport.request('GET','/control/status');protocol(initial)
     report={'mode':'read_only','input_sent':False,'protocol_ok':True,'in_world':initial.get('in_world') is True,
             'movement_enabled':capability.get('guarded_movement',{}).get('enabled') is True,
@@ -73,13 +150,20 @@ def read_only_probe(transport, clock):
     initial_identity=session_identity(initial)
     fingerprint=session_fingerprint(initial)
     def world():
+        progress['stage']='terrain_status'
         status=transport.request('GET','/control/status')
         if session_identity(status)!=initial_identity or session_fingerprint(status)!=fingerprint:
             raise ProbeError('session_changed')
         return WorldStamp.parse(status['world'])
-    grid=collect_terrain(lambda path:transport.request('GET',path),world,clock,radius=1,vertical=1,max_pages=27,max_seconds=2)
+    def terrain(path):
+        progress['stage']='terrain_page'
+        return transport.request('GET',path)
+    grid=collect_terrain(terrain,world,clock,radius=1,vertical=1,max_pages=27,max_seconds=2)
+    progress['stage']='player_state'
     state=transport.request('GET','/control/state?radius=4');protocol(state)
+    progress['stage']='final_status'
     final=transport.request('GET','/control/status');protocol(final)
+    progress['stage']='validate_observations'
     if session_identity(final)!=initial_identity or session_fingerprint(final)!=fingerprint:
         raise ProbeError('session_changed')
     state_world=WorldStamp.parse(state['world']); final_world=WorldStamp.parse(final['world'])
@@ -180,6 +264,8 @@ def main(argv=None):
     transport=None
     output=None
     report_handle=None
+    action=False
+    progress={'stage':'arguments'}
     try:
         args=parser().parse_args(argv)
         if not math.isfinite(args.start_delay) or not 0 <= args.start_delay <= 15:
@@ -200,10 +286,12 @@ def main(argv=None):
                     or (args.action!='turn' and args.turn_degrees!=0)):
                 raise ProbeError('invalid_turn_degrees')
         if args.report:
+            progress['stage']='reserve_report'
             try:
                 report_handle=Path(args.report).open('x',encoding='utf-8')
             except OSError:
                 raise ProbeError('report_destination_unavailable') from None
+        progress['stage']='hidden_token_prompt'
         if not sys.stdin.isatty():
             raise ProbeError('interactive_hidden_token_prompt_required')
         # Source import only; connection opens solely when an owner runs the command.
@@ -214,42 +302,34 @@ def main(argv=None):
                 token=getpass.getpass('Bridge token (hidden; not saved): ')
         except getpass.GetPassWarning:
             raise ProbeError('secure_token_prompt_unavailable') from None
+        progress['stage']='configure_transport'
         transport=LoopbackHttpTransport(LoopbackConfig(base_url=args.url,token=token,
             enabled=action,acceptance_verified=action))
         token=None
         if args.start_delay:
+            progress['stage']='owner_focus_delay'
             # No connection/observation yet. This is only a manual focus handoff;
             # all fresh-read and action clocks begin afterward with unchanged limits.
             print(f'Starting in {args.start_delay:g} seconds; return focus to Minecraft yourself.',
                   file=sys.stderr,flush=True)
             time.sleep(args.start_delay)
         if action:
+            progress['stage']='one_action_acceptance'
             output=one_action_test(transport,RealClock(),action=args.action,expected_session=args.expected_session,
                 turn_degrees=args.turn_degrees,max_seconds=args.max_seconds,
                 accept_local_test=args.accept_local_test,accept_installed_guard_build=args.accept_installed_guard_build,
                 accept_unpublished_survival=args.accept_unpublished_survival)
         else:
-            output=read_only_probe(transport,RealClock())
-        text=json.dumps(output,indent=2,allow_nan=False)+'\n'
-        report_failed=False
-        if report_handle is not None:
-            try:
-                report_handle.write(text)
-                report_handle.flush()
-            except Exception:
-                report_failed=True
-                output=dict(output,report_saved=False,report_error='report_write_failed')
-                text=json.dumps(output,indent=2,allow_nan=False)+'\n'
-        print(text,end='')
-        return 0 if output.get('result') not in ('stopped',) and not report_failed else 1
+            output=read_only_probe(transport,RealClock(),progress)
+        report_status=emit_report(output,report_handle)
+        return report_status or (1 if output.get('result')=='stopped' else 0)
     except KeyboardInterrupt:
-        print(json.dumps({'result':'interrupted','cleanup_verified':False,'input_retried':False}))
+        interrupted={'result':'interrupted','cleanup_verified':False,'input_retried':False,'stage':progress['stage']}
+        if not action:interrupted.update(mode='read_only',input_sent=False)
+        emit_report(interrupted,report_handle)
         return 130
-    except ProbeError as exc:
-        print(json.dumps({'result':'stopped','code':str(exc),'input_retried':False}))
-        return 1
-    except Exception:
-        print(json.dumps({'result':'stopped','code':'probe_or_transport_failed','input_retried':False}))
+    except Exception as exc:
+        emit_report(safe_failure(exc,progress,action=action),report_handle)
         return 1
     finally:
         if transport is not None:transport.close()

@@ -1,6 +1,6 @@
 # MineClient Bridge: integrated development snapshot
 
-> Based on upstream 1.1.5, with experimental terrain, guarded combat and guarded forward samples (`1.1.5-terrain-guard-navigation.1`). The current full mod build and 54 JUnit cases pass, and small read-only live terrain checks pass; guarded combat/movement and navigation acceptance remain incomplete. Read [the repository status](../README.md#验证状态) and [current yaw integration verification](docs/turning-verification.md). Historical upstream checks below do not verify these extensions.
+> Based on upstream 1.1.5, with experimental terrain, guarded combat and guarded forward samples (`1.1.5-terrain-guard-navigation.2`). The current full mod build and 64 JUnit cases pass, and small read-only live terrain checks pass; guarded combat/movement and navigation acceptance remain incomplete. Read [the repository status](../README.md#验证状态) and [current encoding correction verification](docs/serialization-verification.md). Historical upstream checks below do not verify these extensions.
 
 
 MineClient Bridge is a client-side NeoForge 1.21.1 mod that exposes an authenticated HTTP interface on the local loopback address. External tools can inspect the active Minecraft client, capture its current framebuffer, and operate configured keys and GUI controls. Isolated background sessions use process-local virtual input rather than the operating system cursor and clipboard.
@@ -46,7 +46,7 @@ Any local program that receives the token can operate the exposed client actions
 ## Installation
 
 1. Install NeoForge for Minecraft 1.21.1.
-2. Only after separately approving experimental installation, place `mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.1.jar` in a disposable test client's `mods` directory. Preserve the known-working client; never install two bridge versions together. Follow the guarded-action acceptance gates before enabling that route.
+2. Only after separately approving experimental installation, place `mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.2.jar` in a disposable test client's `mods` directory. Preserve the known-working client; never install two bridge versions together. Follow the guarded-action acceptance gates before enabling that route.
 3. Start the client. The mod creates its config and token files on first launch.
 4. Connect an authorized loopback client to `http://127.0.0.1:38121` using the generated token.
 
@@ -103,7 +103,7 @@ The upstream project documented a real 960x540 framebuffer from its NeoForge 1.2
 npm --prefix .\mcp test
 ```
 
-The development artifact is `build/libs/mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.1.jar`. No compiled mod is distributed in this source repository. See [the verified build command](docs/turning-verification.md).
+The development artifact is `build/libs/mineclient-bridge-neoforge-1.21.1-1.1.5-terrain-guard-navigation.2.jar`. No compiled mod is distributed in this source repository. See [the verified build command](docs/serialization-verification.md).
 
 ## License And References
 
@@ -113,7 +113,7 @@ The bundled mod icon is an original upstream AI-assisted illustration and does n
 
 ## Experimental terrain extension
 
-See [the bounded terrain API](docs/terrain-api.md) for paging, limits, unknown-cell semantics, validation, and current verification limits. This integrated development source uses version `1.1.5-terrain-guard-navigation.1`; it is not a live-tested release.
+See [the bounded terrain API](docs/terrain-api.md) for paging, limits, unknown-cell semantics, validation, and current verification limits. This integrated development source uses version `1.1.5-terrain-guard-navigation.2`; it is not a live-tested release.
 
 The terrain extension passed a complete Gradle compile/test/build against NeoForge 21.1.255 using the official memory-efficient binary dependency pipeline. See [verification details](docs/terrain-verification.md). The earlier terrain-only extension passed limited live reads of a 27-cell cube, equivalent seven-page scan and 17-cell vertical boundary. Sanitized offline schema/planner regressions also pass. Maximum scans, navigation and combat remain unvalidated; this does not live-accept the current navigation-primitives build. See [the limited live record](docs/terrain-live-validation.md) and [captured-data limits](../navigation-controller/docs/PROTOCOL.md#captured-schema-regression).
 
@@ -140,7 +140,9 @@ real navigation route-following remains blocked.
 
 The preceding movement-only build passed 35 JUnit cases, including 21 movement tests.
 No installation or live input was part of that earlier source build. The current
-verified navigation JAR is now installed in an isolated profile but has not been launched. See
+previous navigation.1 JAR was used for a read-only attempt that failed generically;
+no guarded turn/forward action ran, and the client was saved and closed. The new
+navigation.2 correction is not installed. See
 [movement build verification](docs/movement-verification.md).
 
 ## Experimental guarded player-only yaw
@@ -150,8 +152,18 @@ at most 30 degrees using validated float32 angles. It shares movement admission,
 one-use state observations and replay protection; every turn needs fresh state
 before any following action. It changes no pitch and applies no movement impulse.
 
-The complete navigation-primitives build passes 54 JUnit cases (35 prior plus 19
+The preceding navigation-primitives build passed 54 JUnit cases (35 prior plus 19
 yaw cases). The external adapter has fake coverage and an optional default-read-only HTTP
-probe implementation. The latter was tested with mocked sockets only. The verified JAR has since been installed in an isolated test profile, which has
-not been launched. Live HTTP, actual input and physical settling remain unaccepted;
-a separate local acceptance session is still required. See [current verification](docs/turning-verification.md).
+probe implementation. The latter was tested with mocked sockets only. A prior real read-only attempt failed with an unresolved generic error; no guarded
+turn or forward action ran, and the client was saved and closed. The new correction
+has not been installed. Custom-bridge acceptance is now paused. See [current verification](docs/turning-verification.md).
+
+## Frozen encoding correction
+
+Source revision `navigation.2` preserves explicit null facts only within the
+`guarded_movement` response object; unrelated encoding and all guard policies stay
+unchanged. Full offline build/tests pass 64 JUnit cases, with 1,018 independent
+compatibility comparisons for each of Gson 2.10.1 and 2.11.0. This is not a
+confirmed diagnosis or live fix of the earlier generic read-only failure.
+The new JAR is uninstalled, and custom-bridge live work is paused. See
+[serialization verification](docs/serialization-verification.md).

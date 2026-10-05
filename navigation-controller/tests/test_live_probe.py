@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 from navigation_controller.fake import FakeClock
 from navigation_controller.live_probe import (ProbeError, cleanup_summary, main, one_action_test,
-                                              read_only_probe, session_fingerprint)
+                                              read_only_probe, session_fingerprint, safe_failure)
 from navigation_controller.sample_adapter import GuardedSampleAdapter, SampleConfig, SampleError
 from navigation_controller.sample_fake import FakeSampleTransport
 from navigation_controller.terrain import WorldStamp
@@ -318,6 +318,154 @@ class ProbeTests(unittest.TestCase):
             self.assertEqual(main(['--url','http://127.0.0.1:1234','--start-delay','5',
                                   '--action','forward-sample']),1)
             secret.assert_not_called();sleep.assert_not_called()
+
+    def test_configuration_failure_saved_without_secret_or_requests(self):
+        from pathlib import Path
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'failure.json'
+            with patch('sys.stdin.isatty',return_value=True),\
+                 patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE SECRET WITH SPACE'),\
+                 patch('navigation_controller.http_transport.LoopbackHttpTransport') as client,\
+                 patch('sys.stdout',new_callable=io.StringIO) as output:
+                self.assertEqual(main(['--url','http://127.0.0.1:1234','--report',str(target)]),1)
+                result=json.loads(target.read_text())
+                self.assertEqual(result['code'],'invalid_caller_token')
+                self.assertEqual(result['stage'],'configure_transport')
+                self.assertFalse(result['input_sent'])
+                self.assertEqual(json.loads(output.getvalue()),result)
+                self.assertNotIn('FAKE SECRET',target.read_text()+output.getvalue())
+                client.assert_not_called()
+
+    def test_http_failure_has_only_fixed_code_stage_and_status(self):
+        from navigation_controller.http_transport import TransportError
+        from pathlib import Path
+        import tempfile
+        error=TransportError('unexpected_http_status');error.http_status=401
+        self.transport.request=lambda *a,**kw: (_ for _ in ()).throw(error)
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'failure.json'
+            with patch('sys.stdin.isatty',return_value=True),\
+                 patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+                 patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+                 patch('sys.stdout',new_callable=io.StringIO) as output:
+                self.assertEqual(main(['--url','http://127.0.0.1:1234','--report',str(target)]),1)
+                result=json.loads(target.read_text())
+                self.assertEqual(result['code'],'unexpected_http_status')
+                self.assertEqual(result['http_status'],401)
+                self.assertEqual(result['stage'],'capabilities')
+                self.assertFalse(result['input_sent'])
+                self.assertNotIn('FAKE-ONLY',target.read_text()+output.getvalue())
+                self.assertTrue(self.transport.closed)
+
+    def test_missing_field_name_is_never_exposed(self):
+        self.transport.request=lambda *a,**kw: (_ for _ in ()).throw(KeyError('PRIVATE-KEY-OR-TOKEN'))
+        with patch('sys.stdin.isatty',return_value=True),\
+             patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+             patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+             patch('sys.stdout',new_callable=io.StringIO) as output:
+            self.assertEqual(main(['--url','http://127.0.0.1:1234']),1)
+            result=json.loads(output.getvalue())
+            self.assertEqual(result['code'],'missing_response_field')
+            self.assertEqual(result['stage'],'capabilities')
+            self.assertNotIn('PRIVATE-KEY',output.getvalue())
+
+    def test_unrecognized_error_payloads_remain_private(self):
+        from navigation_controller.http_transport import TransportError
+        from navigation_controller.terrain import TerrainError
+        for error in (ProbeError('PRIVATE-TOKEN'),TransportError('PRIVATE-TOKEN'),
+                      TerrainError('PRIVATE-TOKEN'),RuntimeError('PRIVATE-TOKEN')):
+            result=safe_failure(error,{'stage':'capabilities'})
+            self.assertNotIn('PRIVATE-TOKEN',json.dumps(result))
+            self.assertFalse(result['input_sent'])
+
+    def test_status_diagnostic_excludes_bool_strings_and_out_of_range(self):
+        from navigation_controller.http_transport import TransportError
+        for status in (True,'401',99,600,None):
+            error=TransportError('unexpected_http_status');error.http_status=status
+            self.assertNotIn('http_status',safe_failure(error,{'stage':'capabilities'}))
+
+    def test_action_failure_does_not_claim_no_input_or_safe_retry(self):
+        result=safe_failure(RuntimeError('PRIVATE'),{'stage':'one_action_acceptance'},action=True)
+        self.assertNotIn('input_sent',result)
+        self.assertFalse(result['cleanup_verified'])
+        self.assertFalse(result['further_actions_allowed'])
+        self.assertFalse(result['input_retried'])
+
+    def test_interruption_is_saved_to_reserved_report(self):
+        from pathlib import Path
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'interrupted.json'
+            with patch('sys.stdin.isatty',return_value=True),\
+                 patch('navigation_controller.live_probe.getpass.getpass',side_effect=KeyboardInterrupt),\
+                 patch('sys.stdout',new_callable=io.StringIO):
+                self.assertEqual(main(['--url','http://127.0.0.1:1234','--report',str(target)]),130)
+                result=json.loads(target.read_text())
+                self.assertEqual(result['result'],'interrupted')
+                self.assertEqual(result['stage'],'hidden_token_prompt')
+                self.assertFalse(result['input_sent'])
+
+    def test_closed_stdout_does_not_append_second_report(self):
+        from pathlib import Path
+        from unittest.mock import MagicMock
+        import tempfile
+        broken=MagicMock();broken.write.side_effect=BrokenPipeError('PRIVATE')
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'closed-stdout.json'
+            with patch('sys.stdin.isatty',return_value=True),\
+                 patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+                 patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+                 patch('navigation_controller.live_probe.RealClock',return_value=self.clock),\
+                 patch('sys.stdout',broken):
+                self.assertEqual(main(['--url','http://127.0.0.1:1234','--report',str(target)]),1)
+                result=json.loads(target.read_text())
+                self.assertEqual(result['result'],'read_only_observations_verified')
+                self.assertNotIn('PRIVATE',target.read_text())
+
+    def test_ctrl_c_after_saved_action_keeps_one_json_and_action_count(self):
+        from pathlib import Path
+        from unittest.mock import MagicMock
+        import tempfile
+        expected=self.arm()
+        interrupted=MagicMock();interrupted.write.side_effect=KeyboardInterrupt
+        args=['--url','http://127.0.0.1:1234','--action','turn','--turn-degrees','15',
+              '--expected-session',expected,'--accept-local-test',
+              '--accept-installed-guard-build','--accept-unpublished-survival']
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'saved-action.json'
+            with patch('sys.stdin.isatty',return_value=True),\
+                 patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+                 patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+                 patch('navigation_controller.live_probe.RealClock',return_value=self.clock),\
+                 patch('sys.stdout',interrupted):
+                self.assertEqual(main([*args,'--report',str(target)]),130)
+                result=json.loads(target.read_text())
+                self.assertEqual(result['result'],'readback_verified')
+                self.assertEqual(result['actions'],1)
+                self.assertEqual(result['samples'],0)
+                self.assertTrue(result['cleanup_verified'])
+                self.assertNotIn('input_sent',result)
+                self.assertEqual(len(self.transport.actions),1)
+                self.assertTrue(self.transport.closed)
+                interrupted.write.assert_called_once()
+
+    def test_ctrl_c_during_report_write_is_not_followed_by_second_append(self):
+        from unittest.mock import MagicMock
+        handle=MagicMock();handle.write.side_effect=KeyboardInterrupt
+        with patch('pathlib.Path.open',return_value=handle),\
+             patch('sys.stdin.isatty',return_value=True),\
+             patch('navigation_controller.live_probe.getpass.getpass',return_value='FAKE-ONLY'),\
+             patch('navigation_controller.http_transport.LoopbackHttpTransport',return_value=self.transport),\
+             patch('navigation_controller.live_probe.RealClock',return_value=self.clock),\
+             patch('sys.stdout',new_callable=io.StringIO) as output:
+            self.assertEqual(main(['--url','http://127.0.0.1:1234','--report','mocked-only.json']),130)
+            result=json.loads(output.getvalue())
+            self.assertEqual(result['result'],'read_only_observations_verified')
+            self.assertFalse(result['report_saved'])
+            self.assertEqual(result['report_error'],'report_write_failed')
+            handle.write.assert_called_once()
+            self.assertTrue(self.transport.closed)
 
     def test_action_observation_accepts_fast_two_page_scan(self):
         self.arm()
