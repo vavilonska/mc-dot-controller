@@ -56,7 +56,30 @@ def basic(command):
     body.pop('action_id', None)  # The resident owns stable per-request step IDs.
     response = yield {'step': 'action', 'body': body}
     state = yield observe()
-    return {'action': response, 'state': state, 'server_confirmed': False}
+    result = {'action': response, 'state': state, 'server_confirmed': False,
+              'evidence': {'level': 'client_observed', 'stable': False,
+                           'later_state_game_time': state.get('world', {}).get('game_time')}}
+    if body.get('action') == 'break_block':
+        # A vanished block is not proof that its drops entered inventory. Do
+        # not turn the action's client-side success into a collection claim.
+        broken = (response.get('status') == 'succeeded'
+                  and response.get('reason') == 'block_broken_observed')
+        absent = (response.get('status') == 'succeeded'
+                  and response.get('reason') == 'block_absent')
+        result['mining'] = {'block_broken_observed': broken, 'block_absent_observed': absent,
+                            'drops_collected_confirmed': False}
+        if broken:
+            result['reason'] = 'block_broken_client_observed_collection_unverified'
+        elif absent:
+            result['reason'] = 'block_already_absent_collection_unverified'
+    return result
+
+
+def game_time(state):
+    tick = state.get('world', {}).get('game_time')
+    if type(tick) is not int or tick < 0:
+        raise ValueError('fresh_game_time_required_for_stable_result')
+    return tick
 
 
 def walk_to(command, cache, bridge):
@@ -70,8 +93,26 @@ def walk_to(command, cache, bridge):
 
 def craft_planks(command):
     """Craft exactly ONE log/wood into four planks; no recipe or inventory mirror."""
+    context, previous_tick = None, None
+
+    def observed_menu(state):
+        nonlocal context, previous_tick
+        menu = player_menu(state)
+        world, player = state.get('world', {}), state.get('player', {})
+        identity = (world.get('world_generation'), player.get('uuid'),
+                    player.get('dimension') or world.get('dimension'))
+        if any(not value for value in identity):
+            raise ValueError('craft_world_or_player_identity_missing')
+        if context is not None and identity != context:
+            raise ValueError('craft_world_or_player_changed_stop_no_replay')
+        tick = game_time(state)
+        if previous_tick is not None and tick < previous_tick:
+            raise ValueError('game_time_regressed_stop_no_replay')
+        context, previous_tick = identity, tick
+        return menu
+
     state = yield observe()
-    menu = player_menu(state)
+    menu = observed_menu(state)
     slots = slots_of(menu)
     if not empty(menu['carried']) or any(not empty(slots[i]['item']) for i in range(1, 5)):
         raise ValueError('craft_grid_or_cursor_not_empty')
@@ -91,12 +132,12 @@ def craft_planks(command):
     source_count = source['item']['count']
     yield click(menu, source_slot)
     state = yield observe()
-    menu = player_menu(state)
+    menu = observed_menu(state)
     if menu['carried']['id'] != log_id or menu['carried']['count'] != source_count:
         raise ValueError('log_pickup_not_observed')
     yield click(menu, 1, button=1)
     state = yield observe()
-    menu = player_menu(state)
+    menu = observed_menu(state)
     if slots_of(menu)[1]['item']['id'] != log_id or slots_of(menu)[1]['item']['count'] != 1:
         raise ValueError('single_log_in_grid_not_observed')
     if source_count > 1:
@@ -106,24 +147,34 @@ def craft_planks(command):
     deadline = time.monotonic() + 3.0
     while True:
         state = yield observe()
-        menu = player_menu(state)
+        menu = observed_menu(state)
         output = slots_of(menu)[0]['item']
         if output['id'] == planks and output['count'] == 4 and empty(menu['carried']):
             break
         if time.monotonic() >= deadline:
             raise ValueError('plank_recipe_output_not_observed')
         yield {'step': 'wait', 'seconds': 0.1}
+    output_game_time = game_time(state)
     yield click(menu, 0, click_type='quick_move')
     deadline = time.monotonic() + 3.0
+    stable_game_times = []
     while True:
         state = yield observe()
-        menu = player_menu(state)
-        if (count(state, log_id) == before_log - 1 and count(state, planks) == before_planks + 4
-                and empty(menu['carried']) and all(empty(slots_of(menu)[i]['item']) for i in range(1, 5))):
-            return {'reason': 'one_log_crafted_client_observed', 'log_id': log_id, 'planks_id': planks,
-                    'logs_consumed': 1, 'planks_added': 4, 'state': state, 'server_confirmed': False}
+        menu = observed_menu(state)
+        tick = game_time(state)
+        matches = (count(state, log_id) == before_log - 1 and count(state, planks) == before_planks + 4
+                   and empty(menu['carried'])
+                   and all(empty(slots_of(menu)[i]['item']) for i in range(5)))
+        if not matches:
+            stable_game_times.clear()
+        elif tick > output_game_time and (not stable_game_times or tick > stable_game_times[-1]):
+            stable_game_times.append(tick)
+        if len(stable_game_times) >= 2:
+            return {'reason': 'one_log_crafted_client_observed_stable', 'log_id': log_id, 'planks_id': planks,
+                    'logs_consumed': 1, 'planks_added': 4, 'state': state, 'server_confirmed': False,
+                    'evidence': 'client_observed_stable', 'stable_game_times': stable_game_times}
         if time.monotonic() >= deadline:
-            raise ValueError('craft_inventory_delta_not_observed')
+            raise ValueError('craft_inventory_delta_not_stable_across_fresh_game_times')
         yield {'step': 'wait', 'seconds': 0.1}
 
 

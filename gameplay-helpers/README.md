@@ -2,7 +2,9 @@
 
 Original Python standard-library helpers for the sibling `resident-controller`.
 This directory contains shaped crafting, small gameplay/path wrappers, and a
-private state exporter. Imports do not create queue clients, observe the game,
+private state exporter. The frozen v6 crafting source is built and checked offline,
+not live-accepted; publication does not establish installation. Imports do not
+create queue clients, observe the game,
 write state files, or send actions. Callers explicitly select a client or mailbox.
 
 No license grant has been assigned to this original code. The upstream license
@@ -23,15 +25,17 @@ they do not start the controller, install a mod, or manage authentication.
 
 ## Crafting API
 
-The caller supplies its existing credential-free QueueClient when it deliberately
-wants to craft. This is an API usage example, not an automatic startup script:
+The caller supplies its existing credential-free client when it deliberately
+wants to craft. While the watchdog owns the queue, use its `IntentClient` so it
+remains the sole resident writer. Make `defense-watchdog` importable alongside
+the paths above. This is an API usage example, not an automatic startup script:
 
 ```python
-from resident_controller.ipc import QueueClient
+from intent_client import IntentClient
 from crafting_helper import craft_once, CraftStopped
 
-# Use the caller's verified existing mailbox, not a discovered/default location.
-client = QueueClient(verified_mailbox_directory)
+# The caller supplies the verified private control directory.
+client = IntentClient(verified_watchdog_control_directory)
 result = craft_once(client, "iron_pickaxe", expected_count=1)
 ```
 
@@ -58,8 +62,22 @@ Each ingredient is moved with ordinary pickup: pick up the observed source stack
 right-click exactly one item into an empty grid slot, return any remainder to its
 source. Every intermediate cursor/grid/storage change is verified. The actual
 requested output must appear before one quick_move retrieves it. Success requires
-the exact output increase and ingredient decrease, empty cursor and empty grid.
-Success is client-observed, never claimed to be a server acknowledgment.
+the complete expected inventory delta and empty cursor, grid and output in two
+later `observe` results with distinct increasing `state.world.game_time` values.
+The immediate output-click snapshot and same-tick repeats do not count. A mismatch
+resets the confirmation sequence; missing time fails before the first click and
+time regression stops without replay.
+
+The result includes `evidence:client_observed_stable`, `output_action_game_time`
+and `stable_game_times`. `server_confirmed` remains false: two stable client
+observations are not independent server acknowledgment or protection against a
+later rollback. World, dimension and player identity must remain the same.
+
+The published gateway state must include an integer `pending` inbox count.
+`base_watchdog.run()` adds it to `Watchdog.status()`; the status method alone is
+not the published contract. Missing/invalid `pending` fails with
+`session_pending_count_missing_or_invalid_requires_published_gateway_state`,
+without a `pending=0` fallback. This preserves the actual v5.1-compatible gateway.
 
 Do not interleave this call with other queue writers or manual inventory actions.
 The helper detects observed session/menu/world/player/mapping changes and stops;
@@ -81,7 +99,9 @@ bound waiting for protocol completion/read-only output observations.
 
 `play.py` retains the local breadth-first path search, waypoint generation,
 incremental travel, look-at, and inventory helpers. It has no command-line runner.
-Configure it with a caller-owned client before using a queue-backed function:
+Configure it with a caller-owned client before using a queue-backed function.
+The direct `QueueClient` example below applies only when no watchdog owns the
+queue; otherwise supply its `IntentClient`:
 
 ```python
 from resident_controller.ipc import QueueClient
@@ -139,6 +159,11 @@ The supplied development record documents live crafting only for
 only; no live verification is claimed for the other recipes. Successful crafting
 is client-observed and is not an authoritative server acknowledgment.
 
+These recipe reports predate the v6 stable-result contract and do not establish
+v6 live acceptance. Loading the standalone helper needs a fresh process/import;
+loading changed resident tasks needs an owner-controlled resident reload. Resolve
+existing pending IDs first; restart must never act as a retry.
+
 Publication checks use fake clients and synthetic data only. No game, live queue,
 credentials, network, or user interface is exercised by the tests below.
 
@@ -148,18 +173,23 @@ From the repository root:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=resident-controller:gameplay-helpers \
+WATCHDOG_CANDIDATE="$PWD/defense-watchdog" \
   python3 -m unittest discover -s gameplay-helpers/tests -v
 ```
 
-The 23 crafting tests check menu mapping, both grid sizes, all recipe shapes, one output
-retrieval, intermediate verification, exact counts, and stop/no-replay behavior.
-Additional focused smoke tests check explicit client/output paths, imports without
-queue or write side effects, and CLI help. They do not expand the live evidence
-listed above.
+All 37 staged tests pass: 30 crafting/gateway tests and seven retained portability
+checks. They cover menu mapping, recipe shapes, one output retrieval, exact deltas,
+repeated/regressed ticks, rollback, identity changes and stop/no-replay behavior.
+The real staged watchdog run loop and `IntentClient` are exercised with a fake
+resident and temporary files, including actual published `pending` counts.
+Portability checks cover explicit client/output paths, imports without queue or
+write side effects, and CLI help. These do not expand the live evidence above.
+The public source allowlist is `PUBLIC-FILES.txt`.
 
 ## Running with the defense watchdog
 
-When the independent v5 watchdog owns the resident queue, use its `IntentClient`
+When the independent v6 watchdog (with its retained v5 gateway label) owns the
+resident queue, use its `IntentClient`
 with these helpers instead of constructing a second direct queue writer. The
 watchdog may defer ordinary tasks while combat is active; pending is not failure
 and must not trigger a duplicate submission. Persistent walking is provided by

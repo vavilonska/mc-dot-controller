@@ -12,7 +12,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         int containerId, int slot, int button, String clickType, JsonObject original) {
     record Point(double x, double y, double z, boolean jump) { }
     record Cell(int x, int y, int z) { }
-    static final Set<String> ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot");
+    static final Set<String> ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot", "recover_environment");
     static final Set<String> FACES = Set.of("up", "down", "north", "south", "east", "west");
     static final Set<String> CLICKS = Set.of("pickup", "quick_move", "swap", "throw", "pickup_all", "quick_craft");
 
@@ -21,22 +21,23 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         require(!id.isBlank() && id.length() <= 128, "invalid_action_id");
         String action = string(body, "action");
         require(ACTIONS.contains(action), "unsupported_action");
-        long timeout = integer(body, "timeout_ms", 15000);
-        require(timeout >= 50 && timeout <= 600000, "invalid_timeout_ms");
+        boolean recovery = action.equals("recover_environment");
+        long timeout = integer(body, "timeout_ms", recovery ? 0 : 15000);
+        require((recovery && timeout == 0) || (timeout >= 50 && timeout <= 600000), "invalid_timeout_ms");
         int hotbar = integer(body, "hotbar_slot", -1);
         require(hotbar >= -1 && hotbar <= 8, "invalid_hotbar_slot");
         List<Point> points = new ArrayList<>();
         Cell target = null, support = null;
         String face = null, click = null;
         int container = -1, slot = -1, button = 0;
-        if (action.equals("follow_path")) {
+        if (action.equals("follow_path") || recovery) {
             require(body.has("waypoints") && body.get("waypoints").isJsonArray(), "invalid_waypoints");
             for (JsonElement item : body.getAsJsonArray("waypoints")) {
                 require(item.isJsonObject(), "invalid_waypoint");
                 JsonObject point = item.getAsJsonObject();
                 points.add(new Point(number(point, "x"), number(point, "y"), number(point, "z"), bool(point, "jump", false)));
             }
-            require(!points.isEmpty() && points.size() <= 512, "invalid_waypoints");
+            require((recovery || !points.isEmpty()) && points.size() <= 512, "invalid_waypoints");
         } else if (action.equals("break_block")) {
             target = cell(body, "target");
         } else if (action.equals("place_block")) {

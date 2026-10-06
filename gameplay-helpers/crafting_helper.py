@@ -150,6 +150,9 @@ class View:
         world = state.get("world", {})
         _require(isinstance(world, dict) and world.get("world_generation")
                  and player.get("uuid"), "world_or_player_identity_missing")
+        self.game_time = world.get("game_time")
+        _require(type(self.game_time) is int and self.game_time >= 0,
+                 "fresh_game_time_required_for_stable_result")
         self.identity = (kind, container, world["world_generation"], player["uuid"],
                          player.get("dimension"))
         self.mapping = tuple(sorted((i, slot.get("player_inventory"),
@@ -175,6 +178,7 @@ class _Craft:
         self.session_id = None
         self.last_state = None
         self.initial_view = None
+        self.last_game_time = None
 
     def call(self, command):
         # No queue consumption, credential access, raw input, takeover, resume,
@@ -184,11 +188,13 @@ class _Craft:
         # Wait on metadata only; never replay a game operation to bridge that gap.
         admission_deadline = time.monotonic() + 2.0
         while (isinstance(session, dict)
-               and (session.get("state") == "busy" or session.get("pending", 0) != 0)
+               and (session.get("state") == "busy" or session.get("pending") not in (None, 0))
                and time.monotonic() < admission_deadline):
             time.sleep(0.02)
             session = self.client.session()
         _require(isinstance(session, dict) and session.get("session_id"), "session_missing")
+        _require(type(session.get("pending")) is int and session["pending"] >= 0,
+                 "session_pending_count_missing_or_invalid_requires_published_gateway_state")
         if self.session_id is None:
             self.session_id = session["session_id"]
         _require(session["session_id"] == self.session_id, "controller_session_changed")
@@ -225,6 +231,9 @@ class _Craft:
             _require(isinstance(action, dict) and action.get("status") == "succeeded",
                      "click_success_not_confirmed")
         view = View(state)
+        _require(self.last_game_time is None or view.game_time >= self.last_game_time,
+                 "game_time_regressed_stop_no_replay")
+        self.last_game_time = view.game_time
         if self.initial_view is None:
             self.initial_view = view
         else:
@@ -306,16 +315,31 @@ class _Craft:
         after.subtract(consumed)
         after[output_id] += recipe.count
         deadline = time.monotonic() + self.settle_timeout
+        # The quick-move snapshot can be optimistic client prediction. Require
+        # two strictly newer observe results with matching inventory AND cleanup.
+        # Repeated snapshots in the same game tick never count as new evidence.
+        output_game_time = view.game_time
+        stable_game_times = []
         while True:
-            if (view.counts() == after and view.carried == EMPTY
+            matches = (view.counts() == after and view.carried == EMPTY
                     and all(view.items[i] == EMPTY for i in view.grid)
-                    and view.items[view.output] == EMPTY):
+                    and view.items[view.output] == EMPTY)
+            if not matches:
+                stable_game_times.clear()
+            elif (view.game_time > output_game_time
+                  and (not stable_game_times or view.game_time > stable_game_times[-1])):
+                stable_game_times.append(view.game_time)
+            if len(stable_game_times) >= 2:
                 return {"status": "succeeded", "item_id": output_id, "added": recipe.count,
                         "before_count": before[output_id], "after_count": view.counts()[output_id],
                         "consumed": dict(consumed), "cursor_empty": True, "grid_empty": True,
-                        "server_confirmed": False, "request_ids": tuple(self.request_ids),
+                        "server_confirmed": False, "evidence": "client_observed_stable",
+                        "stable_game_times": tuple(stable_game_times),
+                        "output_action_game_time": output_game_time,
+                        "request_ids": tuple(self.request_ids),
                         "state": view.state}
-            _require(time.monotonic() < deadline, "craft_inventory_delta_or_cleanup_not_observed")
+            _require(time.monotonic() < deadline,
+                     "craft_inventory_delta_or_cleanup_not_stable_across_fresh_game_times")
             time.sleep(min(0.1, max(0, deadline - time.monotonic())))
             view = self.observe()
 
@@ -328,7 +352,10 @@ def craft_once(client: QueueClient, recipe_name: str, *, expected_count: int | N
     ``expected_count`` is the exact requested inventory increase for this batch;
     omitted means the recipe's output count. All required equipment yields one.
     Raises CraftStopped on missing data, interference, rejected actions, or
-    uncertain completion. Preserve the exception's request IDs; do not replay.
+    uncertain completion. Success requires matching final counts and cleanup in
+    two later observations at distinct increasing game ticks; this remains
+    client evidence, not independent server confirmation. Preserve the
+    exception's request IDs; do not replay.
     No GUI is opened/closed, and items are never dropped or automatically cleaned
     up on failure. A stop can therefore leave the cursor/grid partly populated.
     """

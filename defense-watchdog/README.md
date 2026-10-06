@@ -1,14 +1,49 @@
-# Native defense watchdog, v5
+# Native defense watchdog, v6 continuity candidate
 
 Original Python source for a single operator-started coordinator around the existing
-resident queue. The operator confirmed deployment with one armed v5 process and
-resident melee marker 2. The source tests below do not establish complete live
-encounter, retreat or survival behavior.
+resident queue. This frozen v6 source was built and checked offline; it is not
+live-accepted, and publication does not establish installation. An earlier deployed
+v5 encounter failed: approach was blocked, zero attacks were dispatched, and the
+player died. The corrections below must not be read as a successful retest.
 
 Requires Python 3.10+ on a POSIX system (`fcntl`) and the sibling
 `resident-controller` source. While running, this process must be the only resident
 queue writer; ordinary tasks use its IntentClient. The control-directory lock
 cannot exclude clients using another directory or unrelated queue writers.
+
+## v5.1 correction retained
+
+Terminal combat failures are handled once per observed event, preventing a stopped
+resident result from repeatedly cancelling navigation and renewing suppression.
+A later fresh crosshair hit on the same hostile UUID, entity ID and type can admit
+in-range melee with `approach:false`; body distance alone cannot authorize it.
+Losing that fresh hit preserves encounter history and never reopens blind approach.
+The runtime combat trace is bounded and freezes on death. Its private control-directory
+`combat-trace-*.json` files contain gameplay observations and are not public source.
+
+## v6 environmental recovery
+
+The source requires the matching client-mod `environment_schema_version:1` fields
+and `recover_environment` action. It recognizes observed water, submerged eyes,
+lava, powder snow and fire. The watchdog remains the sole queue writer: it first
+requires confirmed cancellation, then lets one native client action hold flotation
+continuously while Python obtains fresh state and chooses a loaded local route.
+A delayed or repeated-tick observation does not release that action's flotation.
+The client still checks death, menus, world/session changes and ownership every tick.
+
+Routes use only complete observed collision/headroom/support facts. There is no
+random escape heading or invented landing; new lava cells, unknown geometry and
+unsupported dry nodes cannot form an exit. Burning on otherwise dry ground may
+seek observed reachable water. With no observed exit, the native action maintains
+flotation while waiting for new observations; this does not guarantee escape or
+survival. A changed route is installed only after confirmed cancellation, preserving
+request identity and never replaying an uncertain movement write.
+
+Recovery finishes only after native action completion and later advancing dry,
+grounded observations with non-increasing frozen ticks. It then changes the defense
+epoch and requires fresh navigation observation. These are client observations;
+`server_confirmed` remains false. Recovery does not wait for full health or assume
+that previously dry ground remains safe after a new hazard entry.
 
 ## Why bounded approach is needed
 
@@ -99,7 +134,10 @@ replaying them. If upgrading an older resident source, load the matching sibling
 resident through its established owner-start flow; authentication stays there.
 This helper neither reads credentials nor creates another access route. Observe
 melee marker 2 and an alive player before explicitly starting one watchdog.
-Minecraft and the mod do not need a restart for these external-source changes.
+The retained melee correction alone does not need a JVM restart. The new v6
+environment fields/action require the matching client-mod to be loaded by an
+owner-controlled JVM reload; load the changed resident once and replace the
+watchdog once, never with two writers. Resolve pending IDs before any reload.
 
 ```sh
 python3 watchdog.py run --queue /path/to/existing/mailbox --control /path/to/private/watchdog
@@ -107,12 +145,17 @@ python3 watchdog.py stop --control /path/to/private/watchdog
 ```
 
 Only `watchdog.py` is the entry point; `base_watchdog.py` is a library. Verify
-`implementation:"native-defense-watchdog-v5"`, a fresh session/heartbeat, armed
-status and the loaded melee marker. Private control folders must remain outside
+`implementation:"native-defense-watchdog-v5"` plus
+`watchdog_revision:"v6-environment-continuity-candidate"`, a fresh session/heartbeat,
+armed status and the loaded melee marker. The v5 implementation label is retained
+for gateway compatibility; it is not a v6 installation check by itself. Private control folders must remain outside
 version control. A previous STOP marker is removed only by an explicit owner
 choice after confirming old process exit and input release.
 
 Use this package's `IntentClient` for `submit`, `wait`, `result` and `session`.
+The actual `base_watchdog.run()` publication adds an integer `pending` inbox count,
+`updated_at` and `pid` to `Watchdog.status()`. A bare `status()` stub lacks the
+published gateway contract; callers must not invent `pending=0`.
 The sibling navigation cursor already accepts v5 and requires the atomic
 `_navigation_defense_epoch` guard. Stale pre-fight routes are cancelled locally
 instead of running after combat. STOP takes precedence; uncertain movement is
@@ -135,20 +178,21 @@ The helper never reconnects, quits, respawns or changes game rules.
 python3 -m unittest discover -s . -v
 ```
 
-- 102 defense/adapter/target-selection/hostile-closing/reach checks pass in the
-  published layout, including the six-block zero-dispatch reproduction and
-  post-release mining admission
-- All 109 tests pass against the integrated sibling resident correction
-- All 38 navigation tests pass with this actual v5 Watchdog/IntentClient source,
-  temporary gateway files and a fake resident, including defense-epoch admission
+- 130 watchdog checks run: 129 pass; one old-v5 comparison is skipped because its
+  historical source is intentionally absent from this isolated publication
+- All 118 sibling resident tests pass; all 67 navigation tests pass with this
+  actual Watchdog/IntentClient source, temporary gateway files and a fake resident
+- All 37 gameplay-helper tests pass, including 30 crafting/gateway checks and
+  seven retained portability checks
 - Source verification does not access a live endpoint, queue, credential or game
 
 Earlier limited live evidence includes a separate sword/shield script with four
 attack dispatches, observed target-dead stop and player health remaining 20, plus
-an older watchdog heartbeat and short navigation intents. Those are not v5
-acceptance. The operator subsequently confirmed v5 deployment and marker 2;
-complete natural-encounter closing, bounded exit, retreat, navigation recovery,
-server hits and ongoing survival remain unverified by this record.
+an older watchdog heartbeat and short navigation intents. A later actual v5
+encounter failed with blocked approach, zero attack dispatches and player death.
+Neither the isolated successful encounter nor offline v6 checks establish v6
+closing, retreat, environmental recovery, navigation continuity, server hits or
+ongoing survival. V6 live acceptance remains outstanding.
 
 Optional axe jump criticals are deliberately separate. See `CRITICAL_HITS_1_21_1.md`.
 No blind timed jump is described as a confirmed critical hit.

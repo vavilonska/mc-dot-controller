@@ -68,10 +68,10 @@ class CursorTests(unittest.TestCase):
 class NavigatorTests(unittest.TestCase):
     def setUp(self):
         # Reproduction geometry: the route starts by moving AWAY from its goal.
-        self.nodes = [(-115,92,-8),(-116,92,-8),(-117,92,-8),(-117,92,-9),
-                      (-117,92,-10),(-116,92,-10),(-115,92,-10),(-114,92,-10),(-113,92,-10)]
+        self.nodes = [(4,64,2),(3,64,2),(2,64,2),(2,64,1),
+                      (2,64,0),(3,64,0),(4,64,0),(5,64,0),(6,64,0)]
         self.gateway = Gateway()
-        self.nav = Navigator(self.gateway)
+        self.nav = Navigator(self.gateway, slice_size=2)
         self.goal = self.nodes[-1]
 
     def observe(self, position, nodes=None):

@@ -12,3 +12,6 @@ state.json
 observation.json
 owner.lock
 STOP
+
+# Private observations created by the bounded combat trace
+combat-trace-*.json

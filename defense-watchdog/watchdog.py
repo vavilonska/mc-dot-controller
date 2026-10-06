@@ -1,8 +1,10 @@
-"""v5 candidate: bounded melee closing for every hostile, with dry retreat.
+"""v5.1: deduplicate terminal failures and recover observed in-range melee.
 
 No game I/O on import. Only the existing authorized game operator runs this file.
 """
 import argparse
+from collections import OrderedDict, deque
+import re
 import json
 import math
 from pathlib import Path
@@ -10,7 +12,9 @@ import time
 import uuid
 
 import base_watchdog as base
+from resident_controller.native_combat import crosshair_target_in_reach
 from ranged_tactics import RangedMemory, horizontal, retreat_plan
+from environment_recovery import EnvironmentRecovery, hazards
 
 OWNER_OPS, write_json = base.OWNER_OPS, base.write_json
 cancel_waiting_intents = base.cancel_waiting_intents
@@ -24,6 +28,13 @@ class Watchdog(base.Watchdog):
         self.ranged_move=None
         self.ranged_last=None
         self.retreat_lease=None
+        self.handled_terminal=OrderedDict()
+        self.melee_recovery_target=None
+        self.trace=deque(maxlen=96)
+        self.trace_sequence=0
+        self.trace_saved=-1
+        self.trace_frozen=False
+        self.environment=EnvironmentRecovery()
 
     def status(self):
         data=super().status()
@@ -32,6 +43,12 @@ class Watchdog(base.Watchdog):
                             'movement_request':self.ranged_move['id'] if self.ranged_move else None,
                             'shield_blocks_potions_confirmed':False})
         data['engagement']={**data['ranged'],'scope':'all_observed_hostiles'}
+        data['watchdog_revision']='v6-environment-continuity-candidate'
+        data['environment']=self.environment.status()
+        if self.environment.active:data['state']='busy'
+        data['terminal_events_handled']=len(self.handled_terminal)
+        data['combat_telemetry']={'samples':len(self.trace),'frozen_after_death':self.trace_frozen,
+                                 'file':'combat-trace-'+self.session_id+'.json'}
         if self.armed and not self.stopped and (self.ranged_move or (self.rpc and self.rpc['kind'].startswith('ranged_'))):
             data['state']='busy'
         return data
@@ -45,8 +62,14 @@ class Watchdog(base.Watchdog):
             state=(self.latest or {}).get('state',{})
             target=self.target(state,command.get('target_uuid'))
             if target:
+                recovering=self.melee_recovery_target==target['uuid']
+                if recovering and not self.live_hit(state,target):
+                    self.melee_recovery_target=None
+                    self.phase,self.reason='watching','fresh_entity_hit_lost_no_recovery'
+                    self.next_observe=0
+                    return
                 record=self.ranged_memory.begin(state,target,self.clock())
-                if record.get('suppressed_until',0)>self.clock():
+                if record.get('suppressed_until',0)>self.clock() and not recovering:
                     self.targeting.excluded[target['uuid']]=record['suppressed_until']
                     self.started_target=None
                     self.phase,self.reason='watching','hostile_target_temporarily_suppressed'
@@ -57,7 +80,11 @@ class Watchdog(base.Watchdog):
                     return
                 # Existing resident already checks actual flat, dry corridor data
                 # before forward input. Never freeze at range waiting for any hostile.
-                command={**command,'approach':True}
+                if recovering:
+                    record['suppressed_until']=0
+                    self.targeting.excluded.pop(target['uuid'],None)
+                self.melee_recovery_target=None
+                command={**command,'approach':not recovering}
                 if target['type']=='minecraft:witch':command['shield']=False
         return super().send(kind,command)
 
@@ -75,13 +102,100 @@ class Watchdog(base.Watchdog):
         self.defense_epoch+=1
         super().send('ranged_cancel',{'op':'cancel'})
 
+    def live_hit(self,state,target):
+        return (target is not None and state.get('player',{}).get('alive') is True
+                and state.get('screen_open') is False and state.get('paused') is False
+                and crosshair_target_in_reach(state,target['uuid'],target.get('entity_id'),target['type']))
+
+    def terminal_event(self,state,combat):
+        if combat.get('active') is not False:return None
+        return (state.get('world',{}).get('world_generation'),
+                state.get('client_action',{}).get('action_session'),combat.get('request_id'),
+                combat.get('target_uuid'),combat.get('reason'))
+
+    def remember_terminal(self,event):
+        if event is None:return
+        self.handled_terminal[event]=True
+        self.handled_terminal.move_to_end(event)
+        while len(self.handled_terminal)>256:self.handled_terminal.popitem(last=False)
+
+    def recover_live_melee(self,state,target):
+        if self.melee_recovery_target is not None or not self.live_hit(state,target):return False
+        identity=target['uuid']
+        self.targeting.release(self.clock(),'live_entity_hit_recovered')
+        self.targeting.preferred_uuid=identity
+        # Preserve exclusion/progress until the post-cancel observation confirms hit.
+        self.started_target=None
+        self.melee_recovery_target=identity
+        self.phase,self.reason='engaging','live_entity_hit_recovered_no_path_needed'
+        self.send('cancel_threat',{'op':'cancel'})
+        return True
+
+    def observation_received(self,payload,kind):
+        state=payload.get('state',{});player=state.get('player',{});combat=payload.get('combat',{})
+        identity=combat.get('target_uuid') or self.started_target
+        target=self.target(state,identity)
+        if self.trace_frozen:return
+        if not (combat.get('active') or target or self.trace):return
+        pick=lambda value,keys:{k:value.get(k) for k in keys if k in value}
+        self.trace.append({'observed_at':time.time(),'game_time':state.get('world',{}).get('game_time'),
+            'kind':kind,'watchdog_phase':self.phase,'watchdog_reason':self.reason,
+            'player':pick(player,('x','y','z','eye_position','yaw','pitch','alive','health','on_ground','selected_slot')),
+            'target':pick(target or {},('uuid','entity_id','type','x','y','z','bounding_box','distance','alive','health')),
+            'crosshair':pick(state.get('crosshair',{}),('type','uuid','entity_id','entity_type','location','id','x','y','z','face')),
+            'combat':pick(combat,('request_id','active','phase','reason','target_uuid','attack_attempts','attack_dispatches')),
+            'aim':pick(payload.get('aim_lock',{}),('active','reason','target_uuid','center'))})
+        self.trace_sequence+=1
+        if player.get('alive') is False or player.get('health')==0:self.trace_frozen=True
+
+    def persist_telemetry(self,directory):
+        if self.trace_sequence==self.trace_saved or not self.trace:return
+        path=directory/('combat-trace-'+self.session_id+'.json')
+        write_json(path,{'schema_version':1,'revision':'v5.1-live-hit-recovery',
+                         'frozen_after_death':self.trace_frozen,'samples':list(self.trace)})
+        self.trace_saved=self.trace_sequence
+        # Only this helper's generated traces, never arbitrary operator files.
+        files=[p for p in directory.glob('combat-trace-*.json')
+               if re.fullmatch(r'combat-trace-[a-f0-9]{32}\.json',p.name)]
+        for old in sorted(files,key=lambda p:p.stat().st_mtime)[:-4]:old.unlink()
+
     def observe_tactics(self,state,combat,damaged,kind):
+        if self.environment.start(self,state):return True
         self.observe_escape_progress(state)
+        if kind=='fresh' and self.melee_recovery_target is not None:
+            target=self.target(state,self.melee_recovery_target)
+            if target is None or not self.live_hit(state,target):
+                self.melee_recovery_target=None
+                self.targeting.preferred_uuid=None
+                identity=combat.get('target_uuid')
+                record=self.ranged_memory.records.get(identity,{})
+                if identity and record.get('suppressed_until',0)<=0:
+                    until=self.ranged_memory.suppress(identity,self.clock(),'fresh_entity_hit_lost')
+                    self.targeting.excluded[identity]=until
+                self.phase,self.reason='watching','fresh_entity_hit_lost_no_recovery'
+                return True
+            if self.latest.get('action',{}).get('status')=='running':
+                self.melee_recovery_target=None
+                self.attention('navigation_cancel_not_observed')
+                return True
+            self.send('start_combat',{'op':'combat_start','target_uuid':target['uuid'],
+                                    'radius':8,'approach':False,'shield':True})
+            return True
         if self.ranged_move:
             self.phase,self.reason='retreating','following_observed_dry_route'
             return True  # Do not stop the escape just because poison keeps ticking.
         identity=combat.get('target_uuid') or self.started_target
         target=self.target(state,identity)
+        event=self.terminal_event(state,combat)
+        if event is not None:
+            eligible=any(word in str(combat.get('reason','')) for word in ('flat_approach_blocked','target_missing','target_lost'))
+            if eligible:
+                already_handled=event in self.handled_terminal
+                historical=self.started_target is None and identity not in self.ranged_memory.records
+                self.remember_terminal(event)
+                if historical:return False
+                if self.recover_live_melee(state,target):return True
+                if already_handled:return False
         record=self.ranged_memory.records.get(identity)
         if record is None and target is None and identity and combat.get('target_type') in base.HOSTILES:
             # An inherited lock can be outside the lightweight nearby list.
@@ -95,6 +209,11 @@ class Watchdog(base.Watchdog):
         if not combat.get('active') and not any(w in reason for w in ('target_missing','target_lost','flat_approach_blocked')):
             return False  # Manual takeover/menu/uncertainty retain their hard stops.
         problem=self.ranged_memory.observe(state,target,combat,self.clock(),damaged)
+        if combat.get('active') and self.live_hit(state,target) and problem in (
+                'no_observed_closing_progress','no_attack_dispatch_before_deadline'):
+            # A current real hit gets native melee priority over historical path budgets.
+            self.phase,self.reason='combat','verified_entity_hit_native_melee_priority'
+            return True
         if problem:
             self.begin_disengage(identity,problem)
             return True
@@ -122,6 +241,7 @@ class Watchdog(base.Watchdog):
                     and 0 <= self.clock()-lease.get('observed_at',-math.inf) <= .5)
 
     def submit_owner(self,intent_id,command):
+        if self.environment.active:return False
         if self.ranged_move:return False
         accepted=super().submit_owner(intent_id,command)
         if accepted and self.owner and self.owner['id']==intent_id:
@@ -148,6 +268,7 @@ class Watchdog(base.Watchdog):
 
     def capture(self,result):
         self.latest=result['result'];self.observed_at=self.clock()
+        self.observation_received(self.latest,'ranged_observe')
         self.next_observe=self.clock()+self.interval
         state=self.latest.get('state',{})
         if (not base.alive(state) or state.get('screen_open') is not False or state.get('paused') is not False):
@@ -186,6 +307,7 @@ class Watchdog(base.Watchdog):
             super().send('ranged_terrain',{'op':'observe','terrain':True,'radius':3,'vertical':2})
             return
         if kind=='ranged_terrain':
+            self.observation_received(result.get('result',{}),kind)
             self.ranged_terrain={'data':result.get('result',{}).get('terrain',{}),'received':rpc['started']}
             super().send('ranged_fresh',{'op':'observe'})
             return
@@ -216,7 +338,13 @@ class Watchdog(base.Watchdog):
 
     def tick(self):
         if self.stopped:return
-        if self.stop_requested:return super().tick()
+        if self.stop_requested:
+            self.environment.abandon("operator_stop")
+            return super().tick()
+        if (not self.environment.active and self.armed and not self.rpc and self.latest
+                and self.observed_at is not None and self.clock()-self.observed_at <= .8 and hazards(self.latest.get('state',{}))):
+            self.environment.start(self,self.latest['state'])
+        if self.environment.tick(self):return
         if self.rpc and self.rpc['kind'].startswith('ranged_'):
             self.handle_ranged_rpc();return
         if self.ranged_move:

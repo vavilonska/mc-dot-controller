@@ -52,3 +52,12 @@ Loaded scans read only client-loaded data. Unloaded/missing regions remain unkno
 observations age and pages/tick slices are not an atomic world snapshot. Counts,
 clusters and candidate sites do not imply ownership, permission, navigability or
 build safety. No game action was performed to publish this source update.
+
+## Later v5 failure and v6 source
+
+After the limited results above, a later v5 watchdog zombie encounter ended with
+`combat_flat_approach_blocked`, zero attack dispatches and player death. The
+v5.1 terminal-recovery correction and v6 environment/continuity source address
+observed failure modes but do not establish real-game success. See the separate
+[current continuity record](continuity-verification.md). The earlier build and
+scan measurements remain evidence only for their original versions and scope.

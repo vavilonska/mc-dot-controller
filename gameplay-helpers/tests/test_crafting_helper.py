@@ -64,6 +64,8 @@ class FakeQueueClient:
         self.unconsumed = False
         self.final_pending_observes = 0
         self.pending_output = None
+        self.game_time = 100
+        self.advance_game_time = True
 
     def session(self):
         return {"session_id": self.session_id, "state": self.session_state,
@@ -85,7 +87,7 @@ class FakeQueueClient:
                  "player": {"health": 20.0, "uuid": "offline-player", "dimension": "minecraft:overworld",
                             "inventory_truncated": False, "inventory": [
                                 dict(deepcopy(self.slots[s]), slot=i) for i, s in self.storage.items()]},
-                 "world": {"world_generation": self.state_identity}}
+                 "world": {"world_generation": self.state_identity, "game_time": self.game_time}}
         if self.mutate_snapshot:
             self.mutate_snapshot(state)
         return state
@@ -116,6 +118,8 @@ class FakeQueueClient:
 
     def submit(self, command, request_id=None):
         self.commands.append(deepcopy(command))
+        if self.advance_game_time:
+            self.game_time += 1
         result = {"request_id": request_id, "session_id": self.session_id, "status": "succeeded"}
         execute = True
         if self.hook:
@@ -172,7 +176,8 @@ class CraftChecks(unittest.TestCase):
         self.assertEqual(client.quick_moves, 1)
 
     def craft(self, client, name, **kwargs):
-        return craft_once(client, name, settle_timeout=0.001, **kwargs)
+        with patch("crafting_helper.time.sleep"):
+            return craft_once(client, name, settle_timeout=0.05, **kwargs)
 
     def test_all_required_recipes_and_requested_extras(self):
         self.assertEqual(set(RECIPES), set(SHAPES))
@@ -186,6 +191,10 @@ class CraftChecks(unittest.TestCase):
                 self.assertEqual(client.quick_moves, 1)
                 self.assertTrue(result["cursor_empty"] and result["grid_empty"])
                 self.assertFalse(result["server_confirmed"])
+                self.assertEqual(result["evidence"], "client_observed_stable")
+                self.assertEqual(len(set(result["stable_game_times"])), 2)
+                self.assertGreater(result["stable_game_times"][0], result["output_action_game_time"])
+                self.assertEqual(client.commands[-2:], [{"op": "observe"}, {"op": "observe"}])
                 self.assertTrue(all(c["op"] in ("observe", "action") for c in client.commands))
                 self.assertTrue(all(c.get("click_type", "pickup") in ("pickup", "quick_move")
                                     for c in client.commands))
@@ -394,6 +403,74 @@ class CraftChecks(unittest.TestCase):
         for value in (0, -1, float("inf"), float("nan"), True):
             with self.assertRaisesRegex(CraftStopped, "timeouts"):
                 craft_once(client, "iron_pickaxe", wait_timeout=value)
+        self.assertEqual(client.commands, [])
+
+    def test_duplicate_game_tick_cannot_confirm_optimistic_output(self):
+        client = FakeQueueClient()
+        def freeze(queue, command, result):
+            if command.get("click_type") == "quick_move":
+                queue.advance_game_time = False
+        client.hook = freeze
+        with self.assertRaisesRegex(CraftStopped, "not_stable_across_fresh_game_times"):
+            self.craft(client, "iron_pickaxe")
+        self.assertEqual(client.quick_moves, 1)
+        self.assertTrue(all(c["op"] == "observe" for c in client.commands[-2:]))
+
+    def test_optimistic_output_then_rollback_never_reports_success_or_replays(self):
+        client = FakeQueueClient()
+        def rollback(queue, command, result):
+            if queue.quick_moves and command["op"] == "observe":
+                for slot in queue.storage.values():
+                    if queue.slots[slot]["id"] == "minecraft:iron_pickaxe":
+                        queue.slots[slot] = item()
+        client.hook = rollback
+        with self.assertRaisesRegex(CraftStopped, "not_stable_across_fresh_game_times"):
+            self.craft(client, "iron_pickaxe")
+        self.assertEqual(client.quick_moves, 1)
+
+    def test_matching_observation_then_rollback_resets_stability(self):
+        client = FakeQueueClient()
+        after_output = []
+        def rollback_once(queue, command, result):
+            if queue.quick_moves and command["op"] == "observe":
+                after_output.append(queue.game_time)
+                if len(after_output) == 2:
+                    for slot in queue.storage.values():
+                        if queue.slots[slot]["id"] == "minecraft:iron_pickaxe":
+                            queue.slots[slot] = item()
+        client.hook = rollback_once
+        with self.assertRaises(CraftStopped):
+            self.craft(client, "iron_pickaxe")
+        self.assertGreaterEqual(len(after_output), 2)
+        self.assertEqual(client.quick_moves, 1)
+
+    def test_missing_game_time_stops_before_any_click(self):
+        client = FakeQueueClient()
+        client.mutate_snapshot = lambda s: s["world"].pop("game_time")
+        with self.assertRaisesRegex(CraftStopped, "fresh_game_time_required"):
+            self.craft(client, "iron_pickaxe")
+        self.assertEqual(client.commands, [{"op": "observe"}])
+
+    def test_game_time_regression_stops_without_replay(self):
+        client = FakeQueueClient()
+        def regress(queue, command, result):
+            if queue.quick_moves and command["op"] == "observe":
+                queue.game_time = 0
+        client.hook = regress
+        with self.assertRaisesRegex(CraftStopped, "game_time_regressed"):
+            self.craft(client, "iron_pickaxe")
+        self.assertEqual(client.quick_moves, 1)
+
+    def test_missing_pending_is_not_assumed_idle(self):
+        client = FakeQueueClient()
+        original = client.session
+        def session():
+            data = original()
+            data.pop("pending")
+            return data
+        client.session = session
+        with self.assertRaisesRegex(CraftStopped, "session_pending_count_missing"):
+            self.craft(client, "iron_pickaxe")
         self.assertEqual(client.commands, [])
 
 

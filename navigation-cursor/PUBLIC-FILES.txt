@@ -4,6 +4,8 @@ PUBLIC-FILES.txt
 README.md
 navigate.py
 navigation_cursor.py
+tests/test_adaptive_slices.py
 tests/test_drop_policy.py
+tests/test_ground_anchor.py
 tests/test_navigation_cursor.py
 tests/test_watchdog_contract.py

@@ -145,6 +145,12 @@ class Watchdog:
     def damage_requires_cancel(self, state):
         return True
 
+    def observation_received(self, payload, kind):
+        pass
+
+    def persist_telemetry(self, directory):
+        pass
+
     def observe_tactics(self, state, combat, damaged, kind):
         return False
 
@@ -228,6 +234,7 @@ class Watchdog:
                 self.next_observe = 0
             elif kind in ('observe', 'fresh'):
                 self.latest = result.get('result', {})
+                self.observation_received(self.latest, kind)
                 self.observed_at = self.clock()
                 self.next_observe = self.clock() + self.interval
                 state = self.latest.get('state', {})
@@ -343,6 +350,7 @@ def run(queue, directory, watchdog_class=Watchdog):
             if (directory/'STOP').exists(): dog.stop()
             try:
                 dog.tick()
+                dog.persist_telemetry(directory)
                 cancel_waiting_intents(directory, dog)
                 for done in dog.completed:
                     write_json(directory/'results'/(done['intent_id']+'.json'), done)

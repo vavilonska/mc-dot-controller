@@ -3,12 +3,15 @@ CRITICAL_HITS_1_21_1.md
 PUBLIC-FILES.txt
 README.md
 base_watchdog.py
+environment_recovery.py
 intent_client.py
 ranged_tactics.py
 targeting.py
 test_all_hostile_closing.py
+test_environment_recovery.py
 test_intent_client.py
 test_ranged_tactics.py
 test_retaliation.py
+test_terminal_recovery.py
 test_watchdog.py
 watchdog.py

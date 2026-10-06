@@ -223,9 +223,8 @@ class RangedPolicyChecks(unittest.TestCase):
 class EyeReachPatchChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        path=Path(__file__).resolve().parents[1]/'resident-controller/resident_controller/native_combat.py'
-        spec=importlib.util.spec_from_file_location('resident_controller.review_native_combat',path)
-        cls.module=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.module)
+        from resident_controller import native_combat
+        cls.module=native_combat
     def sample(self):
         q=RangedQueue();s=q.obs['state'];s['player']['selected_slot']=0
         t=witch();t.update(type='minecraft:zombie',x=.5,y=65,z=3.5,distance=3)

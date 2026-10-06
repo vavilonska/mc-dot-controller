@@ -1034,6 +1034,19 @@ public final class BridgeServer {
                 : mc.gameMode.getPlayerMode().getName());
         player.addProperty("dimension", mc.level.dimension().location().toString());
         player.addProperty("on_ground", mc.player.onGround());
+        player.addProperty("environment_schema_version", 1);
+        player.addProperty("in_water", mc.player.isInWater());
+        player.addProperty("eye_in_water", mc.player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER));
+        player.addProperty("in_lava", mc.player.isInLava());
+        player.addProperty("in_powder_snow", mc.player.isInPowderSnow);
+        player.addProperty("frozen_ticks", mc.player.getTicksFrozen());
+        player.addProperty("on_fire", mc.player.isOnFire());
+        player.addProperty("fire_ticks", mc.player.getRemainingFireTicks());
+        var playerBounds = mc.player.getBoundingBox();
+        JsonObject playerBox = new JsonObject();
+        playerBox.add("min", vector(new Vec3(playerBounds.minX, playerBounds.minY, playerBounds.minZ)));
+        playerBox.add("max", vector(new Vec3(playerBounds.maxX, playerBounds.maxY, playerBounds.maxZ)));
+        player.add("bounding_box", playerBox);
 
         Inventory inventory = mc.player.getInventory();
         player.addProperty("selected_slot", inventory.selected);

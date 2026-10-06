@@ -15,7 +15,8 @@ def main():
                         help='Verified running watchdog control directory, never the resident mailbox')
     parser.add_argument('--checkpoint', required=True, type=Path)
     parser.add_argument('--target', required=True, nargs='+', type=int, metavar='COORD')
-    parser.add_argument('--slice-size', type=int, default=2)
+    parser.add_argument('--slice-size', type=int, default=None,
+                        help='Explicit 1..32 waypoint limit; default follows the observed safe prefix (up to 32)')
     parser.add_argument('--radius', type=int, default=4)
     parser.add_argument('--vertical', type=int, default=4, help='Use >4 only after verified wrapper upgrade')
     args = parser.parse_args()

@@ -12,7 +12,8 @@ The external controller chooses routes, targets and crafting combinations. The c
 
 All routes require the existing loopback check and Bearer authorization. Existing bridge protocol schema remains 2; new action schema is 1.
 
-Common request fields: `action_id` (nonblank string, up to 128 characters), `action`, optional `timeout_ms` (default 15000, 50–600000). One action may run at a time; another ID receives HTTP 409 `action_busy`.
+Common request fields: `action_id` (nonblank string, up to 128 characters), `action`, optional `timeout_ms` (ordinary actions: default 15000, 50–600000;
+`recover_environment`: default 0, with 0 meaning goal-or-stop lifetime). One action may run at a time; another ID receives HTTP 409 `action_busy`.
 
 IDs are retained for the Java process lifetime, including world changes and same-process bridge restarts. Repeating the exact same JSON request returns its recorded status without replaying any game input. Reusing an ID with a different body returns 409 `action_id_payload_mismatch`. Never resubmit with a new ID merely because an HTTP response was lost. Query the original ID first. The non-secret UUID `action_session` appears in action status, and the same identity appears at `/control/capabilities` → `client_actions.session`. A new Java process starts a new session; queued work from an old session should not be resumed blindly.
 
@@ -23,6 +24,30 @@ IDs are retained for the Java process lifetime, including world changes and same
 ```
 
 Waypoints are player feet coordinates (usually block-center X/Z), not block corners. The executor follows up to 512 points, turns on ticks, applies continuous forward input, and uses normal jump input for an upward step, a collision, or an explicit `jump`. It does not pathfind, remove obstacles or assume the floor is safe. The external planner is responsible for the route. It reports `stuck` after roughly three seconds of no progress toward the current waypoint, or `deadline_exceeded` at the requested wall-clock deadline. Normal client physics applies throughout.
+
+## Recover environment
+
+```json
+{"action_id":"recover-1","action":"recover_environment","timeout_ms":0,"waypoints":[]}
+```
+
+This v6 action uses ordinary per-tick input. Water, lava and powder-snow flags
+keep jump pressed. A nonempty route follows at most 512 externally supplied,
+currently observed waypoints; the mod does not discover an escape route. An
+empty, exhausted or physically stalled route maintains flotation without
+claiming success. After 60 no-progress ticks, futile horizontal pressure stops
+while flotation remains. The default zero deadline ends only at the observed
+goal or an explicit/normal context stop, rather than an external thinking timer.
+
+Five consecutive dry grounded client ticks produce `environment_dry_observed`.
+The outer watchdog then requires two later increasing-game-time observations
+before resuming ordinary tasks. It does not wait for full health, food, air or
+zero frozen ticks. No observed exit remains a blocker, not proof of rescue.
+STOP, direct takeover, death, menus, pause and world changes retain their normal
+input-release behavior. Failed external reads alone do not release native flotation.
+
+Player state adds `environment_schema_version:1`, `in_water`, `eye_in_water`,
+`in_lava`, `in_powder_snow`, `frozen_ticks`, `on_fire` and `fire_ticks`.
 
 ## Break block
 
@@ -39,6 +64,10 @@ Waypoints are player feet coordinates (usually block-center X/Z), not block corn
 ```
 
 The support block and face identify the clicked surface. Faces are `up`, `down`, `north`, `south`, `east`, `west`. The destination is the adjacent block cell. The selected item must be a BlockItem. `jump` and `sneak` are optional booleans, false by default. Jump-underfoot waits until ordinary movement clears the destination's collision box, interacts once, and then waits for landing when the expected placed block is observed. `sneak:true` requests ordinary sneaking when placing against an interactive support.
+
+In `1.1.6-continuity.1`, success requires five consecutive observed-block ticks
+and observed one-item consumption, or creative mode. Jump-underfoot also waits
+for landing. Results label this `client_observed_stable`; it is not a server ack.
 
 The real renderer pick, current reach, BlockPlaceContext and vanilla useItemOn govern placement. The executor never repeatedly clicks an uncertain placement. Failure can report `support_face_not_in_reach_or_visible`, `placement_target_not_available`, `placement_rejected` or `placement_not_observed`.
 
@@ -60,7 +89,7 @@ One ordinary `handleInventoryMouseClick` is dispatched. Completion reason is `cl
 
 States: `running`, `succeeded`, `failed`, `cancelled`; no accepted action yields `idle` with explicit null `action_id`. `ok:true` means the status operation succeeded; inspect `status` for the action outcome. The snapshot is also available as `client_action` in `/control/status` and `/control/state`.
 
-World/player replacement, loss of a usable current player, a world-action screen opening, cancellation, stuck detection or the operation deadline releases owned input. These conditions stop the action, not the connection. No heartbeat, health threshold, potion-effect restriction, floor whitelist, weapon whitelist or singleplayer requirement is imposed by this API.
+World/player replacement, loss of a usable current player, a world-action screen opening and cancellation release owned input. Ordinary action stuck detection and finite deadlines also release input; environment recovery has the goal lifetime and flotation exception described above. These conditions stop the action, not the connection. No heartbeat, health threshold, potion-effect restriction, floor whitelist, weapon whitelist or singleplayer requirement is imposed by this API.
 
 Success is **client-observed**, including Minecraft prediction, not a claimed authoritative server acknowledgement. The caller should compare later state/terrain/inventory as needed, and must not blindly replay a placement or slot click after uncertainty.
 

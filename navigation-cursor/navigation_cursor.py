@@ -108,6 +108,81 @@ class LocalTerrain:
         return (self.clear(point) and self.clear((x, y + 1, z))
                 and self.certain(floor) and self.cells[floor].get('full_top_support') is True)
 
+
+    def ground_anchor(self, player):
+        """Normalize a grounded edge stance to known, overlapping full support.
+
+        Bounding boxes, if observed, are authoritative. The current bridge omits
+        the player's box, so its ordinary standing/crouching 0.6-block width is
+        used only when the observed eye height identifies that vanilla pose.
+        No collision-bounds union is treated as a guaranteed support surface.
+        """
+        if player.get('on_ground') is not True:
+            return None
+        px, py, pz = (float(player[k]) for k in ('x', 'y', 'z'))
+        if not all(math.isfinite(v) for v in (px, py, pz)):
+            return None
+        box = player.get('bounding_box')
+        if box is not None:
+            try:
+                lo, hi = box['min'], box['max']
+                xmin, zmin, xmax, zmax = lo['x'], lo['z'], hi['x'], hi['z']
+                height = hi['y'] - lo['y']
+                body_min_y, body_max_y = lo['y'], hi['y']
+                values = (xmin, zmin, xmax, zmax, height, lo['y'])
+                if (not all(type(v) in (int, float) and math.isfinite(v) for v in values)
+                        or not xmin < px < xmax or not zmin < pz < zmax
+                        or abs(lo['y'] - py) > .04 or not 0 < height <= 3):
+                    return None
+            except (KeyError, TypeError):
+                return None
+        else:
+            eye = player.get('eye_position', {})
+            if not isinstance(eye, dict):
+                return None
+            ey = eye.get('y')
+            if type(ey) not in (int, float) or not math.isfinite(ey):
+                return None
+            eye_height = ey - py
+            if abs(eye_height - 1.62) < .06:
+                height = 1.8
+            elif abs(eye_height - 1.27) < .06:
+                height = 1.5
+            else:
+                return None  # Swimming, riding, scaled/unknown pose: no guess.
+            xmin, xmax, zmin, zmax = px - .3, px + .3, pz - .3, pz + .3
+            body_min_y, body_max_y = py, py + height
+        # Existing graph nodes are full-block feet heights. A lower neighbor or
+        # a partial slab/fence is not invented as a same-height anchor.
+        y = round(py)
+        if abs(py - y) > .04:
+            return None
+        candidates = []
+        for x in range(math.floor(xmin), math.ceil(xmax)):
+            for z in range(math.floor(zmin), math.ceil(zmax)):
+                overlap = min(xmax, x + 1) - max(xmin, x)
+                overlap *= max(0, min(zmax, z + 1) - max(zmin, z))
+                if overlap <= 1e-9 or not self.stand((x, y, z)):
+                    continue
+                bounds = self.cells[(x, y - 1, z)].get('collision_bounds')
+                if (not isinstance(bounds, list) or len(bounds) != 6
+                        or not all(type(v) in (int, float) and math.isfinite(v) for v in bounds)
+                        or abs(bounds[4] - 1) > 1e-6):
+                    continue  # Full top alone does not place a partial shape at y.
+                cx, cz = x + .5, z + .5
+                # Entire player volume swept into the anchor center must be
+                # observed clear. Unknown beside the ledge is not assumed air.
+                sxmin, sxmax = min(xmin, cx + xmin - px), max(xmax, cx + xmax - px)
+                szmin, szmax = min(zmin, cz + zmin - pz), max(zmax, cz + zmax - pz)
+                clear = all(self.clear((bx, by, bz))
+                            for bx in range(math.floor(sxmin + 1e-9), math.ceil(sxmax - 1e-9))
+                            for bz in range(math.floor(szmin + 1e-9), math.ceil(szmax - 1e-9))
+                            for by in range(math.floor(min(body_min_y, y) + 1e-9),
+                                            math.ceil(max(body_max_y, y + height) - 1e-9)))
+                if clear:
+                    candidates.append((math.hypot(cx - px, cz - pz), -overlap, (x, y, z)))
+        return min(candidates)[2] if candidates else None
+
     def edge(self, a, b):
         dx, dy, dz = (b[i] - a[i] for i in range(3))
         if abs(dx) + abs(dz) != 1 or dy > 1 or dy < -self.drop_policy.max_blocks:
@@ -180,6 +255,22 @@ class RouteCursor:
                  'jump': b[1] > self.nodes[i - 1][1]}
                 for i, b in enumerate(self.nodes[self.index:end], self.index)]
 
+    def observed_slice(self, terrain, start, limit=32):
+        """Longest currently verified prefix, retaining the unobserved tail.
+
+        An ordinary one-block step is continuous. Larger drops end the slice
+        at the landing so a fresh grounded/health observation gates the tail.
+        A changed or unknown later edge ends this slice, not the saved route.
+        """
+        candidates = self.slice(limit)
+        a, size = start, 0
+        for b in self.nodes[self.index:self.index + len(candidates)]:
+            if b != a and not terrain.edge(a, b):
+                break
+            size += 1
+            a = b
+        return candidates[:size]
+
     def dump(self):
         return {'nodes': self.nodes, 'index': self.index}
 
@@ -192,9 +283,10 @@ class Navigator:
     A caller stops calling tick to pause; any submitted slice remains owned by the
     watchdog. Never clear/recreate a checkpoint to retry a pending action.
     """
-    def __init__(self, gateway, checkpoint=None, *, slice_size=2, radius=4,
+    def __init__(self, gateway, checkpoint=None, *, slice_size=None, radius=4,
                  vertical=4, max_replans=3, drop_policy=None):
-        if not 1 <= slice_size <= 32 or not 1 <= radius <= 8 or not 2 <= vertical <= 8:
+        if (slice_size is not None and (type(slice_size) is not int or not 1 <= slice_size <= 32)
+                or not 1 <= radius <= 8 or not 2 <= vertical <= 8):
             raise ValueError('invalid_navigation_bounds')
         self.gateway = gateway
         self.checkpoint = Path(checkpoint) if checkpoint else None
@@ -204,7 +296,9 @@ class Navigator:
         self.data = {'schema': 2, 'target': None, 'world': None, 'gateway_session': None,
                      'route': None, 'pending': None, 'last_action': None,
                      'forbidden': [], 'completed_legs': [], 'replans': 0, 'blocked': None,
-                     'observation_epoch': None, 'force_replan': False}
+                     'observation_epoch': None, 'force_replan': False,
+                     'support_misses': 0, 'anchor_attempts': 0, 'anchor_relocalized': False,
+                     'deferred_navigation_action': None}
         if self.checkpoint and self.checkpoint.exists():
             loaded = json.loads(self.checkpoint.read_text())
             if loaded.get('schema') != 2:
@@ -307,12 +401,52 @@ class Navigator:
         if observation.get('terrain', {}).get('world_generation') != identity[0]:
             return self.stop('terrain_world_mismatch')
         terrain, start = LocalTerrain(observation, self.drop_policy), block(p)
+        previous_action = self.data.get('last_action') or {}
+        was_anchor = previous_action.get('purpose') == 'ground_anchor'
         if not terrain.stand(start):
-            return self.result('waiting', 'current_support_not_observed')
+            if was_anchor and previous_action.get('status') == 'cancelled':
+                # Defense cancellation does not count as a failed centering try.
+                self.data['anchor_attempts'] = max(0, self.data['anchor_attempts'] - 1)
+                self.data['last_action'] = None
+            anchor = terrain.ground_anchor(p)
+            if anchor is None:
+                self.data['support_misses'] += 1
+                if self.data['support_misses'] >= 3:
+                    return self.stop('grounded_support_unresolved_after_3_observations')
+                return self.result('waiting', 'grounded_support_not_yet_resolved',
+                                   support_observations=self.data['support_misses'])
+            self.data['support_misses'] = 0
+            if self.data['anchor_attempts'] >= 2:
+                return self.stop('ground_anchor_no_progress_after_2_attempts')
+            route = self.route
+            if previous_action and not was_anchor:
+                self.data['deferred_navigation_action'] = previous_action
+            result = self.submit('action', {'op': 'action', 'action': 'follow_path',
+                                          'waypoints': [{'x': anchor[0] + .5, 'y': anchor[1],
+                                                         'z': anchor[2] + .5, 'jump': False}],
+                                          'timeout_ms': 4000},
+                                 purpose='ground_anchor', anchor=list(anchor),
+                                 start_index=route.index if route else 0,
+                                 end_index=route.index if route else 0)
+            if result['status'] == 'pending':
+                self.data['anchor_attempts'] += 1
+                self.save()
+            return result
+        self.data['support_misses'] = 0
+        self.data['anchor_attempts'] = 0
+        if was_anchor:
+            # Real support is now observed. Centering is not route failure and
+            # must never blacklist the untouched next navigation edge.
+            deferred = self.data.pop('deferred_navigation_action', None)
+            self.data['deferred_navigation_action'] = None
+            self.data['last_action'] = deferred
+            self.data['anchor_relocalized'] = deferred is None
         route = self.route
         action = self.data.pop('last_action', None)
         self.data['last_action'] = None
         replan_reason = None
+        relocated = self.data.pop('anchor_relocalized', False)
+        self.data['anchor_relocalized'] = False
         forced = self.data.pop('force_replan', False)
         self.data['force_replan'] = False
         if route:
@@ -327,6 +461,8 @@ class Navigator:
                 self.data['route'] = None
                 self.data['replans'] = 0
                 route = None
+            elif relocated:
+                replan_reason = 'ground_anchor_relocalized'
             elif forced or (action and action['status'] == 'cancelled'):
                 replan_reason = 'combat_preempted'
             elif action:
@@ -335,16 +471,20 @@ class Navigator:
             if route and not replan_reason:
                 # Only validate the execution slice; observations are local and
                 # must not invalidate an unseen tail that is not executing yet.
-                a = start
-                for b in route.nodes[route.index:route.index + self.slice_size]:
-                    if b == a:
-                        continue
-                    if not terrain.edge(a, b):
+                if self.slice_size is None:
+                    if not route.observed_slice(terrain, start):
                         replan_reason = 'next_edge_changed_or_displaced'
-                        break
-                    a = b
+                else:
+                    a = start
+                    for b in route.nodes[route.index:route.index + len(route.slice(self.slice_size))]:
+                        if b == a:
+                            continue
+                        if not terrain.edge(a, b):
+                            replan_reason = 'next_edge_changed_or_displaced'
+                            break
+                        a = b
         if replan_reason:
-            if replan_reason != 'combat_preempted':
+            if replan_reason not in ('combat_preempted', 'ground_anchor_relocalized'):
                 self.data['replans'] += 1
             if self.data['replans'] > self.max_replans:
                 return self.stop('bounded_alternative_routes_exhausted')
@@ -364,9 +504,12 @@ class Navigator:
         route = self.route
         if route.done:
             return self.stop('empty_local_route_without_target_arrival')
-        way = route.slice(self.slice_size)
+        way = (route.observed_slice(terrain, start) if self.slice_size is None
+               else route.slice(self.slice_size))
+        if not way:
+            return self.stop('no_observed_safe_execution_prefix')
         return self.submit('action', {'op': 'action', 'action': 'follow_path',
-                                     'waypoints': way, 'timeout_ms': 15000},
+                                     'waypoints': way, 'timeout_ms': max(15000, len(way) * 1200)},
                            start_index=route.index, end_index=route.index + len(way))
 
     def tick(self, target):
@@ -402,7 +545,8 @@ class Navigator:
             self.data['pending'] = None
             if pending['kind'] == 'action':
                 self.data['last_action'] = {'status': response['status'], 'reason': response.get('reason'),
-                                            'end_index': pending['end_index']}
+                                            'end_index': pending['end_index'],
+                                            'purpose': pending.get('purpose', 'navigation')}
                 return self.result('progress', 'action_terminal_reobserve_before_cursor_advance')
             if response['status'] != 'succeeded':
                 return self.stop('observation_' + response['status'])

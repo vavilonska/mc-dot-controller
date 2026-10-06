@@ -6,7 +6,12 @@
 
 The upstream MIT license and copyright notice, **Copyright (c) 2026 Campione01**, are preserved in [`client-mod/LICENSE`](client-mod/LICENSE). Upstream third-party design-reference notices remain in [`client-mod/THIRD_PARTY_REFERENCES.md`](client-mod/THIRD_PARTY_REFERENCES.md). This repository is an independently maintained development snapshot, not an official upstream release.
 
-The current `1.1.6-loaded-scan.1` source adds client-tick actions, action identity/status/cancellation, direct-input takeover, entity-view guards, visible-face mining, loaded-world scans and menu observations to the existing authenticated bridge. New actions support ordinary compatible multiplayer and use vanilla interaction paths. Client-observed outcomes do not claim authoritative server confirmation. The old terrain, guarded-local experiments and algorithms are retained separately with their historical documentation. Earlier guarded-local policy limits do not describe the new client-actions API. The bridge handles real-client I/O and tick timing; external code handles planning and task sequencing.
+The `1.1.6-loaded-scan.1` baseline added client-tick actions, action identity/status/cancellation, direct-input takeover, entity-view guards, visible-face mining, loaded-world scans and menu observations to the existing authenticated bridge. New actions support ordinary compatible multiplayer and use vanilla interaction paths. Client-observed outcomes do not claim authoritative server confirmation. The old terrain, guarded-local experiments and algorithms are retained separately with their historical documentation. Earlier guarded-local policy limits do not describe the new client-actions API. The bridge handles real-client I/O and tick timing; external code handles planning and task sequencing.
+
+The current `1.1.6-continuity.1` source preserves that baseline and adds native
+environment observations/recovery plus stable placement evidence. Its exact
+source/build continuity is recorded in `client-mod/docs/continuity-verification.md`.
+The upstream `v1.1.5` reference above is provenance, not the current artifact version.
 
 The source snapshot excludes upstream workflow configuration, screenshots and raw runtime evidence, game files, generated build outputs, and all private runtime state. The small mod icon is the original upstream project resource, not a Minecraft game asset. Any preserved upstream changelogs and verification documents describe upstream historical results, not new verification of this snapshot.
 
@@ -29,9 +34,9 @@ The wrapper is build tooling. No Minecraft, NeoForge, or compiled client-mod JAR
 
 `defense-watchdog/` is original Python standard-library source for an explicitly
 started queue coordinator and an IntentClient adapter. It imports the existing
-resident queue implementation and hostile/weapon constants. The bundled v5
-coordinates bounded approach/retreat with the integrated eye-reach and swept-corridor
-resident correction; no vendor code or
+resident queue implementation and hostile/weapon constants. The v6 source retains v5.1 recovery, coordinates bounded approach/retreat with the
+integrated eye-reach and swept-corridor resident correction, and adds observed
+environment recovery; no vendor code or
 new protocol dependency is copied. No license grant has been assigned to this
 original component. The upstream client-mod MIT license does not automatically
 apply. Public files contain no deployed control directory or live observations.
@@ -39,7 +44,8 @@ apply. Public files contain no deployed control directory or live observations.
 ## Persistent route cursor
 
 `navigation-cursor/` is original Python standard-library source for a retained
-local path/cursor, checkpoint identity and guarded watchdog admission. Its
+local path/cursor, ground anchors, adaptive safe slices, checkpoint identity and
+guarded watchdog admission. Its
 fixtures are synthetic geometry, not published game captures. It does not copy
 Minecraft code or claim global pathfinding. No license grant has been assigned
 to this original component. Optional uninstalled patches and private checkpoints

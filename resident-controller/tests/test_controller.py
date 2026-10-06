@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from resident_controller.controller import Resident
 from resident_controller.ipc import QueueClient, atomic_json
-from resident_controller.tasks import craft_planks
+from resident_controller.tasks import basic, craft_planks
 from resident_controller.transport import Bridge, BridgeError
 
 
@@ -146,17 +146,33 @@ def item(name='', count=0):
     return {'id': name, 'count': count, 'empty': count == 0}
 
 
-def craft_state(source=3, carried=0, grid=0, output=0, planks=0):
+def craft_state(source=3, carried=0, grid=0, output=0, planks=0, game_time=100):
     log, plank = 'minecraft:oak_log', 'minecraft:oak_planks'
     slots = [{'menu_index': i, 'item': item(log, grid) if i == 1 and grid else item(plank, output) if i == 0 and output else item(),
               'player_inventory': False} for i in range(5)]
     slots.append({'menu_index': 36, 'player_inventory': True, 'inventory_index': 0, 'item': item(log, source)})
-    return {'menu': {'menu_class': 'net.minecraft.world.inventory.InventoryMenu', 'container_id': 0,
+    return {'world': {'game_time': game_time, 'world_generation': 'craft-test-world'},
+            'menu': {'menu_class': 'net.minecraft.world.inventory.InventoryMenu', 'container_id': 0,
                      'carried': item(log, carried), 'slots': slots, 'slots_truncated': False},
-            'player': {'inventory': [{'slot': 0, **item(log, source)}, {'slot': 1, **item(plank, planks)}]}}
+            'player': {'uuid': 'craft-test-player', 'dimension': 'minecraft:overworld',
+                       'inventory': [{'slot': 0, **item(log, source)}, {'slot': 1, **item(plank, planks)}]}}
 
 
 class CraftChecks(unittest.TestCase):
+    def final_confirmation(self):
+        recipe = craft_planks({'op': 'craft_planks'})
+        self.assertEqual(next(recipe)['step'], 'observe')
+        clicks = []
+        for state in (craft_state(), craft_state(source=0, carried=3),
+                      craft_state(source=0, carried=2, grid=1, output=4),
+                      craft_state(source=2, grid=1, output=4)):
+            step = recipe.send(state)
+            self.assertEqual(step['step'], 'action')
+            clicks.append(step['body'])
+            self.assertEqual(recipe.send({'status': 'succeeded'})['step'], 'observe')
+        self.assertEqual(sum(c.get('click_type') == 'quick_move' for c in clicks), 1)
+        return recipe
+
     def test_one_log_recipe_uses_actual_output_and_inventory_delta(self):
         recipe = craft_planks({'op': 'craft_planks'})
         self.assertEqual(next(recipe)['step'], 'observe')
@@ -172,14 +188,88 @@ class CraftChecks(unittest.TestCase):
         click = recipe.send(craft_state(source=2, grid=1, output=4))
         self.assertEqual((click['body']['slot'], click['body']['click_type']), (0, 'quick_move'))
         recipe.send({'status': 'succeeded'})
+        self.assertEqual(recipe.send(craft_state(source=2, planks=4, game_time=101))['step'], 'wait')
+        self.assertEqual(recipe.send(None)['step'], 'observe')
         with self.assertRaises(StopIteration) as done:
-            recipe.send(craft_state(source=2, planks=4))
+            recipe.send(craft_state(source=2, planks=4, game_time=102))
         self.assertEqual(done.exception.value['planks_added'], 4)
+        self.assertEqual(done.exception.value['stable_game_times'], [101, 102])
     def test_nonempty_cursor_blocks_before_click(self):
         recipe = craft_planks({'op': 'craft_planks'})
         next(recipe)
         with self.assertRaisesRegex(ValueError, 'cursor_not_empty'):
             recipe.send(craft_state(carried=1))
+
+    def test_duplicate_ticks_do_not_count_as_later_stable_samples(self):
+        recipe = self.final_confirmation()
+        for tick in (100, 101, 101):
+            self.assertEqual(recipe.send(craft_state(source=2, planks=4, game_time=tick))['step'], 'wait')
+            self.assertEqual(recipe.send(None)['step'], 'observe')
+        with self.assertRaises(StopIteration) as done:
+            recipe.send(craft_state(source=2, planks=4, game_time=102))
+        self.assertEqual(done.exception.value['stable_game_times'], [101, 102])
+
+    def test_rollback_resets_stability_without_another_output_click(self):
+        recipe = self.final_confirmation()
+        for tick, planks in ((101, 4), (102, 0), (103, 4)):
+            self.assertEqual(recipe.send(craft_state(source=2, planks=planks, game_time=tick))['step'], 'wait')
+            self.assertEqual(recipe.send(None)['step'], 'observe')
+        with self.assertRaises(StopIteration) as done:
+            recipe.send(craft_state(source=2, planks=4, game_time=104))
+        self.assertEqual(done.exception.value['stable_game_times'], [103, 104])
+
+    def test_game_time_regression_rejects_after_output_without_replay(self):
+        recipe = self.final_confirmation()
+        with self.assertRaisesRegex(ValueError, 'game_time_regressed'):
+            recipe.send(craft_state(source=2, planks=4, game_time=99))
+
+    def test_missing_game_time_rejects_before_click(self):
+        recipe = craft_planks({'op': 'craft_planks'})
+        next(recipe)
+        state = craft_state()
+        state['world'].pop('game_time')
+        with self.assertRaisesRegex(ValueError, 'fresh_game_time_required'):
+            recipe.send(state)
+
+    def test_nonempty_output_is_not_claimed_as_completed_craft(self):
+        recipe = self.final_confirmation()
+        self.assertEqual(recipe.send(craft_state(source=2, planks=4, output=4, game_time=101))['step'], 'wait')
+
+    def test_stability_never_spans_world_or_player_change(self):
+        for category, field in (('world', 'world_generation'), ('player', 'uuid'), ('player', 'dimension')):
+            recipe = self.final_confirmation()
+            changed = craft_state(source=2, planks=4, game_time=101)
+            changed[category][field] = 'different-context'
+            with self.assertRaisesRegex(ValueError, 'craft_world_or_player_changed'):
+                recipe.send(changed)
+
+
+class BasicEvidenceChecks(unittest.TestCase):
+    def finish(self, reason):
+        task = basic({'op': 'action', 'action': 'break_block', 'target': {'x': 1, 'y': 64, 'z': 1}})
+        self.assertEqual(next(task)['step'], 'action')
+        self.assertEqual(task.send({'status': 'succeeded', 'reason': reason})['step'], 'observe')
+        with self.assertRaises(StopIteration) as done:
+            task.send({'world': {'game_time': 20}, 'player': {'inventory': []}})
+        return done.exception.value
+
+    def test_block_broken_does_not_mean_drops_collected(self):
+        result = self.finish('block_broken_observed')
+        self.assertTrue(result['mining']['block_broken_observed'])
+        self.assertFalse(result['mining']['drops_collected_confirmed'])
+        self.assertIn('collection_unverified', result['reason'])
+        self.assertFalse(result['evidence']['stable'])
+        self.assertFalse(result['server_confirmed'])
+
+    def test_already_absent_is_not_claimed_as_mined(self):
+        result = self.finish('block_absent')
+        self.assertFalse(result['mining']['block_broken_observed'])
+        self.assertTrue(result['mining']['block_absent_observed'])
+        self.assertFalse(result['mining']['drops_collected_confirmed'])
+
+    def test_unrecognized_reason_does_not_invent_mining_evidence(self):
+        result = self.finish('block_changed')
+        self.assertFalse(any(result['mining'].values()))
 
 
 if __name__ == '__main__':

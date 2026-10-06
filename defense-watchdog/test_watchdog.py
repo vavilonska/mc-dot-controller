@@ -29,7 +29,10 @@ class Queue:
             for old,oldcmd in self.calls[:-1]:
                 if oldcmd['op']=='action' and old not in self.results:
                     self.results[old]={'status':'cancelled','reason':'cancel_requested'}
-            self.obs['action']['status']='cancelled';self.obs['combat']={'active':False,'reason':'explicit_cancel','melee_closing_schema_version':2}
+            self.obs['action']['status']='cancelled'
+            if self.obs['combat'].get('active') or self.obs['combat'].get('held_mappings'):
+                self.obs['combat'].update(active=False,phase='stopped',reason='explicit_cancel')
+            self.obs['combat']['melee_closing_schema_version']=2
             result={'ok':True}
         elif op=='combat_start':
             if self.start_failure:

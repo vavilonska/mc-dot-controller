@@ -30,7 +30,7 @@ class FakeResident:
     def result(self, rid): return self.results.get(rid)
 
 
-@unittest.skipUnless(CANDIDATE, 'set WATCHDOG_CANDIDATE for the real v3 source contract')
+@unittest.skipUnless(CANDIDATE, 'set WATCHDOG_CANDIDATE for the real v5.1-compatible source contract')
 class RealGatewayContractTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
@@ -50,7 +50,10 @@ class RealGatewayContractTests(unittest.TestCase):
     def tearDown(self):self.temp.cleanup()
 
     def publish_status(self):
-        write_json(self.root/'state.json',{**self.dog.status(),'updated_at':time.time()})
+        # Match base_watchdog.run(), not Watchdog.status() in isolation.
+        write_json(self.root/'state.json',{**self.dog.status(),
+                   'pending': len(list((self.root/'inbox').glob('*.json'))),
+                   'updated_at':time.time()})
 
     def flush(self):
         for done in self.dog.completed:

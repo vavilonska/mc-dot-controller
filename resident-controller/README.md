@@ -5,14 +5,40 @@ one task queue and one small loaded-world cache. The mod executes continuous
 movement/mining/placement on client ticks; Python does not simulate physics,
 inventory, networking, or generate 100 ms key pulses.
 
-**Current source:** `1.1.6-loaded-scan.1` pairing, with 109 focused offline resident
-checks. A later bounded live scan reported 4,864 tested positions, 41 coal blocks,
+**Current source:** v6 continuity candidate paired with
+`1.1.6-continuity.1`, with 118 focused offline resident checks. The frozen source
+was built and checked offline; it is not live-accepted, and publication does not
+establish installation.
+
+Historical `1.1.6-loaded-scan.1` evidence includes a bounded live scan with
+4,864 tested positions, 41 coal blocks,
 79 ms and 3 client ticks. This does not validate maximum scans, every biome/surface
 mode or general aim/combat reliability. A later short sword/shield script reported
 one successful zombie encounter: four attack dispatches, observed target death,
 and player health remaining 20. This is not server hit attribution or acceptance
-of persistent watchdog threat preemption.
+of persistent watchdog threat preemption. A subsequent actual v5 watchdog
+encounter failed with blocked approach, zero attack dispatches and player death.
+V6 source changes do not establish that this failure is resolved in live play.
 See [verification scope](../client-mod/docs/loaded-scan-verification.md).
+
+## V6 result and continuity contract
+
+- `craft_planks` retrieves one output batch once, then requires the expected
+  complete inventory delta and empty cursor/grid/output in two later observations
+  with distinct increasing game ticks. Same-tick repeats do not count; mismatch
+  resets confirmation, and missing/regressed time or context change stops. Success
+  is `client_observed_stable`, with `server_confirmed:false`.
+- Generic semantic actions preserve their raw action result and label their later
+  state as client-observed, explicitly not stable evidence. Mining distinguishes
+  `block_broken_observed` from `block_absent`; neither confirms dropped-item pickup.
+- The matching client-mod owns continuous `recover_environment` movement/flotation
+  and stable placement semantics. The watchdog selects only observed exit routes.
+  Passing the resident tests does not independently validate those Java behaviors.
+- Loading changed `tasks.py` requires an owner-controlled resident reload; the
+  matching environment/placement client-mod needs an owner-controlled JVM reload.
+  Replace the watchdog only once its prior process has stopped and released input.
+  Resolve all pending/uncertain IDs first. Helper reloads preserve checkpoint IDs;
+  a restart is never permission to replay an uncertain request.
 
 ## Owner start: once per playing session
 
@@ -220,7 +246,8 @@ biome filter. Original `ores`, `cherry_sites`, and `both` presets remain availab
   requires an observed InventoryMenu, empty cursor and 2×2 crafting grid. It uses
   `player_inventory`/`inventory_index` metadata to find the actual source menu slot,
   moves exactly one log to input slot 1, observes output slot 0, quick-moves it once,
-  and observes inventory deltas. It does not synthesize recipes or pretend slots
+  and requires two later matching inventory observations at increasing game ticks,
+  with empty output/grid/cursor. It does not synthesize recipes or pretend slots
   succeeded. It leaves the UI as it was; failure may leave items in the crafting
   grid/cursor, shown in subsequent observations. Oak/spruce/birch/jungle/acacia/
   dark oak/mangrove/cherry log/wood and their stripped forms are supported.
@@ -244,7 +271,8 @@ Use current observations, not the example coordinates or old inventory counts.
 2. `action: break_block` for that log. Check the returned world result and actual
    inventory. A broken log is not proof its dropped item was collected. Walk near
    the observed drop with a fresh route if collection is needed, then observe.
-3. `craft_planks` for one actual inventory log. Require its observed +4/-1 result.
+3. `craft_planks` for one actual inventory log. Require its stable +4/-1 result
+   across two later increasing game ticks, including empty output/grid/cursor.
 4. Walk to a centered, observed suitable placement base, then `pillar` with two
    planks. Fetch `observe` with `frame:true` for a native view of the result.
 
@@ -328,20 +356,21 @@ observations, images, credentials, and generated Python caches.
 
 ## Independent defense and persistent navigation
 
-The separate [v5 defense watchdog](../defense-watchdog/README.md) is the sole
+The separate [v6 continuity watchdog](../defense-watchdog/README.md) is the sole
 resident-queue writer while running; ordinary tasks use its IntentClient. It
 observes allowlisted hostiles, cancels stale navigation, and requests melee
 approach with bounded progress. This resident includes its required
 `melee_closing_schema_version:2`: actual eye-to-hit reach and full swept-corridor
 clearance. No mod change is needed for that correction.
 
-The [v2 route cursor](../navigation-cursor/README.md) retains a full local path,
+The [adaptive route cursor](../navigation-cursor/README.md) retains a full local path,
 its next waypoint and pending request across calls. A defense-epoch change
 requires a fresh observation/replan; interrupted paths are not blindly replayed.
-The operator confirmed the loaded resident marker and one armed v5 watchdog.
-Earlier heartbeats/navigation and a separate single encounter do not establish
-all v5 approach, retreat or continuous-defense behavior. Published-layout checks:
-102 watchdog/reach cases, 109 resident cases and 38 navigator/gateway cases.
+The v6 watchdog retains the v5 implementation label while publishing its v6
+revision. The earlier v5 blocked-approach encounter ended with zero attacks and
+player death. Current published-layout checks are 130 watchdog cases (129 passed,
+one historical-source comparison skipped), 118 resident cases and 67 navigator/
+gateway cases. These are offline checks, not successful live v6 acceptance.
 
 ## Additional gameplay helpers
 

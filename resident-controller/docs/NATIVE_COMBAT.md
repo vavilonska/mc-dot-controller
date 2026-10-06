@@ -1,10 +1,14 @@
 # Native-client melee combat source
 
 Integration for the Minecraft 1.21.1 resident controller paired with
-`1.1.6-loaded-scan.1`. Source tests use temporary queues and in-memory fake
-bridges. A later short sword/shield script completed one observed zombie
+`1.1.6-continuity.1` in the frozen v6 candidate. This source is built and checked
+offline, not live-accepted; publication does not establish installation. Source
+tests use temporary queues and in-memory fake bridges. A later short sword/shield script completed one observed zombie
 encounter: four attack dispatches, then target-dead, with player health still 20.
-Persistent watchdog threat preemption remains unverified; a successful read-only
+A later actual v5 watchdog encounter failed with blocked approach, zero attack
+dispatches and player death. The v5.1 correction retained in v6 deduplicates
+terminal failures and permits only a fresh in-range entity-hit recovery; the
+offline checks do not establish a successful live retest. A successful read-only
 scan is not combat acceptance.
 
 ## Commands after the coordinated update
@@ -107,16 +111,16 @@ reason, held inputs, attack attempts/dispatches and last observed target health.
 
 ## Current source and verification
 
-Use the matching `1.1.6-loaded-scan.1` mod and full resident source, retaining the
+Use the matching `1.1.6-continuity.1` mod and full resident source, retaining the
 existing sibling navigation helpers. The existing owner-start and verified
 session workflow remains; do not run a competing resident or invent new access.
 
-The current combined resident suite passes 109 offline checks. Its earlier combat
+The current combined resident suite passes 118 offline checks. Its earlier combat
 subset had 81 cases (34 existing/aim + 47 combat). These tests establish protocol
 and control sequencing, not live combat, server hit confirmation, shield blocking
-or gameplay success. The separate live script result above is limited to one
-encounter; it does not validate every target, approach, menu interruption or
-continuous-defense transition.
+or gameplay success. The separate successful live script result above is limited to one encounter.
+The later failed v5 encounter must also be retained; neither establishes v6
+acceptance for approach, menu interruption or continuous-defense transitions.
 
 ```sh
 python3 -m compileall -q resident_controller tests
@@ -124,8 +128,10 @@ python3 -m unittest discover -s tests -v
 bash -n owner-start.sh
 ```
 
-The independent [v5 watchdog](../../defense-watchdog/README.md) uses these existing
-operations and has been deployed as the sole defense queue coordinator. This
+The independent [v6 watchdog](../../defense-watchdog/README.md) uses these existing
+operations as the sole defense queue coordinator when owner-started. It retains
+the v5 gateway label and separately publishes its v6 revision; no v6 deployment
+or live acceptance is established by this source publication. This
 resident includes `melee_closing_schema_version:2`: entity reach is measured from
 observed eye position to the actual hit point; approach checks every swept body
 column and keeps closing until the target is picked or the nearest AABB is within

@@ -1,6 +1,6 @@
 # MineClient Bridge: client-actions source
 
-Current development version: `1.1.6-loaded-scan.1`, based on [Campione01/MineClient-Bridge v1.1.5](https://github.com/Campione01/MineClient-Bridge/tree/60e78940f7e7fa06116cf4fbc58df346ad617531). Original MIT notices are preserved.
+Current development version: `1.1.6-continuity.1`, based on [Campione01/MineClient-Bridge v1.1.5](https://github.com/Campione01/MineClient-Bridge/tree/60e78940f7e7fa06116cf4fbc58df346ad617531). Original MIT notices are preserved.
 
 ## Current path
 
@@ -8,7 +8,7 @@ This client-only NeoForge mod runs ordinary Minecraft movement and interaction e
 
 The authenticated loopback API adds:
 
-- `POST /control/action`: `follow_path`, `break_block`, `place_block`, `click_slot`
+- `POST /control/action`: `follow_path`, `break_block`, `place_block`, `click_slot`, `recover_environment`
 - `GET /control/action/status`: current or named action status
 - `POST /control/action/cancel`: cancel exactly the named action
 - Observed menu/slot data for external crafting decisions
@@ -17,7 +17,9 @@ Existing key/raw-key/look/mouse/text/command controls remain available with atom
 
 The new action path supports ordinary compatible multiplayer. It does not impose the older guarded-local experiments' singleplayer, full-health or half-forward-sample policies. Minecraft's normal reach, interactions and server permissions still apply. Old experimental classes/routes remain separate and cannot own input while a new client action owns it.
 
-Additional source includes [entity aim lock](docs/entity-aim-lock.md), current biome identity, [visible-face mining fallback](docs/mining-visible-face.md), and [loaded-block/biome/surface scans](docs/loaded-world-scans.md). The resident owns aim/combat policy; the mod provides current observations and ordinary client operations. Combat remains live-untested.
+Additional source includes [entity aim lock](docs/entity-aim-lock.md), current biome identity, [visible-face mining fallback](docs/mining-visible-face.md), and [loaded-block/biome/surface scans](docs/loaded-world-scans.md). The resident owns aim/combat policy; the mod provides current observations and ordinary client operations. The later v5 resident/watchdog encounter failed; its recovery fix and new v6
+environment behavior remain separately unaccepted in live play. See the current
+verification record instead of treating an older single encounter as acceptance.
 
 Read [the complete action contract](docs/client-actions.md) and [the resident controller guide](../resident-controller/README.md).
 
@@ -33,7 +35,12 @@ JAVA_HOME=/path/to/jdk-21 GRADLE_USER_HOME=/path/to/gradle-cache \
 
 Use `--offline` only when the official dependencies are already cached. The binary-dependency pipeline compiles the complete mod without rebuilding Minecraft's own sources.
 
-The current published build defaults to Minecraft 1.21.1 / NeoForge 21.1.255 and passed 114 JUnit cases. A bounded live scan later reported 4,864 positions and 41 coal blocks in 79 ms across 3 client ticks. That single result is not maximum-scale or combat acceptance. See [current verification](docs/loaded-scan-verification.md); the earlier [client-actions build record](docs/client-actions-verification.md) remains historical.
+The current published build defaults to Minecraft 1.21.1 / NeoForge 21.1.255 and
+passed 118 JUnit cases. New environment recovery and stable placement have build
+and offline evidence, with live acceptance pending. See [current verification](docs/continuity-verification.md).
+The [loaded-scan record](docs/loaded-scan-verification.md) and earlier
+[client-actions record](docs/client-actions-verification.md) describe their
+respective historical versions.
 
 No compiled mod JAR is published here. The unchanged Gradle wrapper is build tooling.
 

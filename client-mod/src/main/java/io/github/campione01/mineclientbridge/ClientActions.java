@@ -41,14 +41,16 @@ final class ClientActions {
         Input input;
         float forward;
         boolean jump, sneak, attackHeld, dispatched, jumped;
-        int waypoint, dispatchTick, unchangedTicks;
+        int waypoint, dispatchTick, unchangedTicks, dryTicks, placedStableTicks, placementBeforeCount;
+        boolean recoveryStalled;
         double bestDistance = Double.POSITIVE_INFINITY;
         Block initialBlock, placedBlock;
         RuntimeAction(ActionRegistry.Entry entry, Minecraft mc) {
             this.entry = entry;
             player = mc.player;
             level = mc.level;
-            deadline = System.nanoTime() + entry.request.timeoutMs() * 1_000_000L;
+            deadline = entry.request.timeoutMs() == 0 ? Long.MAX_VALUE
+                    : System.nanoTime() + entry.request.timeoutMs() * 1_000_000L;
         }
     }
 
@@ -126,6 +128,7 @@ final class ClientActions {
             if (mc.isPaused()) return;
             switch (a.entry.request.action()) {
                 case "follow_path" -> followPath(mc, a);
+                case "recover_environment" -> recoverEnvironment(mc, a);
                 case "break_block" -> mine(mc, a);
                 case "place_block" -> preparePlacement(mc, a);
                 case "click_slot" -> { }
@@ -186,6 +189,51 @@ final class ClientActions {
         a.entry.result.addProperty("waypoint_index", points.size());
         a.entry.result.addProperty("waypoint_count", points.size());
         finish("succeeded", "path_reached");
+    }
+
+    /** Ordinary tick-owned inputs; external planner supplies only observed egress waypoints.
+     * Empty/exhausted routes keep flotation, never interpret a model/message gap as key-up.
+     * No world, position, velocity, inventory, or packet writes are introduced. */
+    private static void recoverEnvironment(Minecraft mc, RuntimeAction a) {
+        boolean water = a.player.isInWater();
+        boolean powder = a.player.isInPowderSnow;
+        var recovery = EnvironmentSteering.update(water,
+                a.player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER), a.player.isInLava(),
+                powder, a.player.isOnFire(), a.player.onGround(), a.dryTicks);
+        boolean hazardous = recovery.hazardous();
+        a.jump = recovery.jump();
+        a.entry.result.addProperty("environment_schema_version", 1);
+        a.entry.result.addProperty("environment_hazard_observed", hazardous);
+        // Frozen ticks can decay on dry land. Recovery never waits for full health/food/air.
+        a.dryTicks = recovery.dryTicks();
+        if (recovery.recovered()) {
+            a.entry.result.addProperty("confirmation", "client_dry_observed");
+            finish("succeeded", "environment_dry_observed");
+            return;
+        }
+        var points = a.entry.request.waypoints();
+        while (!a.recoveryStalled && a.waypoint < points.size()) {
+            var step = PathSteering.toward(a.player.getX(), a.player.getY(), a.player.getZ(),
+                    a.player.getYRot(), a.player.onGround(), a.player.horizontalCollision, points.get(a.waypoint));
+            if (step.reached()) {
+                a.waypoint++; a.bestDistance = Double.POSITIVE_INFINITY; a.unchangedTicks = 0;
+                continue;
+            }
+            look(mc, step.yaw(), a.player.getXRot());
+            a.forward = step.forward();
+            a.jump = a.jump || step.jump();
+            if (step.distance() < a.bestDistance - 0.04) {
+                a.bestDistance = step.distance(); a.unchangedTicks = 0;
+            } else if (++a.unchangedTicks >= 60) {
+                // Keep flotation, stop futile horizontal pressure, ask the external planner.
+                a.recoveryStalled = true; a.forward = 0;
+            }
+            break;
+        }
+        a.entry.result.addProperty("waypoint_index", a.waypoint);
+        a.entry.result.addProperty("waypoint_count", points.size());
+        a.entry.result.addProperty("environment_route_stalled", a.recoveryStalled);
+        a.entry.result.addProperty("environment_waiting_for_route", a.recoveryStalled || a.waypoint >= points.size());
     }
 
     private static void mine(Minecraft mc, RuntimeAction a) {
@@ -264,10 +312,21 @@ final class ClientActions {
         if (a.dispatched) {
             if (mc.level.getBlockState(target).getBlock() == a.placedBlock) {
                 a.entry.result.addProperty("observed_block", BuiltInRegistries.BLOCK.getKey(a.placedBlock).toString());
-                // For a pillar step, leave the action running until ordinary physics lands us.
-                if (!a.entry.request.jump() || a.player.onGround()) finish("succeeded", "block_placed_observed");
-            } else if (a.entry.ticks - a.dispatchTick >= 10) {
-                finish("failed", "placement_not_observed");
+                a.placedStableTicks++;
+                boolean consumed = mc.gameMode.hasInfiniteItems()
+                        || a.player.getMainHandItem().getCount() == a.placementBeforeCount - 1;
+                a.entry.result.addProperty("client_stable_ticks", a.placedStableTicks);
+                a.entry.result.addProperty("material_consumption_observed", consumed);
+                // Client prediction can roll back; never call a first-frame block a settled result.
+                // This is still client evidence, not a server acknowledgement.
+                if (a.placedStableTicks >= 5 && consumed
+                        && (!a.entry.request.jump() || a.player.onGround())) {
+                    a.entry.result.addProperty("confirmation", "client_observed_stable");
+                    finish("succeeded", "block_placed_observed");
+                }
+            } else {
+                a.placedStableTicks = 0;
+                if (a.entry.ticks - a.dispatchTick >= 10) finish("failed", "placement_not_observed");
             }
             return;
         }
@@ -292,6 +351,7 @@ final class ClientActions {
         a.entry.result.addProperty("dispatched", true);
         a.entry.result.add("target", cellJson(target));
         int beforeCount = a.player.getMainHandItem().getCount();
+        a.placementBeforeCount = beforeCount;
         InteractionResult result = mc.gameMode.useItemOn(a.player, InteractionHand.MAIN_HAND, hit);
         a.entry.result.addProperty("interaction_result", result.name().toLowerCase(Locale.ROOT));
         if (result.shouldSwing() && event.shouldSwingHand()) {
