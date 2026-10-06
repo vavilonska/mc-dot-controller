@@ -49,6 +49,9 @@ python3 -m resident_controller --queue /path/to/shared/mailbox submit \
 
 ## 验证状态
 
+- Python 地形读取增量 `terrain-refresh.1`：保留 v6 全部功能，区分完整性错误与合法陈旧数据；仅后者及明确游标过期/地形限流允许一次全新扫描，失败清空旧缓存。三个 Python 运行时文件变更，不修改 Java/mod。详见[边界与离线验证](resident-controller/docs/TERRAIN_RECOVERY.md)
+- 该增量的完整公开 Python 布局：828 项运行，827 项通过，1 项历史源码对照跳过；包含 24 项新增刷新回归。编译与 CLI 检查通过。这是本地离线证据，不代表 GitHub CI 或真实故障恢复已经验收
+- 以下 Java 构建与分组 Python 数量保留为 v6 基线记录；本次未重新构建 Java
 - 当前 Java 21 / Minecraft 1.21.1 / NeoForge 21.1.255 完整构建：118 项测试通过
 - 最终公开 Python 布局：防御 129 项通过、1 项历史源码对照跳过；寻路 67、制作及便携包装 37、resident 118 项通过
 - 本轮仅做源码与离线检查，没有借发布操作游戏；水中持续浮起、细雪/火焰恢复、长片段行走、稳定制作/放块尚待普通游玩中的实机验收

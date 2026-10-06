@@ -18,3 +18,5 @@ tests/test_controller.py
 tests/test_entity_aim_lock.py
 tests/test_native_combat.py
 tests/test_prospecting.py
+tests/test_terrain_recovery.py
+docs/TERRAIN_RECOVERY.md

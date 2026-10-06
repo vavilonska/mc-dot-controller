@@ -28,7 +28,7 @@ The wrapper is build tooling. No Minecraft, NeoForge, or compiled client-mod JAR
 
 ## Resident controller
 
-`resident-controller/` is original Python standard-library source for one owner-started process, an authenticated loopback connection and a credential-free shared task queue. It imports this repository's unchanged `navigation_controller/__init__.py`, `terrain.py` and `planner.py`; no duplicate algorithm package or third-party game code is bundled. No license grant has been assigned to this original Python code or those original navigation helpers. The upstream MIT license in `client-mod/` does not automatically license independent components. Aim/combat decisions and the bounded historical scan cache also stay external to the mod. No Aoi, minecraft-data, Minecraft assets, runtime mailbox or credentials are included.
+`resident-controller/` is original Python standard-library source for one owner-started process, an authenticated loopback connection and a credential-free shared task queue. It imports this repository's `navigation_controller/__init__.py`, `terrain.py` and `planner.py`; `terrain-refresh.1` adds strict rejection classification to that shared terrain parser and bounded fresh reads to the resident cache. No duplicate algorithm package or third-party game code is bundled. No license grant has been assigned to this original Python code or those original navigation helpers. The upstream MIT license in `client-mod/` does not automatically license independent components. Aim/combat decisions and the bounded historical scan cache also stay external to the mod. No Aoi, minecraft-data, Minecraft assets, runtime mailbox or credentials are included.
 
 ## Independent defense watchdog
 

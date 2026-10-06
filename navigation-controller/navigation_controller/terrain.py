@@ -12,6 +12,18 @@ class TerrainError(ValueError):
     pass
 
 
+class StaleTerrainError(TerrainError):
+    """Valid observations have aged out; a caller may start a bounded new scan."""
+
+
+class TerrainPageError(TerrainError):
+    """Keep the legacy public error and an explicit, sanitized rejection cause."""
+    def __init__(self, cause):
+        super().__init__('invalid_or_stale_terrain_page')
+        self.detail = str(cause) if isinstance(cause, TerrainError) else 'malformed_terrain_page'
+        self.refreshable = isinstance(cause, StaleTerrainError)
+
+
 def integer(value, low=None, high=None):
     if type(value) is not int or (low is not None and value < low) or (high is not None and value > high):
         raise TerrainError('invalid_integer')
@@ -169,9 +181,11 @@ class TerrainGrid:
         if not self.first_tick <= self.last_tick <= current.tick:
             raise TerrainError('terrain_from_future')
         if current.tick - self.first_tick > max_age_ticks:
-            raise TerrainError('stale_terrain_ticks')
-        if not 0 <= now - self.received_at <= max_wall_age:
-            raise TerrainError('stale_terrain_clock')
+            raise StaleTerrainError('stale_terrain_ticks')
+        if now < self.received_at:
+            raise TerrainError('terrain_clock_reversed')
+        if now - self.received_at > max_wall_age:
+            raise StaleTerrainError('stale_terrain_clock')
 
 
 class TerrainAssembler:
@@ -204,15 +218,19 @@ class TerrainAssembler:
             raise TerrainError('scan_invalidated')
         try:
             self._add(page, number(now))
-        except (TerrainError, KeyError, TypeError, ValueError):
+        except (TerrainError, KeyError, TypeError, ValueError) as exc:
             self.failed = True
             self.cells.clear()
-            raise TerrainError('invalid_or_stale_terrain_page') from None
+            raise TerrainPageError(exc) from None
 
     def _add(self, page, now):
         protocol(page)
-        if self.complete or self.pages >= self.max_pages or not 0 <= now - self.started_at <= self.max_scan_seconds:
-            raise TerrainError('scan_budget_or_completed')
+        if self.complete:
+            raise TerrainError('scan_already_completed')
+        if self.pages >= self.max_pages:
+            raise TerrainError('scan_page_budget')
+        if now < self.started_at:
+            raise TerrainError('terrain_clock_reversed')
         if (type(page.get('terrain_schema_version')) is not int or page['terrain_schema_version'] != 1
                 or page.get('consistency') != 'live_pages' or page.get('order') != 'x_then_z_then_y'
                 or page.get('read_only') is not True or page.get('loaded_chunks_only') is not True):
@@ -222,8 +240,6 @@ class TerrainAssembler:
             raise TerrainError('world_generation_changed')
         tick = stamp.tick
         response_tick = integer(page['response_game_time'], tick)
-        if not self.world.tick <= tick <= response_tick or response_tick - tick > self.max_scan_ticks:
-            raise TerrainError('page_tick_mismatch')
         generation = uuid(page['generation'])
         origin = Block.parse(page['origin'])
         radius = integer(page['radius'], 0, 16)
@@ -274,8 +290,16 @@ class TerrainAssembler:
             raise TerrainError('invalid_unknown_count')
         if self.first_tick is None:
             self.first_tick = tick
-        if (self.last_tick is not None and tick < self.last_tick) or response_tick - self.first_tick > self.max_scan_ticks:
-            raise TerrainError('scan_tick_budget')
+        if self.last_tick is not None and tick < self.last_tick:
+            raise TerrainError('terrain_page_tick_reversed')
+        # Validate schema, exact coverage, world and ordering before classifying
+        # expiry. A malformed page with an old timestamp is never retryable.
+        if tick < self.world.tick or response_tick - tick > self.max_scan_ticks:
+            raise StaleTerrainError('stale_terrain_page_ticks')
+        if response_tick - self.first_tick > self.max_scan_ticks:
+            raise StaleTerrainError('stale_terrain_scan_ticks')
+        if now - self.started_at > self.max_scan_seconds:
+            raise StaleTerrainError('stale_terrain_clock')
         self.last_tick = tick
         self.next_cursor = cursor
         self.complete = complete

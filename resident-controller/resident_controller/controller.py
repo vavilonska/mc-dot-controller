@@ -64,7 +64,8 @@ class Resident:
                 'active_request_id': self.active.command['request_id'] if self.active else None,
                 'active_action_id': self.active.action_id if self.active else None,
                 'pending': len(self.pending), 'aim_lock': self.aim.status(),
-                'combat': self.combat.status(), 'scan_cache': self.prospecting.summary()}
+                'combat': self.combat.status(), 'scan_cache': self.prospecting.summary(),
+                'terrain_read': dict(self.cache.terrain_read)}
         atomic_json(self.root / 'session.json', data)
         self.last_publish = time.monotonic()
 
@@ -169,6 +170,7 @@ class Resident:
             os.replace(temp, path)
             result['frame'] = {'path': str(path), 'captured_at': time.time(), 'source': 'native_minecraft_frame'}
         result['scan_cache'] = self.prospecting.summary()
+        result['terrain_read'] = dict(self.cache.terrain_read)
         atomic_json(self.root / 'observation.json', result)
         return result
 

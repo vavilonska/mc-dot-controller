@@ -6,9 +6,9 @@ movement/mining/placement on client ticks; Python does not simulate physics,
 inventory, networking, or generate 100 ms key pulses.
 
 **Current source:** v6 continuity candidate paired with
-`1.1.6-continuity.1`, with 118 focused offline resident checks. The frozen source
-was built and checked offline; it is not live-accepted, and publication does not
-establish installation.
+`1.1.6-continuity.1`, plus the Python-only `terrain-refresh.1` increment, with
+142 focused offline resident checks. It is not live-accepted, and publication
+does not establish installation.
 
 Historical `1.1.6-loaded-scan.1` evidence includes a bounded live scan with
 4,864 tested positions, 41 coal blocks,
@@ -328,6 +328,17 @@ actual desktop process must be checked, not a PID in another namespace.
 
 Shutdown: `{"op":"shutdown"}` or owner Ctrl-C releases inputs and stops the
 controller only. Never send a game quit as unconditional cleanup.
+
+## Bounded terrain refresh
+
+The additive `terrain-refresh.1` update preserves the v6 source and adds strict
+rejection diagnostics, one bounded fresh scan for valid stale data or explicit
+cursor expiry/rate limiting, and cache invalidation on refresh failure. It does
+not retry malformed/mixed-world pages or POST actions. The shared three-second
+budget controls new read admission, not a hard timeout for an in-flight GET.
+See [the contract, loading boundaries and full offline results](docs/TERRAIN_RECOVERY.md).
+The updated public layout passes 142 resident tests, including 24 new refresh
+regressions; this does not establish live recovery of the original failure.
 
 ## Focused offline checks
 
