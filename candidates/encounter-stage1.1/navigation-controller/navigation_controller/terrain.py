@@ -291,7 +291,10 @@ class TerrainAssembler:
         if self.first_tick is None:
             self.first_tick = tick
         if self.last_tick is not None and tick < self.last_tick:
-            raise TerrainError('terrain_page_tick_reversed')
+            # ClientLevel game time can be corrected backwards by time-sync
+            # packets. Still poison this batch; callers may only begin a fresh
+            # full scan under their existing attempt/deadline budget.
+            raise StaleTerrainError('terrain_page_tick_reversed')
         # Validate schema, exact coverage, world and ordering before classifying
         # expiry. A malformed page with an old timestamp is never retryable.
         if tick < self.world.tick or response_tick - tick > self.max_scan_ticks:

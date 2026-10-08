@@ -63,4 +63,76 @@ class BoatSteeringTest {
   assertEquals(0,BoatSteering.turn(89,-.6,1).lock());
  }
 
+ @Test void maximumLengthStraightRoutesSettleWithOneTickInputPipeline() {
+  // Both fixtures use the full 256-block route budget, including the first leg.
+  // The second also uses all 64 admitted waypoints, without append or renewal.
+  for(int count:new int[]{16,64}) {
+   var points=new java.util.ArrayList<BoatSteering.Point>();
+   for(int i=1;i<=count;i++)points.add(new BoatSteering.Point(0,i*(256.0/count)));
+   assertDelayedModelSettlesWithinGuards(points);
+  }
+ }
+
+ @Test void multiWaypointTurnsRespectDeviationGuardWithOneTickInputPipeline() {
+  for(int direction:new int[]{-1,1}) {
+   assertDelayedModelSettlesWithinGuards(List.of(new BoatSteering.Point(0,8),
+           new BoatSteering.Point(direction*8,8),new BoatSteering.Point(direction*8,16)));
+   // Include shallow corners, right angles, and a reversal; each second leg is 8 blocks.
+   for(int angle=15;angle<=180;angle+=15) {
+    double radians=Math.toRadians(direction*angle);
+    assertDelayedModelSettlesWithinGuards(List.of(new BoatSteering.Point(0,8),
+            new BoatSteering.Point(-8*Math.sin(radians),8+8*Math.cos(radians))));
+   }
+  }
+ }
+
+ @Test void waypointTransitionClearsPreviousReverseTurnLock() {
+  for(int direction:new int[]{-1,1}) {
+   var points=List.of(new BoatSteering.Point(0,8),new BoatSteering.Point(direction*8,0));
+   // This 90–150 degree turn does not clear or acquire a lock by angle alone.
+   // A stale lock from the preceding segment points away from the new corner.
+   var decision=BoatSteering.decide(p(0,7.5,0,0,.05,0),points,0,direction);
+   assertEquals(1,decision.step().waypoint());
+   assertEquals(0,decision.turnLock());
+   assertEquals(direction>0,decision.step().left());
+   assertEquals(direction<0,decision.step().right());
+  }
+ }
+
+ private static void assertDelayedModelSettlesWithinGuards(List<BoatSteering.Point> points) {
+  // Deterministic still-water formula regression ONLY, not Minecraft acceptance.
+  // One iteration models one 20 Hz client tick; 2400 ticks is the maximum 120 s
+  // lease at that rate, not a wall-clock deadline guarantee under a delayed client.
+  // Native Boat.tick consumes the preceding rideTick input. Pose is observed and
+  // checked against the CURRENT segment before this tick advances its waypoint.
+  double x=0,z=0,yaw=0,vx=0,vz=0,rate=0;
+  int index=0,stable=0,lock=0;
+  var start=new BoatSteering.Point(0,0);
+  var queued=new BoatSteering.Step(0,false,false,false,false,false,false,"initial-neutral",0);
+  for(int tick=0;tick<2400;tick++) {
+   var previous=index==0?start:points.get(index-1);
+   assertTrue(BoatCollision.distanceToSegment(x,z,previous,points.get(index))<=2.5,
+           "route deviation at tick="+tick+", waypoint="+index+", position="+x+","+z);
+   assertTrue(Math.hypot(vx,vz)<=BoatSteering.MAX_SPEED,"speed guard at tick="+tick);
+   var decision=BoatSteering.decide(p(x,z,yaw,vx,vz,rate),points,index,lock);
+   var output=decision.step();
+   assertTrue(output.waypoint()>=index,"waypoint progress must be monotonic");
+   index=output.waypoint();lock=decision.turnLock();
+   if(output.settled())stable++;else stable=0;
+   if(stable>=4) {
+    assertEquals(points.size()-1,index);
+    assertTrue(new BoatSteering.Point(x,z).distance(points.getLast())<=BoatSteering.ARRIVAL_RADIUS);
+    return;
+   }
+   var input=queued;queued=output;
+   rate=.9*rate+(input.left()?-1:0)+(input.right()?1:0);yaw+=rate;
+   double thrust=(input.forward()?.04:0)-(input.backward()?.005:0)
+           +((input.left()!=input.right()&&!input.forward()&&!input.backward())?.005:0);
+   vx=.9*vx-Math.sin(Math.toRadians(yaw))*thrust;
+   vz=.9*vz+Math.cos(Math.toRadians(yaw))*thrust;
+   x+=vx;z+=vz;
+  }
+  fail("model did not settle within maximum modeled lease: waypoint="+index+", position="+x+","+z);
+ }
+
 }

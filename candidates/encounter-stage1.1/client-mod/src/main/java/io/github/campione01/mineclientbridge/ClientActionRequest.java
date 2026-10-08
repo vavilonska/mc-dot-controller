@@ -12,7 +12,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         int containerId, int slot, int button, String clickType, JsonObject original) {
     record Point(double x, double y, double z, boolean jump) { }
     record Cell(int x, int y, int z) { }
-    static final Set<String> ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot", "combat_entity", "boat_drive");
+    static final Set<String> ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot", "combat_entity", "boat_drive", "boat_mount", "boat_dismount");
     static final Set<String> FACES = Set.of("up", "down", "north", "south", "east", "west");
     static final Set<String> CLICKS = Set.of("pickup", "quick_move", "swap", "throw", "pickup_all", "quick_craft");
 
@@ -21,7 +21,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         require(!id.isBlank() && id.length() <= 128, "invalid_action_id");
         String action = string(body, "action");
         require(ACTIONS.contains(action), "unsupported_action");
-        if(body.has("encounter_mode") || body.has("encounter_scope"))
+        if(body.has("encounter_mode") || body.has("encounter_scope") || body.has(EncounterRequest.PAUSE_ON_TERMINAL))
             require(action.equals("combat_entity"),"encounter_requires_combat_entity");
         if (body.has("sprint")) {
             bool(body, "sprint", false);
@@ -49,6 +49,8 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             support = cell(body, "support");
             face = string(body, "face");
             require(FACES.contains(face), "invalid_face");
+        } else if (action.equals("boat_mount") || action.equals("boat_dismount")) {
+            BoatTransferRequest.parse(body);
         } else if (action.equals("boat_drive")) {
             BoatDriveRequest.parse(body);
         } else if (action.equals("combat_entity")) {

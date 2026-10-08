@@ -2,7 +2,7 @@
 
 This receipt proves only bounded client-observed clearance for the same two
 living zombies. Risk and handoff remain explicit even after that observation.
-Legacy action bodies without either encounter field are intentionally untouched.
+Legacy action bodies without encounter fields are intentionally untouched.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ META = {'op', 'session_id', 'request_id', 'submitted_at'}
 FIELDS = {'action_id', 'action', 'timeout_ms', 'expected_world_generation',
           'expected_player_uuid', 'expected_action_session', 'expected_navigation_epoch',
           'expected_origin', 'target_entity_id', 'target_uuid', 'target_type',
-          'approach', 'shield', 'encounter_mode', 'encounter_scope'}
+          'approach', 'shield', 'encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal'}
 IDENTITY_FIELDS = {'entity_id', 'uuid', 'type'}
 
 
@@ -58,11 +58,14 @@ def _scope(value):
 
 def validate_encounter_request(body):
     """Return an immutable-by-copy contract, or None for untouched legacy input."""
-    if 'encounter_mode' not in body and 'encounter_scope' not in body:
+    if not any(field in body for field in ('encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal')):
         return None
     _require(body.get('action') == 'combat_entity', 'encounter_requires_combat_entity')
     _require(body.get('encounter_mode') == MODE, 'encounter_mode_invalid')
     _require(set(body) <= FIELDS, 'encounter_unknown_or_forbidden_field')
+    if 'encounter_pause_on_terminal' in body:
+        _require(type(body['encounter_pause_on_terminal']) is bool,
+                 'encounter_pause_on_terminal_requires_boolean')
     _require(body.get('approach') is False and body.get('shield') is False,
              'encounter_requires_approach_false_shield_false')
     _require(body.get('target_type') == 'minecraft:zombie'
@@ -87,10 +90,35 @@ def validate_encounter_request(body):
 
 
 def validate_encounter_command(command):
-    if 'encounter_mode' not in command and 'encounter_scope' not in command:
+    if not any(field in command for field in ('encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal')):
         return None
     _require(command.get('op') == 'action', 'encounter_requires_action_operation')
     return validate_encounter_request({k: v for k, v in command.items() if k not in META})
+
+
+def _validate_terminal_pause(result):
+    pause = result.get('encounter_terminal_pause')
+    _require(type(pause) is dict and type(pause.get('hook_schema_version')) is int
+             and pause['hook_schema_version'] == 1
+             and pause.get('requested') is True and pause.get('attempted') is True
+             and type(pause.get('pause_call_attempted')) is bool
+             and pause.get('outcome') in ('screen_installed', 'rejected', 'unconfirmed')
+             and pause.get('pause_effect_confirmed') is False
+             and pause.get('server_confirmed') is False,
+             'encounter_receipt_terminal_pause_invalid')
+    for field in ('pause_screen_installed', 'already_pause_screen', 'client_paused_observed'):
+        _require(field in pause and (pause[field] is None or type(pause[field]) is bool),
+                 'encounter_receipt_terminal_pause_observation_invalid')
+    _require(type(result.get('input_release_confirmed')) is bool
+             and type(pause.get('input_release_confirmed')) is bool
+             and pause['input_release_confirmed'] is result['input_release_confirmed'],
+             'encounter_receipt_terminal_pause_release_mismatch')
+    if pause['outcome'] == 'screen_installed':
+        _require(pause['pause_call_attempted'] is True and pause['pause_screen_installed'] is True,
+                 'encounter_receipt_terminal_pause_installation_unproved')
+    for field in ('error_type', 'reason'):
+        if field in pause:
+            _require(isinstance(pause[field], str), 'encounter_receipt_terminal_pause_diagnostic_invalid')
 
 
 def validate_encounter_receipt(receipt, request):
@@ -113,6 +141,14 @@ def validate_encounter_receipt(receipt, request):
     combat = result.get('combat') if type(result) is dict else None
     encounter = combat.get('encounter') if type(combat) is dict else None
     _require(type(encounter) is dict, 'encounter_receipt_missing')
+    # The echo confirms the original opt-in, not that a pause has taken effect.
+    # Absent/false requests retain compatibility with receipts predating this flag.
+    if 'encounter_pause_on_terminal' in encounter:
+        _require(type(encounter['encounter_pause_on_terminal']) is bool,
+                 'encounter_receipt_pause_on_terminal_invalid')
+    _require((encounter.get('encounter_pause_on_terminal') is True)
+             == (request.get('encounter_pause_on_terminal') is True),
+             'encounter_receipt_pause_on_terminal_mismatch')
     _require(type(encounter.get('encounter_schema_version')) is int
              and encounter['encounter_schema_version'] == 1
              and encounter.get('encounter_mode') == MODE
@@ -147,6 +183,8 @@ def validate_encounter_receipt(receipt, request):
     if status == 'running':
         _require(encounter.get('outcome_scope') is None, 'encounter_receipt_premature_outcome')
         return
+    if request.get('encounter_pause_on_terminal') is True:
+        _validate_terminal_pause(result)
     _require(encounter.get('terminal_status') == status
              and encounter.get('terminal_reason') == receipt.get('reason')
              and isinstance(receipt.get('reason'), str) and bool(receipt['reason']),

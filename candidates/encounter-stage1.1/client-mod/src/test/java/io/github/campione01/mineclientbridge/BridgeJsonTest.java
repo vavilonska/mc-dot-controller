@@ -26,6 +26,113 @@ class BridgeJsonTest {
     }
     private JsonObject roundTrip(JsonObject root) throws Exception { return JsonParser.parseString(BridgeJson.toJson(root)).getAsJsonObject(); }
 
+    @Test void realUnknownTerminalHookRetainsOnlyItsExplicitNullableObservations() throws Exception {
+        var registry=new ActionRegistry();
+        var entry=registry.begin(EncounterTerminalPauseTest.request(registry,true));
+        registry.finishAfterCleanup("failed","original_failure",true);
+        EncounterTerminalPause.afterTerminal(entry,registry.session,b->{throw new IllegalStateException("pause_outcome_unknown");});
+        var hook=entry.result.getAsJsonObject(EncounterTerminalPause.EVIDENCE);
+        hook.add("legacy_null",JsonNull.INSTANCE);entry.result.add("legacy_null",JsonNull.INSTANCE);
+        var wire=roundTrip(registry.status(entry.request.id()));
+        var decoded=wire.getAsJsonObject("result").getAsJsonObject(EncounterTerminalPause.EVIDENCE);
+        for(String key:new String[]{"pause_screen_installed","already_pause_screen","client_paused_observed"}) {
+            assertTrue(decoded.has(key));assertTrue(decoded.get(key).isJsonNull());
+        }
+        assertEquals("unconfirmed",decoded.get("outcome").getAsString());
+        assertFalse(decoded.has("legacy_null"));assertFalse(wire.getAsJsonObject("result").has("legacy_null"));
+        assertEquals("original_failure",wire.get("reason").getAsString());
+    }
+
+    @Test void firstCallbackInterruptionRetainsUnknownClockAnchorsOnActualWire() throws Exception {
+        var f=new BoundedEncounterTest.Fixture();
+        assertEquals("encounter_callback_observation_gap_risk_remaining",
+                f.owner.callbackInterruption(1_150_000_001L,"pre_tick"));
+        var callback=f.e().getAsJsonObject("callback_interruption");callback.add("legacy_null",JsonNull.INSTANCE);
+        var root=new JsonObject();var result=new JsonObject();result.add("combat",f.root);root.add("result",result);
+        var actual=roundTrip(root).getAsJsonObject("result").getAsJsonObject("combat")
+                .getAsJsonObject("encounter").getAsJsonObject("callback_interruption");
+        for(String key:new String[]{"last_tick_nanos","snapshot_captured_nanos","previous_callback_nanos",
+                "previous_callback_phase","callback_interval_nanos"}) {
+            assertTrue(actual.has(key));assertTrue(actual.get(key).isJsonNull());
+        }
+        assertFalse(actual.has("legacy_null"));assertEquals(-1,actual.get("evaluated_tick").getAsInt());
+        assertEquals(150_000_001L,actual.get("observation_age_nanos").getAsLong());
+    }
+
+    @Test void realMissingActionPauseAckRetainsNullActionAndReleaseWithoutChangingOtherEnvelopes() throws Exception {
+        var f=new EncounterPauseTest.Fake();f.expected=null;f.current=EncounterPauseTest.action("failed");
+        var reply=f.run();reply.add("legacy_null",JsonNull.INSTANCE);
+        var wire=roundTrip(reply);
+        assertTrue(wire.get("client_action").isJsonNull());
+        assertTrue(wire.get("input_release_confirmed").isJsonNull());
+        assertFalse(wire.has("legacy_null"));
+        reply.remove("pause_schema_version");
+        assertFalse(roundTrip(reply).has("client_action"));assertFalse(roundTrip(reply).has("input_release_confirmed"));
+    }
+
+    @Test void newPauseNullableContractsNeverInventMissingFieldsOrAffectOtherPaths() throws Exception {
+        var root=JsonParser.parseString("{\"pause_schema_version\":1,\"action\":\"ensure_paused\",\"other\":{\"client_action\":null},\"result\":{\"encounter_terminal_pause\":{},\"other\":{\"client_paused_observed\":null}}}").getAsJsonObject();
+        var decoded=roundTrip(root);
+        assertFalse(decoded.has("client_action"));assertFalse(decoded.has("input_release_confirmed"));
+        assertEquals(0,decoded.getAsJsonObject("other").size());
+        assertEquals(0,decoded.getAsJsonObject("result").getAsJsonObject("encounter_terminal_pause").size());
+        assertEquals(0,decoded.getAsJsonObject("result").getAsJsonObject("other").size());
+    }
+
+    @Test void nativeTruncationFailureRetainsExplicitUnknownOutcomeOnWire() throws Exception {
+        var fixture = new BoundedEncounterTest.Fixture();
+        fixture.truncated = true;
+        var decision = fixture.tick(0, 0, BoundedEncounterTest.pair(3));
+        assertEquals("failed", decision.terminal());
+        assertEquals("threat_snapshot_truncated_risk_remaining", decision.reason());
+        assertEquals(0, decision.forward());
+        fixture.owner.terminal(decision.terminal(), decision.reason());
+        JsonObject receipt = new JsonObject(), result = new JsonObject();
+        receipt.add("result", result); result.add("combat", fixture.root);
+        JsonObject encounter = roundTrip(receipt).getAsJsonObject("result")
+                .getAsJsonObject("combat").getAsJsonObject("encounter");
+        assertTrue(encounter.has("outcome_scope"));
+        assertTrue(encounter.get("outcome_scope").isJsonNull());
+        assertTrue(encounter.get("risk_remaining").getAsBoolean());
+        assertFalse(encounter.get("safety_assured").getAsBoolean());
+        // /state and /control/status expose the existing native receipt under
+        // client_action, whose explicit nulls were preserved even before this fix.
+        JsonObject status = new JsonObject(); status.add("client_action", receipt);
+        assertEquals(receipt, roundTrip(status).getAsJsonObject("client_action"));
+    }
+
+    @Test void encounterOutcomeScopeSurvivesWireForRunningAndFailedReceipts() throws Exception {
+        for (String status : new String[]{"running", "failed", "cancelled", "succeeded"}) {
+            JsonObject root = new JsonObject();
+            root.addProperty("status", status);
+            JsonObject result = new JsonObject(), combat = new JsonObject(), encounter = new JsonObject();
+            root.add("result", result); result.add("combat", combat); combat.add("encounter", encounter);
+            encounter.addProperty("outcome_scope", status.equals("succeeded") ? "local_clearance" : null);
+            encounter.addProperty("legacy_null", (String) null);
+            result.addProperty("legacy_null", (String) null);
+            combat.addProperty("legacy_null", (String) null);
+            JsonObject before = root.deepCopy();
+            JsonObject decodedResult = roundTrip(root).getAsJsonObject("result");
+            JsonObject decodedCombat = decodedResult.getAsJsonObject("combat");
+            JsonObject decoded = decodedCombat.getAsJsonObject("encounter");
+            assertTrue(decoded.has("outcome_scope"), status);
+            assertEquals(encounter.get("outcome_scope"), decoded.get("outcome_scope"));
+            assertFalse(decoded.has("legacy_null"));
+            assertFalse(decodedResult.has("legacy_null"));
+            assertFalse(decodedCombat.has("legacy_null"));
+            assertEquals(before, root);
+        }
+    }
+
+    @Test void encounterMissingOutcomeIsNotInventedAndOtherPathsKeepLegacyEncoding() throws Exception {
+        JsonObject root = JsonParser.parseString("{\"result\":{\"combat\":{\"encounter\":{\"schema_version\":1},\"outcome_scope\":null},\"outcome_scope\":null},\"outcome_scope\":null}").getAsJsonObject();
+        assertEquals(LEGACY.toJson(root), BridgeJson.toJson(root));
+        for (String json : new String[]{"{\"result\":null}", "{\"result\":{\"combat\":null}}", "{\"result\":{\"combat\":{\"encounter\":null}}}"}) {
+            JsonObject value = JsonParser.parseString(json).getAsJsonObject();
+            assertEquals(LEGACY.toJson(value), BridgeJson.toJson(value));
+        }
+    }
+
     @Test void biomeRegistryIdOrExplicitUnavailableNullSurvivesWireEncoding() throws Exception {
         JsonObject root = new JsonObject();
         JsonObject world = new JsonObject();

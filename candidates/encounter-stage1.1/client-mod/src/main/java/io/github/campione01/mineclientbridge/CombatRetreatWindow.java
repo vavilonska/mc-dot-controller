@@ -15,8 +15,10 @@ final class CombatRetreatWindow {
                         CombatDetour.Point to,double originX,double originY,double originZ,
                         FlatStepCorridor.CellSource cells,List<CombatSpatial.Box> obstacles,Metrics metrics) {
         Result result;
+        long windowStarted=start(metrics,Stage.WINDOW_TOTAL);
         try { result=checkObserved(threats,now,tick,from,to,originX,originY,originZ,cells,obstacles,metrics); }
         catch(RuntimeException exception) { result=denied("retreat_window_exception",null,-1); }
+        finally { end(metrics,Stage.WINDOW_TOTAL,windowStarted); }
         if(metrics!=null && metrics.clockInvalid) return denied("retreat_window_clock_invalid",result.terrain(),result.blockedEntityId());
         return result;
     }
@@ -50,7 +52,8 @@ final class CombatRetreatWindow {
         if(!terrain.clear()) return denied(terrain.reason(),terrain,-1);
         return new Result(new CombatDetour.EdgeResult(true,Math.min(100,risk.minimumClearance()),"clear"),terrain,-1);
     }
-    enum Stage { THREAT_ROUTES, DYNAMIC_OBSTACLES, CENTER_TERRAIN, ENVELOPE, ENVELOPE_TERRAIN }
+    enum Stage { THREAT_ROUTES, DYNAMIC_OBSTACLES, CENTER_TERRAIN, ENVELOPE, ENVELOPE_TERRAIN,
+        WINDOW_TOTAL, TERRAIN_CELL_READ }
     /** Aggregate-only observations; envelope duration contains its terrain/dynamic subdurations. */
     static final class Metrics {
         private final LongSupplier clock;
@@ -95,8 +98,19 @@ final class CombatRetreatWindow {
     static FlatStepCorridor.Result terrain(FlatStepCorridor.Pose pose,double dx,double dz,
                                            FlatStepCorridor.CellSource cells,Metrics metrics,Stage stage) {
         long started=start(metrics,stage);
-        try { return FlatStepCorridor.check(pose,dx,dz,cells); }
+        try {
+            FlatStepCorridor.CellSource measured=cells;
+            if(metrics!=null && cells!=null) measured=new MeasuredCells(cells,metrics);
+            return FlatStepCorridor.check(pose,dx,dz,measured);
+        }
         finally { end(metrics,stage,started); }
+    }
+    private record MeasuredCells(FlatStepCorridor.CellSource source,Metrics metrics) implements FlatStepCorridor.CellSource {
+        @Override public FlatStepCorridor.Cell read(int x,int y,int z) {
+            long started=start(metrics,Stage.TERRAIN_CELL_READ);
+            try { return source.read(x,y,z); }
+            finally { end(metrics,Stage.TERRAIN_CELL_READ,started); }
+        }
     }
     private static Result denied(String reason,FlatStepCorridor.Result terrain,int entityId) {
         return new Result(new CombatDetour.EdgeResult(false,0,reason),terrain,entityId);

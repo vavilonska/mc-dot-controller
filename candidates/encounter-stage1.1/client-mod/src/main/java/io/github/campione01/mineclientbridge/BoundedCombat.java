@@ -116,7 +116,7 @@ final class BoundedCombat {
     }
 
     boolean isEncounter() { return encounter!=null; }
-    String encounterCallbackInterruption(long now) { return encounter==null?null:encounter.callbackInterruption(now); }
+    String encounterCallbackInterruption(long now,String phase) { return encounter==null?null:encounter.callbackInterruption(now,phase); }
     void terminal(String status,String reason) { if(encounter!=null) encounter.terminal(status,reason); }
 
     private Step tickEncounter(Minecraft mc,int tick,CombatThreats.HealthGuard.Result health) {
@@ -358,13 +358,14 @@ final class BoundedCombat {
                 if (!(entity instanceof LivingEntity)) continue;
                 if (observed.size() >= 128) { truncated=true; break; }
                 String type = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+                String uuid = entity.getUUID().toString();
                 boolean dangerous = entity instanceof Enemy || entity instanceof NeutralMob
                         || CombatThreats.observableThreat(type);
-                observed.add(new CombatThreats.Observed(entity.getId(), entity.getUUID().toString(), type,
+                observed.add(new CombatThreats.Observed(entity.getId(), uuid, type,
                         entity.getX(), entity.getY(), entity.getZ(),
                         Math.max(bb.maxX-bb.minX,bb.maxZ-bb.minZ)/2, dangerous, entity.isAlive()));
                 JsonObject item = new JsonObject();
-                item.addProperty("entity_id",entity.getId()); item.addProperty("uuid",entity.getUUID().toString());
+                item.addProperty("entity_id",entity.getId()); item.addProperty("uuid",uuid);
                 item.addProperty("type",type); item.addProperty("dangerous_or_potential",dangerous);
                 number(item,"x",entity.getX());number(item,"y",entity.getY());number(item,"z",entity.getZ());
                 entities.add(item);

@@ -15,6 +15,7 @@ from .entity_aim_lock import EntityAimLock, MAX_SAMPLE_SECONDS
 from .encounter_contract import (validate_encounter_command, validate_encounter_request,
                                  validate_encounter_receipt)
 from .native_combat import NativeCombat
+from .pause_contract import pause_body, validate_pause_receipt
 from .ipc import ID, MAX_PENDING, MAX_RESULTS, atomic_json, read_json
 from .prospecting import ProspectingCache, SCAN_OPS, scan_id, start_body, validate_scan
 from .tasks import make_task
@@ -68,7 +69,9 @@ class Resident:
                 'bridge_identity': self.bridge_identity,
                 'active_request_id': self.active.command['request_id'] if self.active else None,
                 'active_action_id': self.active.action_id if self.active else None,
-                'pending': len(self.pending), 'aim_lock': self.aim.status(),
+                'pending': len(self.pending),
+                'pending_request_ids': [command['request_id'] for command in self.pending],
+                'aim_lock': self.aim.status(),
                 'combat': self.combat.status(), 'scan_cache': self.prospecting.summary(),
                 'terrain_read': dict(self.cache.terrain_read)}
         atomic_json(self.root / 'session.json', data)
@@ -212,7 +215,9 @@ class Resident:
                         self.combat.confirm_released()
                     elif operation not in ('cancel', 'shutdown'):
                         raise BridgeError('combat_input_release_unconfirmed', uncertain=True)
-        if operation == 'observe':
+        if operation == 'encounter_pause':
+            self.encounter_pause(command)
+        elif operation == 'observe':
             self.finish(command, 'succeeded', result=self.snapshot(command))
         elif operation in SCAN_OPS:
             self.scan_command(command)
@@ -295,6 +300,8 @@ class Resident:
             self.paused, self.reason = False, None
             self.finish(command, 'succeeded', result=result)
         elif operation == 'resume':
+            if self.paused and self.reason in ('encounter_pause_requested', 'encounter_pause_unknown') and (self.active or self.pending):
+                raise ValueError('encounter_pause_original_unresolved')
             self.check_identity(self.bridge.request('GET', '/control/status'))
             result = self.bridge.request('GET', '/control/action/status')
             if result.get('status') == 'running':
@@ -368,9 +375,69 @@ class Resident:
         if commands:
             self.publish()
 
+    def encounter_pause(self, command):
+        body = pause_body(command, self.session_id, (self.bridge_identity or {}).get('action_session'))
+        task = self.active
+        if self.aim.active or self.combat.active or self.combat.held:
+            raise ValueError('encounter_pause_foreign_automatic_owner')
+        for pending in self.pending:
+            planned_id = uuid.uuid5(uuid.UUID(self.session_id), pending['request_id'] + ':1').hex
+            if (planned_id != body['expected_action_id'] or validate_encounter_command(pending) is None):
+                raise ValueError('encounter_pause_foreign_pending_work')
+        if task is not None:
+            owner = task.action_id or (task.last_action_result or {}).get('action_id')
+            if (owner != body['expected_action_id'] or task.encounter_request is None
+                    or task.command.get('op') != 'action'):
+                raise ValueError('encounter_pause_foreign_resident_owner')
+        # No preliminary GET, input takeover, or original-result publication on this path.
+        self.paused, self.reason = True, 'encounter_pause_requested'
+        value = self.bridge.request('POST', '/control/pause', body)
+        try:
+            value = validate_pause_receipt(value, body, task.encounter_request if task else None)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise BridgeError('encounter_pause_response_invalid', uncertain=True) from None
+        self.paused, self.reason = True, 'encounter_pause_requested'
+        self.finish(command, 'succeeded', reason='native_pause_screen_installed', result=value,
+                    gameplay_effect_confirmed=False, risk_remaining=True,
+                    requires_handoff=True, safety_assured=False)
+        # A matching undispatched pending command stays held; resume refuses it.
+        # Retain the original task. The next advance performs only a bound read,
+        # not a cancel/retry or a multi-step recipe transition.
+
+    def reconcile_paused_encounter(self):
+        task = self.active
+        if task is None or task.encounter_request is None or time.monotonic() < task.wake_at:
+            return
+        action_id = task.action_id or (task.last_action_result or {}).get('action_id')
+        if not action_id:
+            return
+        task.wake_at = time.monotonic() + 0.2
+        try:
+            value = self.bridge.request('GET', '/control/action/status?action_id=' + quote(action_id, safe=''))
+            terminal = self.resolved_terminal(task, value, action_id)
+            if terminal is None:
+                return
+            if terminal['status'] == 'succeeded':
+                # Preserve the ordinary basic-action result shape using only a read.
+                state = self.cache.observe(self.bridge)
+                self.end_active('succeeded', result={'action': terminal, 'state': state,
+                                                      'server_confirmed': False})
+            else:
+                self.end_active(terminal['status'], reason=terminal['reason'], action=terminal)
+        except (BridgeError, ValueError, KeyError, TypeError):
+            # Unknown remains pending; neither this read nor an acknowledgement
+            # licenses another POST or rewriting an earlier uncertain envelope.
+            return
+
     def command_error(self, command, exc):
         uncertain = isinstance(exc, BridgeError) and exc.uncertain
         reason = safe_reason(exc)
+        if command.get('op') == 'encounter_pause':
+            if uncertain:
+                self.paused, self.reason = True, 'encounter_pause_unknown'
+            self.finish(command, 'uncertain' if uncertain else 'failed', reason=reason,
+                        risk_remaining=True, requires_handoff=True, safety_assured=False)
+            return
         if command.get('op') in SCAN_OPS:
             # Scanning owns no gameplay inputs. Even an ambiguous scan POST must
             # not stop combat/aim, release keys, or discard semantic tasks.
@@ -445,6 +512,9 @@ class Resident:
             self.publish()
 
     def advance(self):
+        if self.paused and self.reason in ('encounter_pause_requested', 'encounter_pause_unknown'):
+            self.reconcile_paused_encounter()
+            return
         if self.active is None:
             if not self.pending or self.paused:
                 return

@@ -77,6 +77,12 @@ repair, clear or reset it automatically. This is local tamper detection, not a
 claim of security against an actor rewriting all executable code and filesystem
 trust material.
 
+Every bound terminal in the report's intermediate samples must agree with the
+final bound terminal. Such a sample also contradicts a later null admission
+rejection, even if no running sample was captured. Recording and reopening the
+ledger use the same check: a contradiction blocks narrow closeout, and a sample
+cannot upgrade an unknown response into a known outcome.
+
 ## What remains outside the guarantee
 
 Read/submit sequences are not atomic across processes. A last instant owner,

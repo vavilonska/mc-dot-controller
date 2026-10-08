@@ -1,29 +1,26 @@
 # Encounter safety-v2: public offline subset
 
-This directory contains 16 unchanged files selected from the private safety-v2
-harness: five pure/core Python modules, synthetic/native-offline fixtures and
-support, five test files, and two historical plan/state-machine documents.
-It does not contain the live Operator or a complete runnable v2 game harness.
-No runtime guard has been weakened or rewritten for publication.
+This subset contains pure ledger/receipt/health modules, generic registered-case
+entrypoints, synthetic observations and temporary-queue tests. It has no live
+Operator, credential configuration, real-world evidence or runnable game setup.
 
-The selection passed 287 offline tests on 2026-10-08. All clients used in these
-tests are in-memory fakes; ledger writes use temporary directories. The emitted
-native fixture explicitly describes synthetic offline observations and its
-world/player identities are synthetic. Never use fixture IDs for live requests.
+The v18 source snapshot adds terminal-sample consistency, explicit active-case
+pause-first contracts, unknown-effect no-retry handling and append-only operator
+closeout reconciliation. Single-case and active-case entrypoints are dependency
+injected: importing them does not start a game, connect to a server or submit a
+request. Any real action still requires separately approved bindings and scope.
 
-From this directory on Linux/macOS, with Python 3:
+SOURCE_SHA256SUMS.txt checks 23 selected payloads. The private environment's
+Operator closeout how-to is deliberately excluded; no private case paths or
+evidence are reconstructed from these tests. Existing historical PLAN.md and
+STATE-MACHINE.md refer to the fuller harness and are not permission to run it.
 
-```sh
-export PYTHONDONTWRITEBYTECODE=1
-export PYTHONPATH="$PWD"
-python3 -m unittest discover -s tests -p test_receipt_binding.py -v
-python3 -m unittest discover -s safety_tests -p 'test_*.py' -v
-python3 -m unittest discover -s independent-review -p 'test_*.py' -v
-```
+From repository root, run python3 handoff/run_offline_checks.py. It sets local
+import paths and runs synthetic tests only. All mailbox/ledger writes in those
+tests go to temporary directories. POSIX fcntl is required. The separate
+handoff/test_native_wire_contract.py needs a locally compiled candidate classpath
+and Gson, as documented in that file, but does not open an HTTP connection.
 
-The core ledger uses POSIX `fcntl`; Windows is not supported by these commands.
-See `../../handoff/README.md` for omissions and owner-controlled access to the
-full private archive. Source hashes here cover the 16 unchanged selected files.
-The two preserved plan documents refer to the full harness and prior context;
-they do not claim that omitted APIs are available here, authorize future actions,
-or establish active-AI readiness or actual input release.
+These sources are an isolated candidate, not a main-line integration or live
+acceptance result. See ../../handoff/publication-v18-20261008.md for scope, checks
+and the unresolved differences against main. Existing licenses/notices remain.

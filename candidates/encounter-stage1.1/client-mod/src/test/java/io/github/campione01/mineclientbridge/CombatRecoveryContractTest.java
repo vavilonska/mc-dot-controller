@@ -85,7 +85,7 @@ class CombatRecoveryContractTest {
                 "!mc.player.isAlive()", "System.nanoTime() >= active.deadline", "mc.screen != null"})
             assertTrue(context.contains(gate), gate);
         String pre = actions.substring(actions.indexOf("private static void preTick("), actions.indexOf("private static void input("));
-        before(pre, "if (!context(mc)) return;", "a.combat.tick(mc, a.entry.ticks)");
+        before(pre, "if (!context(mc,\"pre_tick\")) return;", "a.combat.tick(mc, a.entry.ticks)");
         before(pre, "a.forward = 0", "a.combat.tick(mc, a.entry.ticks)");
         before(pre, "a.jump = false", "a.combat.tick(mc, a.entry.ticks)");
         assertTrue(actions.contains("final long deadline;"));

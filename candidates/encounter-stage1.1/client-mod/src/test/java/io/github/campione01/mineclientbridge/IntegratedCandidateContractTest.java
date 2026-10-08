@@ -18,7 +18,7 @@ class IntegratedCandidateContractTest {
   assertTrue(n.contains("case \"follow_path\", \"break_block\", \"place_block\", \"combat_entity\" -> true"));
   assertFalse(n.contains("\"boat_drive\" -> true"));
   assertTrue(a.contains("NavigationPositionGuard.applies(active.entry.request.action())"));
-  assertTrue(a.indexOf("NavigationPositionGuard.tick(mc)")<a.indexOf("if (!context(mc)) return;"));
+  assertTrue(a.indexOf("NavigationPositionGuard.tick(mc)")<a.indexOf("if (!context(mc,\"pre_tick\")) return;"));
   assertTrue(a.contains("if (a.boat == null) input.left = input.right = false"));
   assertTrue(src("BoundedBoatDrive.java").contains("hasChunkAt"));
  }

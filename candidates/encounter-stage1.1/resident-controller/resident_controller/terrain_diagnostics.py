@@ -159,7 +159,8 @@ class ScanDiagnostics:
                     metadata = bridge.last_response_metadata
                     record.update(response_bytes_read=metadata['response_bytes_read'],
                                   response_bytes_status=metadata['response_bytes_status'],
-                                  http_status=metadata['http_status'])
+                                  http_status=metadata['http_status'],
+                                  server_timing=metadata.get('server_timing'))
         if type(result) is dict:
             if phase == 'terrain_page':
                 fields = ('offset', 'next_offset', 'returned', 'total_cells', 'complete',

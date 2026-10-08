@@ -41,6 +41,7 @@ final class ClientActions {
         final long navigationEpoch;
         final BoundedCombat combat;
         final BoundedBoatDrive boat;
+        final BoundedBoatTransfer transfer;
         boolean left, right;
         Input input;
         float forward;
@@ -50,10 +51,11 @@ final class ClientActions {
         int waypoint, dispatchTick, unchangedTicks;
         double bestDistance = Double.POSITIVE_INFINITY;
         Block initialBlock, placedBlock;
-        RuntimeAction(ActionRegistry.Entry entry, Minecraft mc, BoundedCombat combat, BoundedBoatDrive boat, long deadline) {
+        RuntimeAction(ActionRegistry.Entry entry, Minecraft mc, BoundedCombat combat, BoundedBoatDrive boat, BoundedBoatTransfer transfer, long deadline) {
             this.entry = entry;
             this.combat = combat;
             this.boat = boat;
+            this.transfer = transfer;
             player = mc.player;
             level = mc.level;
             navigationEpoch = NavigationPositionGuard.epoch();
@@ -95,6 +97,7 @@ final class ClientActions {
         if (request.action().equals("combat_entity") && EncounterRequest.parseOptional(request.original())!=null
                 && !EncounterRequest.runtimeEnabled())
             throw new ClientActionRequest.Rejected(409,"encounter_stage1_disabled");
+        if (EncounterRequest.pauseRequested(request.original())) BridgeServer.requireEncounterPauseAdmission();
         long deadline=System.nanoTime()+request.timeoutMs()*1_000_000L;
         JsonObject combatEvidence = new JsonObject();
         BoundedCombat combat = request.action().equals("combat_entity")
@@ -102,13 +105,20 @@ final class ClientActions {
         JsonObject boatEvidence = new JsonObject();
         BoundedBoatDrive boat = request.action().equals("boat_drive")
                 ? new BoundedBoatDrive(mc, BoatDriveRequest.parse(request.original()), boatEvidence) : null;
+        JsonObject transferEvidence = new JsonObject();
+        BoundedBoatTransfer transfer = request.action().equals("boat_mount") || request.action().equals("boat_dismount")
+                ? new BoundedBoatTransfer(mc, BoatTransferRequest.parse(request.original()), transferEvidence) : null;
         // Transfer ownership once. A direct request later releases only this action's inputs.
         BridgeServer.releaseAllInputs();
-        active = new RuntimeAction(ACTIONS.begin(request), mc, combat, boat, deadline);
+        active = new RuntimeAction(ACTIONS.begin(request), mc, combat, boat, transfer, deadline);
         active.entry.result.addProperty("world_generation", WorldGeneration.current(mc.level));
         if (boat != null) {
             active.entry.result.add("boat", boatEvidence);
             boat.boat.setInput(false,false,false,false);
+        }
+        if (transfer != null) {
+            active.entry.result.add("boat_transfer", transferEvidence);
+            transfer.boat.setInput(false, false, false, false);
         }
         if (combat != null) {
             active.entry.result.add("combat", combatEvidence);
@@ -121,6 +131,10 @@ final class ClientActions {
     static JsonObject status(String id) { requireThread(Minecraft.getInstance()); return ACTIONS.status(id); }
     static String session() { return ACTIONS.session; }
     static boolean ownsInput() { return active != null; }
+    static boolean ownsTransfer(BoundedBoatTransfer transfer) {
+        requireThread(Minecraft.getInstance());
+        return active != null && active.transfer == transfer;
+    }
     static JsonObject cancelId(String id, String expectedSession) {
         requireThread(Minecraft.getInstance());
         if (expectedSession != null && !ACTIONS.session.equals(expectedSession))
@@ -144,7 +158,7 @@ final class ClientActions {
         if (active != null) finish("cancelled", reason);
     }
 
-    private static boolean context(Minecraft mc) {
+    private static boolean context(Minecraft mc,String phase) {
         if (active == null) return false;
         if (mc.player != active.player || mc.level != active.level || mc.gameMode == null) {
             finish("cancelled", "world_transition"); return false;
@@ -158,7 +172,7 @@ final class ClientActions {
         if (active.combat!=null && active.combat.isEncounter()) {
             String interruption=BoundedEncounter.lifecycle(mc.isPaused(),mc.isWindowActive(),mc.player.isSpectator());
             if(interruption!=null) { finish("cancelled",interruption);return false; }
-            interruption=active.combat.encounterCallbackInterruption(System.nanoTime());
+            interruption=active.combat.encounterCallbackInterruption(System.nanoTime(),phase);
             if(interruption!=null) { finish("failed",interruption);return false; }
         }
         if (!mc.player.isAlive()) { finish("failed", "player_unavailable"); return false; }
@@ -172,7 +186,7 @@ final class ClientActions {
     private static void preTick() {
         Minecraft mc = Minecraft.getInstance();
         NavigationPositionGuard.tick(mc);
-        if (!context(mc)) return;
+        if (!context(mc,"pre_tick")) return;
         try {
             RuntimeAction a = active;
             a.entry.ticks++;
@@ -183,6 +197,15 @@ final class ClientActions {
             if (mc.isPaused()) return;
             switch (a.entry.request.action()) {
                 case "follow_path" -> followPath(mc, a);
+                case "boat_mount", "boat_dismount" -> {
+                    BoundedBoatTransfer.Step step;
+                    try { step = a.transfer.tick(mc); }
+                    catch (RuntimeException failure) { if (active == a) failException(failure); return; }
+                    // An input/mod hook can synchronously cancel or replace this owner.
+                    if (active != a) return;
+                    a.entry.result.addProperty("phase", step.reason());
+                    if (step.terminal() != null) finish(step.terminal(), step.reason());
+                }
                 case "boat_drive" -> {
                     BoundedBoatDrive.Step step = a.boat.tick(mc);
                     a.forward = step.up() ? 1 : step.down() ? -1 : 0;
@@ -209,7 +232,14 @@ final class ClientActions {
 
     private static void input(MovementInputUpdateEvent event) {
         RuntimeAction a = active;
-        if (a == null || event.getEntity() != a.player || !context(Minecraft.getInstance())) return;
+        if (a == null || event.getEntity() != a.player || !context(Minecraft.getInstance(),"movement_input")) return;
+        if (a.transfer != null) {
+            try {
+                String reason = a.transfer.inputRejection(Minecraft.getInstance());
+                if (active != a) return;
+                if (reason != null) { finish("failed", reason); return; }
+            } catch (RuntimeException failure) { if (active == a) failException(failure); return; }
+        }
         Input input = event.getInput();
         a.input = input;
         input.forwardImpulse = a.forward;
@@ -219,12 +249,12 @@ final class ClientActions {
         if (a.boat == null) input.left = input.right = false;
         else { input.left = a.left; input.right = a.right; }
         input.jumping = a.jump;
-        input.shiftKeyDown = a.sneak;
+        input.shiftKeyDown = a.transfer != null ? a.transfer.sneakInput(Minecraft.getInstance()) : a.sneak;
     }
 
     private static void postTick() {
         Minecraft mc = Minecraft.getInstance();
-        if (!context(mc) || mc.isPaused()) return;
+        if (!context(mc,"post_tick") || mc.isPaused()) return;
         try {
             RuntimeAction a = active;
             switch (a.entry.request.action()) {
@@ -466,6 +496,7 @@ final class ClientActions {
             a.input.up = a.input.down = a.input.left = a.input.right = a.input.jumping = a.input.shiftKeyDown = false;
         }
         boolean released = true;
+        if (a.transfer != null) released &= cleanup(a.transfer::release);
         if (a.boat != null) released &= cleanup(() -> a.boat.release(Minecraft.getInstance()));
         if (a.combat != null) released &= cleanup(() -> a.combat.release(Minecraft.getInstance()));
         released &= cleanup(() -> sprint(Minecraft.getInstance(),a,false));
@@ -479,6 +510,7 @@ final class ClientActions {
         // A cleanup failure must not leave a previously published success.
         if(a.combat!=null) a.combat.terminal(released?status:"failed",released?reason:"input_release_unconfirmed");
         ACTIONS.finishAfterCleanup(status, reason, released);
+        EncounterTerminalPause.afterTerminal(a.entry, ACTIONS.session, BridgeServer::pauseEncounterTerminalOnGameThread);
     }
     private static boolean cleanup(Runnable release) {
         try { release.run(); return true; }

@@ -30,7 +30,8 @@ final class BoundedEncounter {
     private CombatRecovery.Motion previousPose;
     private CombatDetour.Point goal;
     private int startTick=-1,lastTick=-1,segments,revocations,clearSamples;
-    private long lastNanos,lastObservationNanos;
+    private long lastNanos,lastObservationNanos,lastCallbackNanos;
+    private String lastCallbackPhase;
     private double travelled;
     private String terminalStatus,terminalReason;
 
@@ -40,6 +41,7 @@ final class BoundedEncounter {
         this.deadline=deadline;this.clock=clock;this.started=clock.getAsLong();this.lastObservationNanos=started;this.healthGuard=healthGuard;
         evidence=new JsonObject();root.add("encounter",evidence);
         evidence.addProperty("encounter_schema_version",1);evidence.addProperty("encounter_mode",EncounterRequest.MODE);
+        if(request.pauseOnTerminal()) evidence.addProperty(EncounterRequest.PAUSE_ON_TERMINAL,true);
         evidence.add("encounter_scope",request.json());evidence.addProperty("offense_disabled",true);
         evidence.addProperty("risk_remaining",true);evidence.addProperty("requires_handoff",true);
         evidence.addProperty("safety_assured",false);evidence.addProperty("danger_radius",CombatThreats.DANGER_RADIUS);
@@ -51,13 +53,33 @@ final class BoundedEncounter {
     }
 
     /** Used by every existing client context callback, including input/post, before replaying a.forward. */
-    String callbackInterruption(long now) {
-        if(now-started<0 || lastTick>=0 && now-lastNanos<0) return "encounter_clock_invalid_risk_remaining";
-        if(now>=deadline) return "deadline_exceeded";
-        if(now-started>=MAX_NANOS) return "retreat_budget_risk_remaining";
-        if(now-Math.min(lastTick<0?started:lastNanos,lastObservationNanos)>CombatThreats.MAX_SNAPSHOT_AGE_NANOS)
-            return "encounter_callback_observation_gap_risk_remaining";
-        return null;
+    String callbackInterruption(long now) { return callbackInterruption(now,"unspecified"); }
+
+    String callbackInterruption(long now,String phase) {
+        String reason=null;
+        if(now-started<0 || lastTick>=0 && now-lastNanos<0) reason="encounter_clock_invalid_risk_remaining";
+        else if(now>=deadline) reason="deadline_exceeded";
+        else if(now-started>=MAX_NANOS) reason="retreat_budget_risk_remaining";
+        else if(now-Math.min(lastTick<0?started:lastNanos,lastObservationNanos)>CombatThreats.MAX_SNAPSHOT_AGE_NANOS)
+            reason="encounter_callback_observation_gap_risk_remaining";
+        // Capture the actual failing clock read, not the last successful tick's elapsed time.
+        // No allocation on successful callbacks and no freshness/budget/ownership changes.
+        if(reason!=null) {
+            JsonObject gap=new JsonObject();
+            gap.addProperty("phase",phase);gap.addProperty("reason",reason);
+            gap.addProperty("now_nanos",now);gap.addProperty("started_nanos",started);
+            gap.addProperty("evaluated_tick",lastTick);
+            gap.addProperty("last_tick_nanos",lastTick<0?null:lastNanos);
+            gap.addProperty("snapshot_captured_nanos",lastTick<0?null:lastObservationNanos);
+            gap.addProperty("observation_age_nanos",now-Math.min(lastTick<0?started:lastNanos,lastObservationNanos));
+            gap.addProperty("max_observation_age_nanos",CombatThreats.MAX_SNAPSHOT_AGE_NANOS);
+            gap.addProperty("previous_callback_nanos",lastCallbackPhase==null?null:lastCallbackNanos);
+            gap.addProperty("previous_callback_phase",lastCallbackPhase);
+            gap.addProperty("callback_interval_nanos",lastCallbackPhase==null?null:now-lastCallbackNanos);
+            evidence.add("callback_interruption",gap);
+        }
+        lastCallbackNanos=now;lastCallbackPhase=phase;
+        return reason;
     }
 
     static String lifecycle(boolean paused,boolean focused,boolean spectator) {
@@ -212,7 +234,7 @@ final class BoundedEncounter {
 
     private Decision checkedDecision(float forward,String status,String reason,CombatRetreatDiagnostics d,JsonObject data,boolean planning) {
         if(d.checkBudget("encounter_decision_return")) return budgetFailure(planning,data,d);
-        String expired=callbackInterruption(clock.getAsLong());
+        String expired=callbackInterruption(clock.getAsLong(),"decision_return");
         if(expired!=null) return fail(expired);
         CombatRetreatEvidence.stamp(data,d);return decision(forward,status,reason,d,data,planning);
     }

@@ -113,3 +113,6 @@ test('status receipt validates supplied encounter evidence without mutation or r
   const h=hooks(r);await assert.rejects(()=>executeClientAction({run_id:'synthetic',operation:'status',expected_action_session:U,action_id:'encounter-1'},h),e=>e.message.startsWith('encounter_receipt')&&!e.message.includes('outcome_unknown'));
   assert.deepEqual(h.calls,['descriptor',{method:'GET',path:'/control/action/status?action_id=encounter-1',body:undefined}]);
 });
+
+// Run terminal-pause codec regressions in the existing portable test command.
+import "./encounter-pause-flag-test.mjs";

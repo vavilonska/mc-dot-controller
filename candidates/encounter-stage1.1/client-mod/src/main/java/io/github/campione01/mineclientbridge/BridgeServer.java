@@ -39,6 +39,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
@@ -108,6 +109,7 @@ public final class BridgeServer {
         HttpServer createdServer = null;
         ExecutorService createdExecutor = null;
         try {
+            RetreatClassInitialization.initialize();
             InetAddress bindAddress = InetAddress.getByName(config.host());
             if (!bindAddress.isLoopbackAddress()) {
                 throw new IOException("MineClient Bridge refuses non-loopback host: " + config.host());
@@ -127,6 +129,7 @@ public final class BridgeServer {
             createdServer.createContext("/control/action", BridgeServer::handleClientAction);
             createdServer.createContext("/control/action/status", BridgeServer::handleClientActionStatus);
             createdServer.createContext("/control/action/cancel", BridgeServer::handleClientActionCancel);
+            createdServer.createContext("/control/pause", BridgeServer::handleEncounterPause);
             createdServer.createContext("/control/key", BridgeServer::handleControlKey);
             createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
             createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
@@ -256,6 +259,7 @@ public final class BridgeServer {
     }
 
     private static void handleControlState(HttpExchange exchange) throws IOException {
+        BridgeReadTiming timing = new BridgeReadTiming();
         if (!requireControlAccess(exchange, "/control/state", "GET")) return;
 
         final double radius;
@@ -267,16 +271,22 @@ public final class BridgeServer {
         }
 
         try {
+            timing.dispatchRequested();
             EndpointResult result = callOnMinecraftThread(
-                    () -> createStateSnapshot(radius),
+                    () -> timing.call(() -> {
+                        Minecraft mc = Minecraft.getInstance();
+                        timing.clientState(mc.getFps(), mc.isWindowActive(), mc.isPaused());
+                        return createStateSnapshot(radius);
+                    }),
                     MINECRAFT_TIMEOUT_SECONDS);
-            respondJson(exchange, result.status(), result.body());
+            respondJson(exchange, result.status(), result.body(), timing);
         } catch (Exception e) {
-            respondMinecraftFailure(exchange, "state_failed", e);
+            respondMinecraftFailure(exchange, "state_failed", e, timing);
         }
     }
 
     private static void handleControlTerrain(HttpExchange exchange) throws IOException {
+        BridgeReadTiming timing = new BridgeReadTiming();
         if (!requireControlAccess(exchange, "/control/terrain", "GET")) return;
         final TerrainQuery query;
         try {
@@ -286,8 +296,11 @@ public final class BridgeServer {
             return;
         }
         try {
+            timing.dispatchRequested();
             EndpointResult result = TERRAIN_DISPATCH.call(
-                    task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)), () -> {
+                    task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)), () -> timing.call(() -> {
+                Minecraft mc = Minecraft.getInstance();
+                timing.clientState(mc.getFps(), mc.isWindowActive(), mc.isPaused());
                 try {
                     JsonObject body = protocolOk();
                     for (var entry : TerrainReader.read(query).entrySet()) body.add(entry.getKey(), entry.getValue());
@@ -295,14 +308,14 @@ public final class BridgeServer {
                 } catch (TerrainScan.Failure e) {
                     return new EndpointResult(e.status, error(e.getMessage()));
                 }
-            }, MINECRAFT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            }), MINECRAFT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (result.status() == 429) exchange.getResponseHeaders().set("Retry-After", "1");
-            respondJson(exchange, result.status(), result.body());
+            respondJson(exchange, result.status(), result.body(), timing);
         } catch (TerrainScan.Failure e) {
             exchange.getResponseHeaders().set("Retry-After", "1");
-            respondJson(exchange, e.status, error(e.getMessage()));
+            respondJson(exchange, e.status, error(e.getMessage()), timing);
         } catch (Exception e) {
-            respondMinecraftFailure(exchange, "terrain_failed", e);
+            respondMinecraftFailure(exchange, "terrain_failed", e, timing);
         }
     }
 
@@ -400,6 +413,59 @@ public final class BridgeServer {
             respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
         }
         respondActionOperation(exchange, () -> ClientActions.cancelId(id, expectedSession), false);
+    }
+
+    private static void handleEncounterPause(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/pause", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final EncounterPause.Request request;
+        try { request = EncounterPause.parse(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> pauseEncounterOnGameThread(request), false);
+    }
+
+    static void requireEncounterPauseAdmission() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null || mc.gameMode == null
+                || !mc.hasSingleplayerServer() || mc.getSingleplayerServer() == null
+                || mc.getSingleplayerServer().isPublished())
+            throw new ClientActionRequest.Rejected(409, "pause_requires_private_singleplayer");
+    }
+
+    static JsonObject pauseEncounterOnGameThread(EncounterPause.Request request) {
+        return pauseEncounterOnGameThread(request,false);
+    }
+
+    static JsonObject pauseEncounterTerminalOnGameThread(EncounterPause.Request request) {
+        return pauseEncounterOnGameThread(request,true);
+    }
+
+    private static JsonObject pauseEncounterOnGameThread(EncounterPause.Request request,boolean originalTerminalHookCall) {
+        return EncounterPause.apply(request, new EncounterPause.Adapter() {
+            final Minecraft mc = Minecraft.getInstance();
+            public EncounterPause.Context context(String actionId) {
+                JsonObject expected = null;
+                try { expected = ClientActions.status(actionId); }
+                catch (ClientActionRequest.Rejected failure) { if (failure.httpStatus != 404) throw failure; }
+                boolean local = mc.player != null && mc.level != null && mc.gameMode != null
+                        && mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null
+                        && !mc.getSingleplayerServer().isPublished();
+                return new EncounterPause.Context(local, ClientActions.session(),
+                        mc.level == null ? null : WorldGeneration.current(mc.level),
+                        mc.player == null ? null : mc.player.getUUID().toString(),
+                        GuardedGameMovement.LEASES.status().ownerRequestId() != null,
+                        mc.screen == null ? null : mc.screen.getClass().getName(),
+                        ClientActions.status(null), expected);
+            }
+            public void openPauseScreen() { mc.pauseGame(false); }
+            public boolean pauseScreenInstalled() { return mc.screen != null && mc.screen.getClass() == PauseScreen.class; }
+            public boolean clientPaused() { return mc.isPaused(); }
+            public void cancelEncounter() { ClientActions.cancel("encounter_paused_risk_remaining"); }
+            public JsonObject action(String actionId) { return ClientActions.status(actionId); }
+        },originalTerminalHookCall);
     }
 
     private static void respondActionOperation(HttpExchange exchange, Callable<JsonObject> operation, boolean start) throws IOException {
@@ -884,6 +950,7 @@ public final class BridgeServer {
         addOperation(operations, "POST", "/control/action", "continuous_client_action");
         addOperation(operations, "GET", "/control/action/status", "client_action_status");
         addOperation(operations, "POST", "/control/action/cancel", "cancel_client_action");
+        addOperation(operations, "POST", "/control/pause", "ensure_bound_encounter_pause_screen");
         addOperation(operations, "POST", "/control/key", "keymap_input");
         addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
         addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
@@ -907,7 +974,21 @@ public final class BridgeServer {
         JsonArray actionNames = new JsonArray();
         ClientActionRequest.ACTIONS.stream().sorted().forEach(actionNames::add);
         actions.add("actions", actionNames);
+        JsonObject boatTransfer = new JsonObject();
+        boatTransfer.addProperty("schema_version", 1);
+        boatTransfer.addProperty("private_singleplayer_only", true);
+        boatTransfer.addProperty("max_sneak_ticks", 10);
+        boatTransfer.addProperty("min_timeout_ms", 1000);
+        boatTransfer.addProperty("max_timeout_ms", 5000);
+        actions.add("boat_transfer", boatTransfer);
         obj.add("client_actions", actions);
+        JsonObject pause = new JsonObject();
+        pause.addProperty("schema_version", 1);
+        pause.addProperty("private_singleplayer_only", true);
+        pause.addProperty("screen_installed_not_pause_proof", true);
+        pause.addProperty("idempotent_non_toggling", true);
+        pause.addProperty("native_terminal_opt_in", EncounterRequest.PAUSE_ON_TERMINAL);
+        obj.add("encounter_pause", pause);
         obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
         obj.addProperty("combat_observation_schema_version", 1);
         JsonObject guarded = new JsonObject();
@@ -2169,29 +2250,39 @@ public final class BridgeServer {
 
     private static void respondMinecraftFailure(HttpExchange exchange, String operationCode, Exception e)
             throws IOException {
+        respondMinecraftFailure(exchange,operationCode,e,null);
+    }
+
+    private static void respondMinecraftFailure(HttpExchange exchange, String operationCode, Exception e,
+                                                BridgeReadTiming timing) throws IOException {
         if (e instanceof TimeoutException) {
             respondJson(exchange, 504, error("minecraft_thread_timeout",
-                    "Minecraft did not complete the operation within the configured timeout"));
+                    "Minecraft did not complete the operation within the configured timeout"), timing);
             return;
         }
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
-            respondJson(exchange, 503, error("request_interrupted"));
+            respondJson(exchange, 503, error("request_interrupted"), timing);
             return;
         }
 
         Throwable cause = e instanceof ExecutionException && e.getCause() != null ? e.getCause() : e;
         if (cause instanceof FrameTooLargeException frameTooLarge) {
-            respondJson(exchange, 500, error("frame_too_large", frameTooLarge.getMessage()));
+            respondJson(exchange, 500, error("frame_too_large", frameTooLarge.getMessage()), timing);
             return;
         }
 
         JsonObject obj = error(operationCode);
         obj.addProperty("detail", exceptionDetail(cause));
-        respondJson(exchange, 500, obj);
+        respondJson(exchange, 500, obj, timing);
     }
 
     private static void respondJson(HttpExchange exchange, int status, JsonObject body) throws IOException {
+        respondJson(exchange,status,body,null);
+    }
+
+    private static void respondJson(HttpExchange exchange, int status, JsonObject body, BridgeReadTiming timing) throws IOException {
+        if(timing!=null) timing.encodingStarted();
         byte[] bytes = BridgeJson.toJson(body).getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_JSON_BYTES) {
             status = 500;
@@ -2199,6 +2290,7 @@ public final class BridgeServer {
                     "JSON response exceeds " + MAX_JSON_BYTES + " bytes"))
                     .getBytes(StandardCharsets.UTF_8);
         }
+        if(timing!=null) { timing.encodingFinished();timing.addHeaders(exchange.getResponseHeaders()); }
         respondBytes(exchange, status, "application/json; charset=utf-8", bytes);
     }
 

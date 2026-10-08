@@ -134,7 +134,7 @@ final class CombatRetreatPolicy {
             if (result.firstWindowRejected()) firstRejected++;
             diagnostics.endCandidate(result);
             if (result.clear()) return finish(goal,result.reason(),candidates,windows,firstRejected,false,rejected,diagnostics);
-            rejected.merge(result.reason(),1,Integer::sum);
+            rejected.put(result.reason(),rejected.getOrDefault(result.reason(),0)+1);
             if (result.budgetExhausted()) return finish(null,result.reason(),candidates,windows,firstRejected,true,rejected,diagnostics);
         }
         return finish(null,"no_safe_retreat_risk_remaining",candidates,windows,firstRejected,false,rejected,diagnostics);
@@ -203,10 +203,14 @@ final class CombatRetreatPolicy {
     }
 
     private static boolean usable(CombatThreats.Snapshot s) {
-        return s!=null && s.known() && !s.truncated() && s.entities().stream().allMatch(e->e!=null && e.valid());
+        if(s==null || !s.known() || s.truncated()) return false;
+        for(var entity:s.entities()) if(entity==null || !entity.valid()) return false;
+        return true;
     }
     private static List<CombatThreats.Observed> dangers(CombatThreats.Snapshot s) {
-        return s.entities().stream().filter(e->e.alive() && e.isDangerous()).toList();
+        var result=new java.util.ArrayList<CombatThreats.Observed>();
+        for(var entity:s.entities()) if(entity.alive() && entity.isDangerous()) result.add(entity);
+        return List.copyOf(result);
     }
     private static CombatThreats.Observed identity(List<CombatThreats.Observed> list,CombatThreats.Observed wanted) {
         for (CombatThreats.Observed e:list) if (e.entityId()==wanted.entityId() && e.uuid().equals(wanted.uuid())) return e;

@@ -1,3 +1,5 @@
+> A later isolated offline extension adds bounded singleplayer `boat_mount` / `boat_dismount` primitives; see [BOAT-TRANSFER.md](BOAT-TRANSFER.md). The historical drive-only scope below is preserved. No live acceptance is claimed.
+
 > Historical phase-one design/test record. The current isolated `1.1.7-boat-passenger.1` candidate adds native passenger geometry and passenger-inclusive clearance. See [passenger admission correction](../client-mod/docs/boat-passenger-admission.md) and the candidate verification summary for current limits/counts. No post-fix live acceptance is claimed.
 
 # Continuous boat drive, phase-one offline candidate

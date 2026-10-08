@@ -8,7 +8,7 @@ export const encounterScopeSchema = {type:'array', minItems:2, maxItems:2, uniqu
     uuid:{type:'string',pattern:UUID.source},type:{type:'string',const:'minecraft:zombie'}},
     required:identityKeys,additionalProperties:false}};
 export const encounterCondition = {
-  if:{anyOf:[{required:['encounter_mode']},{required:['encounter_scope']}]},
+  if:{anyOf:[{required:['encounter_mode']},{required:['encounter_scope']},{required:['encounter_pause_on_terminal']}]},
   then:{required:['encounter_mode','encounter_scope','approach','shield'],
     properties:{approach:{const:false},shield:{const:false},target_type:{const:'minecraft:zombie'}},
     not:{anyOf:['hotbar_slot','jump','sneak','sprint'].map(k=>({required:[k]}))}}
@@ -20,19 +20,35 @@ function sameIdentity(a,b) {return identityKeys.every(k=>a[k]===b[k]);}
 function identity(x) {require(object(x) && Object.keys(x).length===3 && identityKeys.every(k=>Object.hasOwn(x,k)) && integer(x.entity_id) && typeof x.uuid==='string' && UUID.test(x.uuid) && x.type==='minecraft:zombie','encounter_scope_identity_invalid');}
 function scope(x) {require(Array.isArray(x)&&x.length===2,'encounter_scope_requires_two');x.forEach(identity);require(x[0].entity_id!==x[1].entity_id&&x[0].uuid!==x[1].uuid,'encounter_scope_identity_duplicate');}
 export function validateEncounterRequest(body) {
-  if(!Object.hasOwn(body,'encounter_mode')&&!Object.hasOwn(body,'encounter_scope'))return false;
+  if(!['encounter_mode','encounter_scope','encounter_pause_on_terminal'].some(k=>Object.hasOwn(body,k)))return false;
   require(body.action==='combat_entity'&&body.encounter_mode===ENCOUNTER_MODE,'encounter_mode_invalid');
+  if(Object.hasOwn(body,'encounter_pause_on_terminal'))require(typeof body.encounter_pause_on_terminal==='boolean','encounter_pause_on_terminal_requires_boolean');
   require(body.target_type==='minecraft:zombie'&&body.approach===false&&body.shield===false,'encounter_requires_zombie_no_approach_no_shield');
   require(!['hotbar_slot','jump','sneak','sprint'].some(k=>Object.hasOwn(body,k)),'encounter_forbidden_input_field');
   scope(body.encounter_scope);
   require(body.encounter_scope.some(x=>x.entity_id===body.target_entity_id&&x.uuid===body.target_uuid&&x.type===body.target_type),'encounter_scope_target_missing');
   return true;
 }
+function validateTerminalPause(result) {
+  const p=result.encounter_terminal_pause;
+  require(object(p)&&p.hook_schema_version===1&&p.requested===true&&p.attempted===true
+    &&typeof p.pause_call_attempted==='boolean'&&['screen_installed','rejected','unconfirmed'].includes(p.outcome)
+    &&p.pause_effect_confirmed===false&&p.server_confirmed===false,'encounter_receipt_terminal_pause_invalid');
+  for(const k of ['pause_screen_installed','already_pause_screen','client_paused_observed'])
+    require(Object.hasOwn(p,k)&&(p[k]===null||typeof p[k]==='boolean'),'encounter_receipt_terminal_pause_observation_invalid');
+  require(typeof result.input_release_confirmed==='boolean'&&typeof p.input_release_confirmed==='boolean'
+    &&p.input_release_confirmed===result.input_release_confirmed,'encounter_receipt_terminal_pause_release_mismatch');
+  if(p.outcome==='screen_installed')require(p.pause_call_attempted===true&&p.pause_screen_installed===true,'encounter_receipt_terminal_pause_installation_unproved');
+  for(const k of ['error_type','reason'])if(Object.hasOwn(p,k))require(typeof p[k]==='string','encounter_receipt_terminal_pause_diagnostic_invalid');
+}
 export function validateEncounterReceipt(receipt, request) {
   const c=receipt?.result?.combat, e=c?.encounter;
   const expected=request?.encounter_mode===ENCOUNTER_MODE;
   if(!expected&&e===undefined)return;
   require(object(e)&&receipt.action_schema_version===1&&receipt.action==='combat_entity'&&receipt.ok===true&&receipt.server_confirmed===false,'encounter_receipt_missing');
+  // This is the opt-in echo, never proof that a native pause has propagated.
+  if(Object.hasOwn(e,'encounter_pause_on_terminal'))require(typeof e.encounter_pause_on_terminal==='boolean','encounter_receipt_pause_on_terminal_invalid');
+  if(expected)require((e.encounter_pause_on_terminal===true)===(request.encounter_pause_on_terminal===true),'encounter_receipt_pause_on_terminal_mismatch');
   if(expected)require(receipt.result.world_generation===request.expected_world_generation&&receipt.action_session===request.expected_action_session,'encounter_receipt_context_mismatch');
   require(e.encounter_schema_version===1&&e.encounter_mode===ENCOUNTER_MODE,'encounter_receipt_schema_invalid');
   scope(e.encounter_scope);
@@ -45,6 +61,7 @@ export function validateEncounterReceipt(receipt, request) {
   require(integer(e.clearance_observations,0,3)&&e.danger_radius===8&&Object.hasOwn(e,'outcome_scope'),'encounter_receipt_observation_bounds_invalid');
   require(['running','succeeded','failed','cancelled'].includes(receipt.status),'encounter_receipt_status_invalid');
   if(receipt.status==='running'){require(e.outcome_scope===null,'encounter_receipt_premature_outcome');return;}
+  if(e.encounter_pause_on_terminal===true)validateTerminalPause(receipt.result);
   require(e.terminal_status===receipt.status&&e.terminal_reason===receipt.reason&&typeof receipt.reason==='string'&&receipt.reason.length>0,'encounter_receipt_terminal_mismatch');
   if(receipt.status!=='succeeded'){require(e.outcome_scope===null,'encounter_receipt_failure_outcome_invalid');return;}
   require(receipt.reason==='encounter_clearance_observed'&&e.outcome_scope===OUTCOME&&e.clearance_observations===3&&receipt.result.input_release_confirmed===true,'encounter_receipt_success_not_proved');

@@ -12,7 +12,7 @@ class ExpeditionPrerequisitesContractTest {
     }
     @Test void guardIsBeforePathAndInputAndSamplesEvenWhenIdle() throws Exception {
         String s=source("ClientActions.java");
-        assertTrue(s.indexOf("NavigationPositionGuard.tick(mc)")<s.indexOf("if (!context(mc)) return;"));
+        assertTrue(s.indexOf("NavigationPositionGuard.tick(mc)")<s.indexOf("if (!context(mc,\"pre_tick\")) return;"));
         assertTrue(s.contains("NavigationPositionGuard.requireBinding(mc, request)"));
         assertTrue(s.contains("active.navigationEpoch != NavigationPositionGuard.epoch()"));
         assertTrue(s.contains("finish(\"cancelled\", \"position_discontinuity_rebind_required\")"));

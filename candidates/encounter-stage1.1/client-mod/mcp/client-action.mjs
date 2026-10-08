@@ -5,13 +5,18 @@ const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 const identity = ['expected_world_generation', 'expected_player_uuid', 'expected_action_session'];
 const navigation = ['expected_navigation_epoch', 'expected_origin'];
 const common = ['action_id', 'action', 'timeout_ms', ...identity];
+const boatTransferFields = ['boat_transfer_schema_version', 'expected_game_time', 'vehicle_uuid', 'vehicle_entity_id', 'vehicle_type'];
+const isBoatTransfer = action => action==='boat_mount'||action==='boat_dismount';
+const timeoutBounds = action => isBoatTransfer(action)?[1000,5000]:action==='boat_drive'?[1000,120000]:action==='combat_entity'?[50,30000]:[50,600000];
 const fields = {
   follow_path: [...navigation, 'waypoints', 'sprint', 'jump', 'sneak', 'hotbar_slot'],
   break_block: [...navigation, 'target', 'hotbar_slot', 'sneak'],
   place_block: [...navigation, 'support', 'face', 'hotbar_slot', 'jump', 'sneak'],
   click_slot: ['container_id', 'slot', 'button', 'click_type'],
-  combat_entity: [...navigation, 'target_uuid', 'target_entity_id', 'target_type', 'approach', 'shield', 'hotbar_slot', 'encounter_mode', 'encounter_scope'],
-  boat_drive: ['boat_schema_version', 'vehicle_uuid', 'vehicle_entity_id', 'vehicle_type', 'water_surface_y', 'waypoints']
+  combat_entity: [...navigation, 'target_uuid', 'target_entity_id', 'target_type', 'approach', 'shield', 'hotbar_slot', 'encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal'],
+  boat_drive: ['boat_schema_version', 'vehicle_uuid', 'vehicle_entity_id', 'vehicle_type', 'water_surface_y', 'waypoints'],
+  boat_mount: boatTransferFields,
+  boat_dismount: boatTransferFields
 };
 const point = {type: 'object', properties: {x:{type:'number'},y:{type:'number'},z:{type:'number'},jump:{type:'boolean'}}, required:['x','z'], additionalProperties:false};
 const cell = {type:'object',properties:{x:{type:'integer'},y:{type:'integer'},z:{type:'integer'}},required:['x','y','z'],additionalProperties:false};
@@ -28,6 +33,8 @@ const properties = {
   click_type:{type:'string',enum:['pickup','quick_move','swap','throw','pickup_all','quick_craft']},
   target_entity_id:{type:'integer',minimum:0},target_type:{type:'string',enum:['minecraft:zombie','minecraft:husk','minecraft:zombie_villager','minecraft:skeleton','minecraft:stray','minecraft:bogged','minecraft:creeper']},
   encounter_mode:{type:'string',const:ENCOUNTER_MODE}, encounter_scope:encounterScopeSchema,
+  encounter_pause_on_terminal:{type:'boolean',description:'Explicit two-zombie encounter opt-in only. Requests a native pause after terminal cleanup; no realtime or pause-effect guarantee.'},
+  boat_transfer_schema_version:{type:'integer',const:1},expected_game_time:{type:'integer',minimum:0,maximum:Number.MAX_SAFE_INTEGER},
   boat_schema_version:{type:'integer',const:1},vehicle_entity_id:{type:'integer',minimum:0},vehicle_type:{type:'string',const:'minecraft:boat'},water_surface_y:{type:'integer',minimum:-2048,maximum:2048}
 };
 // Keep the top-level tool schema a plain object for strict MCP clients. Nested
@@ -37,12 +44,19 @@ const requiredByAction = {
   follow_path:['waypoints'], break_block:['target'], place_block:['support','face'],
   click_slot:['container_id','slot','button','click_type'],
   combat_entity:['target_uuid','target_entity_id','target_type'],
-  boat_drive:['boat_schema_version','vehicle_uuid','vehicle_entity_id','vehicle_type','water_surface_y','waypoints']
+  boat_drive:['boat_schema_version','vehicle_uuid','vehicle_entity_id','vehicle_type','water_surface_y','waypoints'],
+  boat_mount:boatTransferFields,
+  boat_dismount:boatTransferFields
 };
 const variants = Object.entries(fields).map(([action,extra]) => {
   const p=Object.fromEntries([...common,...extra].map(k=>[k,properties[k]]));
   p.action={type:'string',const:action};
-  p.timeout_ms={type:'integer',minimum:action==='boat_drive'?1000:50,maximum:action==='boat_drive'?120000:action==='combat_entity'?30000:600000};
+  const [minimum,maximum]=timeoutBounds(action);
+  p.timeout_ms={type:'integer',minimum,maximum};
+  if(isBoatTransfer(action)) {
+    p.vehicle_entity_id={type:'integer',minimum:0,maximum:2147483647};
+    for(const key of [...identity,'vehicle_uuid'])p[key]={type:'string',pattern:UUID.source,minLength:36,maxLength:36};
+  }
   if(action==='follow_path') p.waypoints={type:'array',minItems:1,maxItems:512,items:{...point,required:['x','y','z']}};
   if(action==='boat_drive') p.waypoints={type:'array',minItems:1,maxItems:64,items:{type:'object',properties:{x:{type:'number'},z:{type:'number'}},required:['x','z'],additionalProperties:false}};
   return {type:'object',properties:p,required:[...common,...requiredByAction[action]],additionalProperties:false,...(action==='combat_entity'?{allOf:[encounterCondition]}:{})};
@@ -69,12 +83,13 @@ export function parseClientAction(args, validateRunId = x => {require(typeof x==
   }
   require(!Object.hasOwn(args,'action_id'),'action_id_belongs_in_body');
   const b=args.body;require(object(b)&&Object.hasOwn(fields,b.action),'action_unsupported');
-  exact(b,[...common,...fields[b.action]],common);
+  exact(b,[...common,...fields[b.action]],isBoatTransfer(b.action)?[...common,...boatTransferFields]:common);
   require(Buffer.byteLength(JSON.stringify(b),'utf8')<=65536,'action_payload_too_large');
   require(typeof b.action_id==='string'&&ID.test(b.action_id),'action_invalid_id');
   for(const k of identity)uuid(b[k]);require(b.expected_action_session===args.expected_action_session,'action_session_mismatch');
-  number(b.timeout_ms,b.action==='boat_drive'?1000:50,b.action==='boat_drive'?120000:b.action==='combat_entity'?30000:600000,true);
-  for(const k of ['jump','sneak','sprint','approach','shield'])if(Object.hasOwn(b,k))require(typeof b[k]==='boolean','action_invalid_boolean');
+  const [minimum,maximum]=timeoutBounds(b.action);
+  number(b.timeout_ms,minimum,maximum,true);
+  for(const k of ['jump','sneak','sprint','approach','shield','encounter_pause_on_terminal'])if(Object.hasOwn(b,k))require(typeof b[k]==='boolean','action_invalid_boolean');
   if(Object.hasOwn(b,'hotbar_slot'))number(b.hotbar_slot,0,8,true);
   require(Object.hasOwn(b,'expected_navigation_epoch')===Object.hasOwn(b,'expected_origin'),'action_navigation_binding_pair_required');
   if(Object.hasOwn(b,'expected_navigation_epoch')) {number(b.expected_navigation_epoch,0,Number.MAX_SAFE_INTEGER,true);position(b.expected_origin);}
@@ -89,6 +104,11 @@ export function parseClientAction(args, validateRunId = x => {require(typeof x==
   if(b.action==='place_block') {position(b.support,true);require(properties.face.enum.includes(b.face),'action_invalid_face');}
   if(b.action==='combat_entity') {uuid(b.target_uuid);number(b.target_entity_id,0,2147483647,true);require(properties.target_type.enum.includes(b.target_type),'action_unsupported_target');}
   validateEncounterRequest(b);
+  if(isBoatTransfer(b.action)) {
+    require(b.boat_transfer_schema_version===1&&b.vehicle_type==='minecraft:boat','action_invalid_boat_transfer_schema');
+    for(const key of [...identity,'vehicle_uuid']) {uuid(b[key]);require(b[key].length===36,'action_invalid_uuid');}
+    number(b.vehicle_entity_id,0,2147483647,true);number(b.expected_game_time,0,Number.MAX_SAFE_INTEGER,true);
+  }
   if(b.action==='boat_drive') {
     require(b.boat_schema_version===1&&b.vehicle_type==='minecraft:boat','action_invalid_boat_schema');uuid(b.vehicle_uuid);number(b.vehicle_entity_id,0,2147483647,true);number(b.water_surface_y,-2048,2048,true);
     let length=0;for(let i=1;i<b.waypoints.length;i++){const d=Math.hypot(b.waypoints[i].x-b.waypoints[i-1].x,b.waypoints[i].z-b.waypoints[i-1].z);require(d>=.25&&d<=16,'action_invalid_boat_segment');length+=d;}require(length<=256,'action_boat_route_too_long');

@@ -11,7 +11,7 @@ READS = {'/control/status', '/control/capabilities', '/control/state', '/control
          '/control/scan/status'}
 DIRECT = {'key', 'raw-key', 'look', 'mouse', 'text', 'command', 'release-all'}
 WRITES = {'/control/' + x for x in DIRECT} | {
-    '/control/action', '/control/action/cancel', '/control/scan', '/control/scan/cancel'}
+    '/control/action', '/control/action/cancel', '/control/scan', '/control/scan/cancel', '/control/pause'}
 
 
 class BridgeError(RuntimeError):
@@ -22,6 +22,54 @@ class BridgeError(RuntimeError):
 
 def json_bytes(value):
     return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode()
+
+
+def read_server_timing(response):
+    """Reported native phase offsets; never used as freshness or retry authority."""
+    getter = getattr(response, 'getheader', None)
+    if not callable(getter):
+        return None
+    try:
+        version = getter('X-MDC-Read-Timing-Version')
+        if version is None:
+            return None
+        if version != '1':
+            return {'status': 'unsupported_version'}
+        phases = ('Dispatch', 'Client-Start', 'Client-End', 'Encode-Start', 'Encode-End')
+        offsets = {}
+        for phase in phases:
+            value = getter('X-MDC-' + phase + '-Offset-Nanos')
+            if value is None:
+                continue
+            if not isinstance(value, str) or re.fullmatch(r'[0-9]{1,19}', value) is None or int(value) > 2**63-1:
+                return {'status': 'invalid_offset'}
+            offsets[phase.lower().replace('-', '_')] = int(value)
+        sequence = list(offsets.values())
+        if any(a > b for a, b in zip(sequence, sequence[1:])):
+            return {'status': 'invalid_order'}
+        reported = getter('X-MDC-Read-Timing-Status')
+        if reported not in ('complete', 'partial') or (reported == 'complete' and len(offsets) != 5):
+            return {'status': 'invalid_completeness'}
+        def interval(first, last):
+            return None if first not in offsets or last not in offsets else (offsets[last] - offsets[first]) / 1_000_000
+        result = {'schema_version': 1, 'status': 'reported_' + reported,
+            'clock': 'java_system_nano_time', 'origin': 'http_handler_entry_not_socket_arrival',
+            'offsets_ns': offsets, 'dispatch_to_client_operation_ms': interval('dispatch', 'client_start'),
+            'client_operation_ms': interval('client_start', 'client_end'),
+            'client_end_to_encoding_ms': interval('client_end', 'encode_start'),
+            'json_encoding_ms': interval('encode_start', 'encode_end'),
+            'through_encoding_ms': offsets.get('encode_end', 0) / 1_000_000 if 'encode_end' in offsets else None,
+            'includes_socket_write_or_transport': False}
+        fps = getter('X-MDC-Client-Fps')
+        if isinstance(fps, str) and re.fullmatch(r'[0-9]{1,6}', fps):
+            result['client_reported_fps'] = int(fps)
+        for name in ('Focused', 'Paused'):
+            value = getter('X-MDC-Client-' + name)
+            if value in ('true', 'false'):
+                result['client_' + name.lower()] = value == 'true'
+        return result
+    except Exception:
+        return {'status': 'header_read_failed'}
 
 
 class Bridge:
@@ -62,6 +110,9 @@ class Bridge:
             conn.request(method, path, body=payload, headers=headers)
             response = conn.getresponse()
             self.last_response_metadata['http_status'] = response.status
+            timing = read_server_timing(response)
+            if timing is not None:
+                self.last_response_metadata['server_timing'] = timing
             is_frame = route.path == '/control/frame'
             bound = 32 * 1024 * 1024 if is_frame else 256 * 1024
             raw = response.read(bound + 1)

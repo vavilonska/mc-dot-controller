@@ -94,6 +94,35 @@ def sample(binding, native=None):
 
 
 class SafetyTests(unittest.TestCase):
+    def test_observe_accepts_only_the_exact_queued_owner_before_native_start(self):
+        self.queue.current['action'].update(status='idle', action_id=None)
+        self.queue.session_data.update(pending=1, pending_request_ids=[self.b.request_id])
+        result=self.s._observe(self.base, 'queued-owner', self.b, owner=self.b.request_id)
+        self.assertIsNone(result['action']['action_id'])
+        self.assertEqual(self.queue.mutations(), [])
+        self.assertEqual(len(list(self.base.glob('queued-owner-*.session-after.json'))), 1)
+
+    def test_foreign_missing_duplicate_and_ownerless_pending_remain_blocked(self):
+        for ids in (None, [], ['foreign'], [self.b.request_id, 'foreign']):
+            with self.subTest(ids=ids):
+                self.queue.session_data.update(pending=1, pending_request_ids=ids)
+                with self.assertRaisesRegex(SafetyHalt, 'active_pending'):
+                    self.s._session(self.b.request_id)
+        self.queue.session_data.update(pending=1, pending_request_ids=[self.b.request_id])
+        with self.assertRaisesRegex(SafetyHalt, 'active_pending'):
+            self.s._session()
+        self.queue.session_data['active_request_id']=self.b.request_id
+        with self.assertRaisesRegex(SafetyHalt, 'active_pending'):
+            self.s._session(self.b.request_id)
+
+    def test_rejected_session_is_saved_before_observation_submission(self):
+        self.queue.session_data.update(pending=1)
+        with self.assertRaisesRegex(SafetyHalt, 'active_pending'):
+            self.s._observe(self.base, 'rejected-session', self.b, owner=self.b.request_id)
+        path=next(self.base.glob('rejected-session-*.session-before.json'))
+        self.assertEqual(json.loads(path.read_text())['session'], self.queue.session_data)
+        self.assertFalse(any(c[0]=='submit' for c in self.queue.calls))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.base = Path(self.tmp.name)
@@ -190,6 +219,68 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual(result['resolved_outcome']['kind'], 'admission_rejected')
         cleanup = self.s.cleanup_uuid(self.es[0]['uuid'], 'authorization')
         self.assertTrue(cleanup['effect_confirmed']); self.assertFalse(cleanup['combat_success'])
+    def test_terminal_sample_conflicts_with_null_admission(self):
+        self.register()
+        with self.assertRaisesRegex(SafetyHalt, 'unknown_or_release'):
+            self.record(response=rejection(self.b), after=sample(self.b),
+                samples=[{'observation': sample(self.b, self.native)}])
+        resolution = json.loads((self.case() / 'trial-resolution.json').read_text())
+        self.assertEqual(resolution['resolved_outcome']['kind'], 'receipt_conflict')
+        self.assertFalse(resolution['narrow_safety_eligible'])
+        with self.assertRaises(SafetyHalt): self.s.cleanup_uuid(self.es[0]['uuid'], 'cleanup')
+        with self.assertRaises(SafetyHalt): self.s.pause_once('pause')
+        self.assertEqual(self.queue.mutations(), [])
+    def test_conflicting_terminal_sample_blocks_closeout(self):
+        self.register(); changed = copy.deepcopy(self.native); changed['ticks'] += 1
+        with self.assertRaisesRegex(SafetyHalt, 'unknown_or_release'):
+            self.record(samples=[{'observation': sample(self.b, changed)}])
+        self.assertTrue((self.case() / 'SAFETY-STOP.json').exists())
+        self.assertEqual(self.queue.mutations(), [])
+    def test_matching_terminal_sample_preserves_closeout(self):
+        self.register()
+        result = self.record(samples=[{'observation': sample(self.b, self.native)}])
+        self.assertTrue(result['narrow_safety_eligible'])
+        self.assertTrue(self.s.cleanup_uuid(self.es[0]['uuid'], 'cleanup')['effect_confirmed'])
+    def test_terminal_sample_does_not_resolve_unknown_response(self):
+        self.register()
+        with self.assertRaisesRegex(SafetyHalt, 'unknown_or_release'):
+            self.record(response=receipt(self.b, self.native, status='uncertain'),
+                samples=[{'observation': sample(self.b, self.native)}])
+        resolution = json.loads((self.case() / 'trial-resolution.json').read_text())
+        self.assertEqual(resolution['resolved_outcome']['kind'], 'unknown_post_outcome')
+        self.assertFalse(resolution['narrow_safety_eligible'])
+        self.assertEqual(self.queue.mutations(), [])
+    def test_unrelated_retained_terminal_sample_is_not_admission(self):
+        self.register()
+        result = self.record(response=rejection(self.b), after=sample(self.b),
+            samples=[{'observation': sample(self.b)}])
+        self.assertEqual(result['resolved_outcome']['kind'], 'admission_rejected')
+        self.assertTrue(result['narrow_safety_eligible'])
+    def rewrite_saved_samples(self, samples):
+        # Simulate an old-version ledger that hashed but ignored these samples.
+        report_path = self.o.out / 'one.json'
+        report = json.loads(report_path.read_text()); report['samples'] = samples
+        report_path.write_text(json.dumps(report))
+        path = self.case() / 'trial-resolution.json'; record = json.loads(path.read_text())
+        record['original_report'] = report
+        record['original_report_sha256'] = hashlib.sha256(report_path.read_bytes()).hexdigest()
+        path.write_text(json.dumps(record))
+        Path(str(path) + '.sha256').write_text(hashlib.sha256(path.read_bytes()).hexdigest())
+    def test_reopened_null_ledger_rechecks_terminal_samples(self):
+        self.register(); self.record(response=rejection(self.b), after=sample(self.b))
+        self.rewrite_saved_samples([{'observation': sample(self.b, self.native)}])
+        reopened = PostTrialSafety(self.o, self.s.root)
+        with self.assertRaisesRegex(SafetyHalt, 'main_trial_not_safe'):
+            reopened.cleanup_uuid(self.es[0]['uuid'], 'cleanup')
+        with self.assertRaises(SafetyHalt): reopened.pause_once('pause')
+        self.assertEqual(self.queue.mutations(), [])
+    def test_reopened_terminal_ledger_rechecks_terminal_samples(self):
+        self.ready(); changed = copy.deepcopy(self.native); changed['ticks'] += 1
+        self.rewrite_saved_samples([{'observation': sample(self.b, changed)}])
+        reopened = PostTrialSafety(self.o, self.s.root)
+        with self.assertRaisesRegex(SafetyHalt, 'main_trial_not_safe'):
+            reopened.cleanup_uuid(self.es[0]['uuid'], 'cleanup')
+        self.assertEqual(self.queue.mutations(), [])
     def test_binding_rejection_without_explicit_null_is_not_allowed(self):
         self.register()
         response = receipt(self.b, reason='action_world_changed', status='failed')

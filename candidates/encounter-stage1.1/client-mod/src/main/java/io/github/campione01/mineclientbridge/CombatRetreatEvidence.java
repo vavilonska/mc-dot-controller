@@ -8,6 +8,7 @@ final class CombatRetreatEvidence {
     static void append(JsonObject target,CombatRetreatDiagnostics diagnostics,CombatRetreatWindow.Metrics metrics,
                        CombatCellCache cells,TerrainReader.ReadMetrics reads) {
         target.addProperty("diagnostics_schema_version",1);
+        target.addProperty("planning_budget_ns",CombatRetreatPolicy.MAX_CHECK_NANOS);
         target.addProperty("timing_scope","invocation_wall_time_cooperative_boundaries_not_hard_realtime");
         target.addProperty("candidate_scope","window_validation_before_final_publication_gates");
         target.addProperty("pre_first_window_elapsed_ns",diagnostics.preFirstWindowElapsedNanos());

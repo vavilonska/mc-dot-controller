@@ -45,6 +45,17 @@ class FakeBridge:
 
 
 class ControllerChecks(unittest.TestCase):
+    def test_published_pending_identity_matches_mailbox_before_task_launch(self):
+        rid=self.client.submit({'op':'action','action':'break_block','target':{'x':1,'y':64,'z':2}})
+        self.resident.pending.append({'request_id':rid})
+        self.resident.publish()
+        session=self.client.session()
+        self.assertEqual(session['pending'],1)
+        self.assertEqual(session['pending_request_ids'],[rid])
+        self.assertIsNone(session['active_request_id'])
+        self.resident.pending.clear()
+        self.resident.publish()
+        self.assertEqual(self.client.session()['pending_request_ids'],[])
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.bridge = FakeBridge()

@@ -126,7 +126,19 @@ class CombatRetreatDiagnosticsTest {
         assertEquals(1,metrics.calls(CombatRetreatWindow.Stage.ENVELOPE));
         assertEquals(4,metrics.calls(CombatRetreatWindow.Stage.ENVELOPE_TERRAIN));
         assertEquals(2,metrics.nanos(CombatRetreatWindow.Stage.THREAT_ROUTES));
-        assertEquals(17,metrics.nanos(CombatRetreatWindow.Stage.ENVELOPE));assertFalse(metrics.clockInvalid);
+        assertTrue(metrics.nanos(CombatRetreatWindow.Stage.ENVELOPE) > metrics.nanos(CombatRetreatWindow.Stage.ENVELOPE_TERRAIN));
+        assertEquals(1,metrics.calls(CombatRetreatWindow.Stage.WINDOW_TOTAL));
+        assertTrue(metrics.calls(CombatRetreatWindow.Stage.TERRAIN_CELL_READ)>0);
+        assertFalse(metrics.clockInvalid);
+    }
+    @Test void cellReadTimingIncludesExceptionsWithoutChangingRejection() {
+        AtomicLong clock=new AtomicLong();var metrics=new CombatRetreatWindow.Metrics(clock::get);
+        var result=window((x,y,z)->{clock.addAndGet(100);throw new IllegalStateException();},List.of(),metrics);
+        assertEquals("cell_read_failed",result.edge().reason());
+        assertEquals(1,metrics.calls(CombatRetreatWindow.Stage.TERRAIN_CELL_READ));
+        assertEquals(100,metrics.nanos(CombatRetreatWindow.Stage.TERRAIN_CELL_READ));
+        assertEquals(100,metrics.nanos(CombatRetreatWindow.Stage.WINDOW_TOTAL));
+        assertEquals(0,metrics.calls(CombatRetreatWindow.Stage.ENVELOPE));
     }
     @Test void terrainAndDynamicEarlyExitsDoNotInventLaterWork() {
         var terrain=new CombatRetreatWindow.Metrics(()->0);

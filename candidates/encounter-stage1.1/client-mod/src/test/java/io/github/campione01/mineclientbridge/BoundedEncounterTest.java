@@ -75,6 +75,42 @@ class BoundedEncounterTest {
         assertNull(f.owner.callbackInterruption(1_146_000_000L));
         assertEquals("encounter_callback_observation_gap_risk_remaining",f.owner.callbackInterruption(1_146_000_001L));
     }
+    @Test void callbackGapEvidenceDistinguishesCallbackDelayFromSnapshotAge() {
+        var f=new Fixture();f.age=4_000_000;f.tick(0,0,pair(3));
+        assertFalse(f.e().has("callback_interruption"));
+        assertNull(f.owner.callbackInterruption(1_146_000_000L,"movement_input"));
+        assertFalse(f.e().has("callback_interruption"));
+        assertEquals("encounter_callback_observation_gap_risk_remaining",
+                f.owner.callbackInterruption(1_146_000_001L,"post_tick"));
+        var e=f.e().getAsJsonObject("callback_interruption");
+        assertEquals("post_tick",e.get("phase").getAsString());
+        assertEquals(1_146_000_001L,e.get("now_nanos").getAsLong());
+        assertEquals(1_000_000_000L,e.get("last_tick_nanos").getAsLong());
+        assertEquals(996_000_000L,e.get("snapshot_captured_nanos").getAsLong());
+        assertEquals(150_000_001L,e.get("observation_age_nanos").getAsLong());
+        assertEquals(150_000_000L,e.get("max_observation_age_nanos").getAsLong());
+        assertEquals(1L,e.get("callback_interval_nanos").getAsLong());
+        assertEquals("movement_input",e.get("previous_callback_phase").getAsString());
+        assertEquals(0,e.get("evaluated_tick").getAsInt());
+    }
+    @Test void firstCallbackGapRetainsMissingPriorCallbackAndMissingTick() {
+        var f=new Fixture();
+        assertEquals("encounter_callback_observation_gap_risk_remaining",
+                f.owner.callbackInterruption(1_150_000_001L,"pre_tick"));
+        var e=f.e().getAsJsonObject("callback_interruption");
+        assertTrue(e.get("previous_callback_nanos").isJsonNull());
+        assertTrue(e.get("callback_interval_nanos").isJsonNull());
+        assertTrue(e.get("last_tick_nanos").isJsonNull());
+        assertTrue(e.get("snapshot_captured_nanos").isJsonNull());
+        assertEquals(-1,e.get("evaluated_tick").getAsInt());
+        assertEquals(150_000_001L,e.get("observation_age_nanos").getAsLong());
+    }
+    @Test void callbackEvidencePreservesClockAndDeadlinePriority() {
+        var f=new Fixture(1_150_000_000L);
+        assertEquals("encounter_clock_invalid_risk_remaining",f.owner.callbackInterruption(999_999_999L,"pre_tick"));
+        assertEquals("deadline_exceeded",f.owner.callbackInterruption(1_150_000_001L,"pre_tick"));
+        assertEquals("deadline_exceeded",f.e().getAsJsonObject("callback_interruption").get("reason").getAsString());
+    }
     @Test void currentTerminalEvidenceZerosMovementAndRemovesHistoricalGoal() {
         var f=new Fixture();f.tick(0,0,pair(3));assertTrue(f.e().has("goal"));
         f.owner.terminal("cancelled","cancel_requested");

@@ -8,22 +8,30 @@ import java.util.ArrayList;
 import java.util.UUID;
 
 /** Explicit opt-in; no acquisition, automatic replay, or permission expansion of the old API. */
-record EncounterRequest(List<Identity> scope) {
+record EncounterRequest(List<Identity> scope, boolean pauseOnTerminal) {
     static final String MODE="two_zombie_retreat_v1";
+    static final String PAUSE_ON_TERMINAL="encounter_pause_on_terminal";
     static final String ENABLE_PROPERTY="mineclientBridge.encounterRetreatStage1Enabled";
     record Identity(int entityId,String uuid,String type) {
         boolean matches(CombatThreats.Observed e) { return e.entityId()==entityId && e.uuid().equals(uuid) && e.type().equals(type); }
     }
     EncounterRequest { scope=List.copyOf(scope); }
+    EncounterRequest(List<Identity> scope) { this(scope,false); }
+    static boolean pauseRequested(JsonObject body) {
+        if(!body.has(PAUSE_ON_TERMINAL)) return false;
+        ClientActionRequest.require(body.has("encounter_mode"),"encounter_pause_requires_mode");
+        return ClientActionRequest.bool(body,PAUSE_ON_TERMINAL,false);
+    }
     static boolean runtimeEnabled() { return Boolean.getBoolean(ENABLE_PROPERTY); }
     static EncounterRequest parseOptional(JsonObject body) {
+        boolean pause=pauseRequested(body);
         if(!body.has("encounter_mode")) {
             ClientActionRequest.require(!body.has("encounter_scope"),"encounter_scope_requires_mode");return null;
         }
         ClientActionRequest.require(ClientActionRequest.string(body,"encounter_mode").equals(MODE),"encounter_mode_unsupported");
         var allowed=java.util.Set.of("action","action_id","timeout_ms","expected_world_generation","expected_player_uuid",
                 "expected_action_session","expected_origin","expected_navigation_epoch","target_uuid","target_entity_id",
-                "target_type","approach","shield","encounter_mode","encounter_scope");
+                "target_type","approach","shield","encounter_mode","encounter_scope",PAUSE_ON_TERMINAL);
         ClientActionRequest.require(allowed.containsAll(body.keySet()),"encounter_unknown_fields");
         ClientActionRequest.require(body.has("approach") && !ClientActionRequest.bool(body,"approach",true)
                 && body.has("shield") && !ClientActionRequest.bool(body,"shield",true),"encounter_offense_and_shield_must_be_disabled");
@@ -56,7 +64,7 @@ record EncounterRequest(List<Identity> scope) {
         ClientActionRequest.require(scope.stream().anyMatch(i->i.entityId()==ClientActionRequest.integer(body,"target_entity_id",-1)
                 && i.uuid().equals(ClientActionRequest.string(body,"target_uuid"))
                 && i.type().equals(ClientActionRequest.string(body,"target_type"))),"encounter_target_outside_scope");
-        return new EncounterRequest(scope);
+        return new EncounterRequest(scope,pause);
     }
     private static void requireNumber(JsonObject object,String key,double limit,boolean epoch) {
         var value=object.get(key);

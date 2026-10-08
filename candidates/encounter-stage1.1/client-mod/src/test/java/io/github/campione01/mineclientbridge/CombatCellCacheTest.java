@@ -5,6 +5,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CombatCellCacheTest {
+    @Test void hashCollisionDoesNotAliasLoadedAndNullCells() {
+        AtomicInteger actual=new AtomicInteger();
+        var loaded=new FlatStepCorridor.Cell(FlatStepCorridor.Availability.LOADED,"minecraft:air",true,true,false,"minecraft:empty",false);
+        var cache=new CombatCellCache((x,y,z)->{actual.incrementAndGet();return y==1?loaded:null;});
+        // Record keys (0,1,0) and (0,0,31) share a hash, but not an identity.
+        assertSame(loaded,cache.read(0,1,0));assertNull(cache.read(0,0,31));
+        assertSame(loaded,cache.read(0,1,0));assertNull(cache.read(0,0,31));
+        assertEquals(2,actual.get());assertEquals(2,cache.hits);assertEquals(2,cache.misses);
+    }
     @Test void nullAndUnknownEntriesAreStillHits() {
         AtomicInteger actual=new AtomicInteger();
         var cache=new CombatCellCache((x,y,z)->{actual.incrementAndGet();return null;});

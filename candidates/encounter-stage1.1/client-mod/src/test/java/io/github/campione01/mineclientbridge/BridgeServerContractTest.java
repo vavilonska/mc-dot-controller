@@ -10,12 +10,30 @@ import org.junit.jupiter.api.Test;
 
 class BridgeServerContractTest {
     @Test
+    void pauseRouteIsAuthenticatedAndNonTogglingWithExplicitCapabilityLimits() throws Exception {
+        Path project = Path.of(System.getProperty("mineclientBridge.projectDir"));
+        String source = Files.readString(project.resolve("src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java"));
+        String route = source.substring(source.indexOf("private static void handleEncounterPause"),
+                source.indexOf("private static void respondActionOperation"));
+        assertTrue(route.contains("requireControlAccess(exchange, \"/control/pause\", \"POST\")"));
+        assertTrue(route.contains("respondActionOperation(exchange"));
+        assertTrue(route.contains("mc.pauseGame(false)"));
+        assertTrue(route.contains("!mc.getSingleplayerServer().isPublished()"));
+        assertTrue(route.contains("ClientActions.cancel(\"encounter_paused_risk_remaining\")"));
+        assertFalse(route.contains("directTakeover"));
+        assertFalse(route.contains("key.keyboard.escape"));
+        assertFalse(route.contains("setScreen(null)"));
+        assertTrue(source.contains("actions.add(\"boat_transfer\", boatTransfer)"));
+        assertTrue(source.contains("pause.addProperty(\"screen_installed_not_pause_proof\", true)"));
+    }
+
+    @Test
     void sourceKeepsTheBoundedAuthenticatedControlSurface() throws Exception {
         Path project = Path.of(System.getProperty("mineclientBridge.projectDir"));
         String source = Files.readString(project.resolve(
                 "src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java"));
 
-        assertEquals(24, occurrences(source, "createContext(\"/control/"));
+        assertEquals(25, occurrences(source, "createContext(\"/control/"));
         assertTrue(source.contains("MAX_BODY_BYTES = 64 * 1024"));
         assertTrue(source.contains("MAX_JSON_BYTES = 256 * 1024"));
         assertTrue(source.contains("MAX_FRAME_BYTES = 32 * 1024 * 1024"));
