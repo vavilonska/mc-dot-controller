@@ -1,0 +1,41 @@
+# Isolated retreat budget observations
+
+This candidate changes observations, not retreat geometry or admission thresholds. It has **zero post-patch live executions**, and has not been deployed. Offline helper timings cannot establish Minecraft latency, the cause of historical R/R2 budget exhaustion, or the existence of an escape route.
+
+## Deadline and safety
+
+`CombatRetreatPolicy.MAX_CHECK_NANOS` remains **8,000,000 ns**, with rejection at equality. One monotonic wall-clock interval covers the entire invocation. The deadline is never restarted per candidate/window, and timing/counter overhead is never subtracted. The diagnostic arrays are allocated after the initial timestamp. The production stage collector is allocated lazily inside the first window. Existing public-package record constructor forms and original `plan`, `validate`, and `check` signatures remain supported.
+
+The policy checks before candidates, before windows, immediately before callbacks, after callback/cell-observer recording, and after candidate aggregation/map copying. `BoundedCombat` additionally checks the same original deadline after JSON construction, during plan publication, and before and after the final movement-facing operation, and after the tick's remaining decision-motion/pose JSON before returning its Step. A detected expiry or clock regression can only revoke a result. Clock supplier failures, callback exceptions, null callback results, rejected-cell observer failures, and stage-clock regressions are fail-closed. Rejected-cell observer failure preserves the actual returned window result while refusing the enclosing validation.
+
+These are **cooperative boundaries**, not a hard-real-time guarantee. A native collision hook, synchronous callback, allocation, JSON write, scheduler pause, or final check-to-return/input interval cannot be preempted by this code. The small final timestamp stamp necessarily occurs after its sampled boundary. Existing `ClientActions` phase JSON and input scheduling also occur after the cooperative `BoundedCombat` tick-decision-return gate; these existing caller operations are not claimed to be bounded by this patch. Stage names refer to decision return, not actual input dispatch. No claim is made that callbacks, complete decisions, or actual inputs execute in less than 8 ms. Added aggregate serialization happens before the final decision gates, rather than outside an otherwise successful admission budget.
+
+The 0.65-block windows, full 0.65 short-tail motion probe, 0.1 clearance improvement, every-threat route conditions, freshness checks, dynamic body geometry, center corridor, four translated envelope corridors, per-tick refresh, movement/progress/identity gates, and zero-forward failure returns remain. No route calculation or corridor check was deduplicated in this candidate.
+
+## Diagnostic schema
+
+`retreat_window_schema_version` is 2. Both `retreat_plan` and `retreat_live_validation` add `diagnostics_schema_version: 1`:
+
+- `plan_elapsed_ns`: elapsed through `elapsed_through_stage`, the most recently sampled deadline boundary. The name is retained for both plan and live-validation records; each is its own invocation, not the whole combat tick or action.
+- `pre_first_window_elapsed_ns`: invocation start to the boundary immediately before the first callback. `-1` means no callback was invoked. The tiny entry bookkeeping after that sample is included in the window interval.
+- `last_window_elapsed_ns` and `total_window_elapsed_ns`: respectively the last and sum of all invoked window intervals. Each interval includes the callback and optional rejected-cell observer, ending at the sample before adding its bounded window record. This is **not** pure terrain time. `last_window_elapsed_ns` is `-1` when no window was invoked.
+- `budget_check_stage`: first stage detecting expiry or invalid clock; `none` if none did. `elapsed_through_stage` reports the latest boundary, even when a prior budget rejection remains latched. `clock_invalid` marks clock regression/failure independently.
+- `candidates`: at most 16 records of candidate index, actual invoked window count, elapsed, clear/reason and budget status. These describe that candidate's **window validation before later publication/serialization gates**. Thus a clear candidate may still have an enclosing final budget rejection.
+- `windows`: at most 16 × 7 records, indexed by candidate/window. `returned` means the callback returned normally, including a null return. `result_present` requires a normally returned, non-null result. The clear/reason fields retain the actual original return; null windows are unknown, and exceptions carry a synthesized refusal with `returned: false`. Cell-observer exceptions do not replace the returned window result.
+- `last_window_result_before_budget`: the same last invoked window record, including `clear`, `reason`, and `rejected_cell` when observed. It is present whether or not budget eventually wins. In particular, a `feet_collision` cell is retained when the post-window check returns `retreat_check_budget`. A successfully clear window followed by expiry remains visibly clear here while the enclosing plan refuses.
+
+Candidate window counts sum to `window_checks`; window durations sum to `total_window_elapsed_ns`. Existing `first_window_rejections` retains its historical semantics: budget interruption on/before the first window can count, so it is not evidence that a geometric safety check rejected the first window. Top-level `reason` and `budget_exhausted` reflect later production serialization/publication rejection as well. Candidate records and original window records do not retroactively claim that a window failed geometrically.
+
+## Aggregate work counters
+
+`window_stages` has scope `this_plan_or_validation`. Counts measure actual stage entries, including an entry that throws or returns a refusal. `THREAT_ROUTES` includes both the route endpoint and full-distance motion probe. `DYNAMIC_OBSTACLES` includes center plus envelope bodies. `CENTER_TERRAIN` is the center sweep; `ENVELOPE` includes all envelope work; `ENVELOPE_TERRAIN` counts its terrain sweeps. A completely clear window therefore has 2, 5, 1, 1, and 4 calls respectively. Early exits have only the stages they actually reached. Envelope times overlap their nested dynamic/terrain times and must not be summed as independent costs.
+
+`cell_cache` and `terrain_reads` explicitly have scope `captured_tick_cumulative`. They may include other checks before retreat in the same tick and cannot be attributed to a single window. `CombatCellCache` preserves the existing 1,024-entry, no-eviction, per-tick cache and caches null/unknown entries. Requests equal hits plus misses. Misses include capacity refusal and source exceptions; `capacity_rejections` and `read_failures` distinguish those cases. A failed read is not cached, just as before. A new captured tick constructs a new cache and read-metrics collector.
+
+Terrain read counters are primitive accumulators supplied by `TerrainReader.ReadMetrics`. Actual block-state/fluid and chunk-fetch attempts count immediately before calls, including throwing calls. Shape-context counts include denied state/fluid access attempts. `metadata_preflight_ns` covers registry/air metadata and retained property preflight work, including failures. Collision timers contain nested context/state work and overlap other terrain timing aggregates. These read counters are not estimates derived from logical corridor calls.
+
+There is no per-Cell JSON generation or logging in the Cell cache or observation path. JSON construction happens once at bounded decision-output boundaries. Diagnostic counters do not change cache admission or source results.
+
+## Offline regression evidence
+
+New regressions cover original failed/successful windows followed by exact-boundary expiry, pre-candidate/pre-window expiry, callback-entry expiry, final aggregation expiry, null/exception/clock failures, observer failure preservation, count/duration sums, stage entry/early-exit behavior, and cache capacity/null/exception/tick behavior. Existing short-tail velocity, opposing/moving threats, progress, envelope, and release/risk contracts still execute. Tests run against production helpers; they are not a Minecraft simulation or live safety acceptance.

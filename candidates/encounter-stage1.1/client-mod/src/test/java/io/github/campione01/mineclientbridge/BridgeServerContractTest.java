@@ -1,0 +1,104 @@
+package io.github.campione01.mineclientbridge;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+
+class BridgeServerContractTest {
+    @Test
+    void sourceKeepsTheBoundedAuthenticatedControlSurface() throws Exception {
+        Path project = Path.of(System.getProperty("mineclientBridge.projectDir"));
+        String source = Files.readString(project.resolve(
+                "src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java"));
+
+        assertEquals(24, occurrences(source, "createContext(\"/control/"));
+        assertTrue(source.contains("MAX_BODY_BYTES = 64 * 1024"));
+        assertTrue(source.contains("MAX_JSON_BYTES = 256 * 1024"));
+        assertTrue(source.contains("MAX_FRAME_BYTES = 32 * 1024 * 1024"));
+        assertTrue(source.contains("remoteAddress.isLoopbackAddress()"));
+        assertTrue(source.contains("BridgeSecurity.bearerMatches"));
+        assertTrue(source.contains("createContext(\"/control/command\""));
+        assertTrue(source.contains("mc.getConnection().sendCommand(command)"));
+        assertTrue(source.contains("createContext(\"/control/raw-key\""));
+        assertTrue(source.contains("mc.keyboardHandler.keyPress"));
+        assertTrue(source.contains("HELD_RAW_KEYS"));
+        assertEquals(4, occurrences(source, "releaseAllInputs();"));
+        assertTrue(source.contains("Input cleanup must run on the Minecraft thread"));
+        assertTrue(source.contains("MAX_COMMAND_LENGTH = 256"));
+        assertTrue(source.contains("command = command.substring(1).stripLeading()"));
+        assertTrue(source.contains("command.length() > MAX_COMMAND_LENGTH"));
+        assertTrue(source.contains("ClientHooks.onMouseScroll"));
+        assertTrue(source.contains("HELD_WORLD_MOUSE_BUTTONS"));
+        assertTrue(source.contains("HELD_WORLD_MOUSE_BUTTONS.contains(button) && action.equals(\"down\")"));
+        assertTrue(source.contains("obj.addProperty(\"screen_transition\", true)"));
+        assertTrue(source.contains("if (HELD_WORLD_MOUSE_BUTTONS.add(button))"));
+        assertTrue(source.contains("dispatchWorldMouseButton(mc, button, GLFW.GLFW_PRESS)"));
+        assertTrue(source.contains("case \"up\", \"release\" -> {"));
+        assertTrue(source.contains("if (releaseHeldWorldMouseButton(mc, button, observed))"));
+        assertTrue(source.contains("for (int button : worldMouseButtons)"));
+        assertTrue(source.contains("releaseHeldWorldMouseButton(mc, button, new ArrayList<>());"));
+        assertTrue(source.contains("dispatchWorldMouseButton(mc, button, GLFW.GLFW_RELEASE)"));
+        assertTrue(source.contains("mc.mouseHandler.isLeftPressed = false"));
+        assertTrue(source.contains("mc.mouseHandler.isRightPressed = false"));
+        assertTrue(source.contains("mc.mouseHandler.isMiddlePressed = false"));
+        assertTrue(source.contains("KeyMapping.resetMapping()"));
+        assertTrue(source.contains("world_move_requires_look"));
+
+        // Every synthetic action reaches the game through the same client handler a device drives,
+        // so the NeoForge input events mods listen on are published exactly as they would be.
+        assertTrue(source.contains("mc.mouseHandler.onPress("));
+        assertTrue(source.contains("case MOUSE -> applyMouseAction(Double.NaN, Double.NaN, boundKey.getValue()"));
+        assertTrue(source.contains(": applyRawKeyForKey(mc, boundKey, action)"));
+        assertTrue(source.contains("exact ? borrowKeyForMapping(mc, selected, action)"));
+        assertTrue(source.contains("optionalBoolean(body, \"exact\", false)"));
+        assertTrue(source.contains("mouse_mapping_requires_no_screen"));
+        assertTrue(source.contains("borrowed_key_hold_unsupported"));
+        assertTrue(source.contains("InputEventProbe.mouseButtonSince("));
+        assertTrue(source.contains("InputEventProbe.keySince("));
+        assertTrue(source.contains("InputEventProbe.scrollSince("));
+        assertFalse(source.contains("KeyMapping.click("));
+        assertFalse(source.contains("ensureWorldInputFocus"));
+        assertFalse(source.contains("command_submission_forbidden"));
+        assertFalse(source.contains("control_arbitrary_commands"));
+        assertFalse(source.contains("mapping_unbound"));
+        assertFalse(source.contains("createContext(\"/" + "chat\""));
+
+        String probe = Files.readString(project.resolve(
+                "src/main/java/io/github/campione01/mineclientbridge/InputEventProbe.java"));
+        assertTrue(probe.contains("InputEvent.MouseButton.Pre.class"));
+        assertTrue(probe.contains("InputEvent.Key.class"));
+        assertTrue(probe.contains("InputEvent.InteractionKeyMappingTriggered.class"));
+
+        assertTrue(probe.contains("InputEvent.MouseScrollingEvent.class"));
+        assertEquals(4, occurrences(probe, "EventPriority.LOWEST, true,"));
+
+        // The mouse grab is bypassed for isolated sessions in grabMouse alone, so window focus keeps
+        // its normal meaning everywhere else and the native cursor is still never captured.
+        String mouseMixin = Files.readString(project.resolve(
+                "src/main/java/io/github/campione01/mineclientbridge/mixin/MouseHandlerMixin.java"));
+        assertTrue(mouseMixin.contains("method = \"grabMouse()V\""));
+        assertTrue(mouseMixin.contains("minecraft.isWindowActive() || ClientInputIsolation.enabled()"));
+        assertEquals(1, occurrences(mouseMixin, "ClientInputIsolation.enabled()"));
+
+        String accessTransformer = Files.readString(project.resolve(
+                "src/main/resources/META-INF/accesstransformer.cfg"));
+        assertTrue(accessTransformer.contains("public net.minecraft.client.MouseHandler onPress(JIII)V"));
+        assertTrue(accessTransformer.contains("public net.minecraft.client.MouseHandler isLeftPressed"));
+        assertTrue(accessTransformer.contains("public net.minecraft.client.MouseHandler isRightPressed"));
+        assertTrue(accessTransformer.contains("public net.minecraft.client.MouseHandler isMiddlePressed"));
+    }
+
+    private static int occurrences(String source, String needle) {
+        int count = 0;
+        int position = 0;
+        while ((position = source.indexOf(needle, position)) >= 0) {
+            count++;
+            position += needle.length();
+        }
+        return count;
+    }
+}

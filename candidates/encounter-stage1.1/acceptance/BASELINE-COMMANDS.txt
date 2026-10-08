@@ -1,0 +1,35 @@
+Owner only: verify independent ordinary-generation local world first. Never use these on a server.
+The parent user explicitly approved local cheat commands, iron/diamond equipment and summoned-mob testing.
+Controlled starting conditions, distinct from unmodified ordinary survival:
+/difficulty normal
+/gamerule keepInventory true
+/gamerule doMobSpawning false
+/gamerule doDaylightCycle false
+/time set midnight
+/weather clear
+Before each trial: clear only previously tagged test mobs and reset player health/food.
+/kill @e[tag=mdc_test]
+/effect clear @s
+/effect give @s minecraft:instant_health 1 10 true
+/effect give @s minecraft:saturation 1 10 true
+Iron group, no enchantments:
+/item replace entity @s armor.head with minecraft:iron_helmet
+/item replace entity @s armor.chest with minecraft:iron_chestplate
+/item replace entity @s armor.legs with minecraft:iron_leggings
+/item replace entity @s armor.feet with minecraft:iron_boots
+/item replace entity @s weapon.mainhand with minecraft:iron_sword
+/item replace entity @s weapon.offhand with minecraft:shield
+Diamond group, no enchantments:
+/item replace entity @s armor.head with minecraft:diamond_helmet
+/item replace entity @s armor.chest with minecraft:diamond_chestplate
+/item replace entity @s armor.legs with minecraft:diamond_leggings
+/item replace entity @s armor.feet with minecraft:diamond_boots
+/item replace entity @s weapon.mainhand with minecraft:diamond_sword
+/item replace entity @s weapon.offhand with minecraft:shield
+First observe a dry, naturally generated clear patch and verify the exact spawn cell six blocks along world +Z is not obstructed or water.
+/summon minecraft:zombie ~ ~ ~6 {Tags:["mdc_test"],PersistenceRequired:1b,IsBaby:0b}
+No NoAI modifier: the mob must really approach and attack. Record any naturally spawned gear and do not treat variant trials as equivalent.
+Read its actual UUID and the current world_generation from a fresh observation, then invoke baseline_stationary_combat.py with those values.
+This baseline is stationary (approach:false), uses existing bridge contracts and stops sampling/requests combat_stop by 20 s.
+It deliberately does not claim a hard Java-side deadline. If stop/release is unconfirmed, stop the batch and return to the sole operator.
+Do not run a second resident/watchdog or paste credentials into arguments.

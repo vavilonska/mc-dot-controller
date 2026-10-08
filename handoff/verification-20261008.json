@@ -1,0 +1,265 @@
+{
+  "checked_at_utc": "2026-10-08T03:01:14.800981+00:00",
+  "candidate": "1.1.7-encounter-stage1.1",
+  "remote_base_commit": "09e45143dc3e9b1aac5fa59c5a98c1e6a5274f14",
+  "publication_kind": "isolated_source_handoff_not_merge_or_deployment",
+  "original_source_manifest_sha256": "ef78b55d63d141cf8e2aadeaf3744d9fb54363db616b8ba2c8ca54c886a0839b",
+  "original_payloads_verified": 360,
+  "published_original_payloads": 359,
+  "omitted_payload": "client-mod/gradle/wrapper/gradle-wrapper.jar",
+  "python": {
+    "discovered": 1048,
+    "passed": 1047,
+    "skipped": 1,
+    "skip": "Historical old-v5 frozen-source comparison fixture unavailable"
+  },
+  "node": {
+    "passed": 50,
+    "action_contract": 42,
+    "framing": 8
+  },
+  "harness_public_subset": {
+    "original_files": 16,
+    "tests": 287,
+    "passed": 287,
+    "all_exit_zero": true
+  },
+  "static_terrain_audit": "passed",
+  "java_current": "not run: Java 21 runtime present, javac and Gradle/dependency cache unavailable",
+  "java_historical_only": {
+    "passed": 470,
+    "candidate": "1.1.7-encounter-stage1.1",
+    "not_rerun_on_2026_10_08": true
+  },
+  "minecraft_started": false,
+  "live_queue_accessed": false,
+  "game_state_recovered": false,
+  "secrets_scan": {
+    "new_payloads": "allowlisted source/docs/test fixtures and pre-existing upstream icon only",
+    "secret_patterns_found": 0,
+    "private_runtime_files_included": false
+  },
+  "source_test_runs": [
+    {
+      "name": "resident-controller",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 170,
+      "skipped": 0
+    },
+    {
+      "name": "navigation-controller",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 254,
+      "skipped": 0
+    },
+    {
+      "name": "navigation-cursor",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 38,
+      "skipped": 0
+    },
+    {
+      "name": "gameplay-helpers",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 54,
+      "skipped": 0
+    },
+    {
+      "name": "building-controller",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 83,
+      "skipped": 0
+    },
+    {
+      "name": "external-controller",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 115,
+      "skipped": 0
+    },
+    {
+      "name": "defense-watchdog",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 117,
+      "skipped": 1
+    },
+    {
+      "name": "acceptance",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 5,
+      "skipped": 0
+    },
+    {
+      "name": "multiagent-coordination",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 212,
+      "skipped": 0
+    },
+    {
+      "name": "node-action",
+      "command": [
+        "node",
+        "--test",
+        "client-action-test.mjs",
+        "encounter-contract-test.mjs"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "node-framing",
+      "command": [
+        "node",
+        "ndjson-framing-test.mjs"
+      ],
+      "exit": 0
+    }
+  ],
+  "harness_test_runs": [
+    {
+      "name": "receipt",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_receipt_binding.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 63
+    },
+    {
+      "name": "safety",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "safety_tests",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 111
+    },
+    {
+      "name": "independent-safety",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "independent-review",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit": 0,
+      "tests": 113
+    }
+  ]
+}

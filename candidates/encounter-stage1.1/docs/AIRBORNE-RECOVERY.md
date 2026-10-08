@@ -1,0 +1,43 @@
+# Native airborne recovery candidate
+
+Version: `1.1.7-combat-loop.4`, based on clean source `2c131bd0a5462247fefbefa04f739c9ae958e8d8` (`combat-loop.3`). This isolated source/build has not been deployed or tested in a live Minecraft client.
+
+## Fix and safety boundary
+
+Native `combat_entity` previously turned a transient airborne pose into terminal `local_flat_corridor_blocked`. Recovery now runs before every native movement/attack branch, including when the target moves into reach during knockback. It preserves the exact target, observations, aim, and existing shield policy: the requested available offhand shield for ordinary targets, no shield use for creeper retreat.
+
+An episode starts at the first airborne sample. Every recovery wait returns zero forward input and dispatches no attack. Neither repeated airborne samples nor an interrupted landing reset the episode. At most 20 client tick numbers, including the initial airborne tick, are available. Settlement may succeed on tick 20; otherwise tick 20 fails. Skipped ticks consume the budget. Two consecutive samples must be grounded, within 0.05 blocks of integer feet height, with finite position/velocity, horizontal speed at most 0.03 blocks/tick and absolute vertical speed at most 0.08 blocks/tick. These are deterministic candidate policy values, not live-calibrated physics or performance claims.
+
+The recovery does not move the player to a remembered position, round airborne feet into a ground layer, write velocity, or bypass terrain guards. On the second settled sample it rereads the complete loaded-cell corridor from the actual landed position and current target direction: forward approach, backward retreat, or the full occupied footprint if remaining stationary. Any following movement also performs the normal complete corridor check that tick. `TerrainReader` is unchanged: grounded/integer-height admission, known collision, loaded cells, full floor support, empty feet/head collision, no fluid and no listed contact hazards are still mandatory. Grounded fractional recovery landings fail immediately as unsupported.
+
+Manual view change, sticky target identity/loss/death, area and weapon guards precede recovery. ClientActions still owns cancellation, direct takeover, player death, GUI interruption, world/player change, deadline and cleanup. The original final deadline is assigned exactly once and never extended. A verified recovery rebases closing-progress tracking once; waiting does not refresh that timer. Fresh ray, cooldown, shield-lowering and protected-bystander/sword-sweep checks still precede resumed attacks.
+
+Ordinary `follow_path`, endpoint settlement, sprint policy, Python combat and watchdog routing are unchanged. Native creeper retreat uses this recovery but still declares success at one observed separation greater than 8 blocks; sustained escape/fuse safety remains separate and unproved. The legacy watchdog uses Python `combat_start`, whose airborne limitation is not repaired by this Java change.
+
+## Diagnostic fields and reasons
+
+Combat evidence adds `player_on_ground`, `player_velocity` (x/y/z; non-finite components recorded as null), `player_feet_height_offset`, `airborne_recovery_active`, `airborne_recovery_episodes`, `airborne_recovery_ticks`, `airborne_recovery_total_ticks`, `airborne_recovery_settled_samples`, `airborne_recoveries_completed` and `airborne_recovery_reason`. These report the last native tick evaluated, not a post-terminal physics sample. Use the enclosing action status and a fresh post-stop observation to establish termination/release.
+
+Recovery phases are `waiting_airborne_recovery` and `waiting_landing_settle`; completion is `airborne_recovery_complete` in recovery evidence. Failures distinguish `airborne_recovery_timeout`, `unsupported_recovery_pose`, `invalid_combat_motion` and `recovery_landing_corridor_blocked`. Ordinary grounded movement failures retain `local_flat_corridor_blocked`. Existing phase tick counters count wait/failure phases, and completion has its separate counter because a safe ordinary combat phase can execute on that tick.
+
+## Offline verification and its limits
+
+- 11 new executable helper tests exercise recovery state, fixed budget, repeated knockback/episodes, both directions and stationary resume, fresh corridor callbacks, velocity/position validation, unsupported heights and denied landings. Unsafe-corridor cases inject a false result; they do not simulate real blocks or Minecraft collision.
+- 4 new source-contract tests check the wiring/order of interruption, sticky target and protected-overlap guards; zero-input/no-attack recovery returns; unchanged terrain predicates; deadline ownership; and release paths. These are source-string assertions, not runtime Minecraft integration tests.
+- Full Java `test build`: 149 tests, zero failures/errors/skips, including existing endpoint/sprint regressions. Compilation uses Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21 with the official binary dependency pipeline. No new actual-client integration assertions were run.
+- Full existing Python suites and standalone terrain/core audits are recorded in the package verification manifest and logs. They use fakes, synthetic/sanitized fixtures and temporary files. They do not contact the game or a resident queue.
+- Independent read-only source review found no production safety/correctness blocker. No live pass, damage reduction, win rate, or ordinary-survival reliability is claimed.
+
+## Required live validation, after an authorized operator installs it
+
+Use the sole authorized game operator, an independent normal-generation local test world and the existing owner-controlled authentication flow. Do not interrupt an ongoing friend's-server task or test on that server. Preserve the original mod and matching source for rollback. See `acceptance/INSTALL-AND-TEST.txt`; any newly requested bridge approval or persistent access requires the human owner.
+
+1. Verify the exact JAR SHA-256 and runtime version `1.1.7-combat-loop.4`, one MDC mod/one input owner, a fresh action session, explicit native `combat_entity`, correct world/player/target identity, and post-stop released movement/use. No ambiguous action is replayed.
+2. On a naturally generated, known dry supported patch, reproduce airborne knockback followed by landing with the same target/action. Capture every tick's phase, grounded flag, velocity, recovery counters, movement input, attack counter, shield use/blocking and target/player health. Establish zero movement input/no attack increments during recovery, two settled samples, fresh landed corridor and bounded resumption. Natural momentum may continue after input is zero; do not label that an input hold.
+3. Exercise persistent airborne and repeated knockback until episode timeout, plus a shorter original action deadline during recovery. Verify the original deadline wins when earlier and all movement/shield use is released. Confirm no action-ID replay or new lease is created.
+4. During recovery exercise explicit cancel, direct takeover/manual view change, GUI opening, player death and world/player transition. Separately observe target death, disappearance/identity change and a protected living bystander entering the fresh ray/sweep area. Verify the correct terminal reason and no collateral attack or retargeting; test an observed axe fallback as well as no available axe.
+5. Test supported forward and backward recovery. In controlled local trials, verify landing near missing support/drop, water/lava, contact hazards, blocked feet/head and unknown/unloaded cells never resumes movement. Do not use a lethal edge as the first trial. Unsupported slab/stair/path-height landings must terminate rather than be rounded into safety. Non-finite synthetic motion is covered offline; do not inject invalid live game state merely to manufacture this case.
+6. Repeat comparable single-skeleton tests at least three times each in unenchanted full iron + iron sword/shield and full diamond + diamond sword/shield. Record difficulty, natural patch/seed, mob equipment, food/effects, total observed damage, attacks, target health/death, recovery events and failures. Retain failed trials; compare like-for-like baselines before any performance claim.
+7. Repeat existing iron/diamond zombie, protected-bystander, endpoint settlement and sprint-release regressions. Creeper backward recovery only validates recovery behavior; observe/replan after the existing 8-block threshold before making a separate sustained-escape claim.
+
+Stop on uncertain release, identity, terrain or access. Roll back only through the authorized operator's normal save/exit/restart procedure; never hot-swap the JAR or change credentials.

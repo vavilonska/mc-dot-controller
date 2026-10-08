@@ -1,0 +1,71 @@
+# Build outputs and dependency caches
+**/.gradle/
+**/.gradle-home/
+**/build/
+**/out/
+**/node_modules/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime and game data must never be published
+**/run/
+**/runtime/
+**/game/
+**/.minecraft/
+**/saves/
+**/screenshots/
+**/logs/
+**/sessions/
+**/config/
+**/launch/
+**/natives/
+**/libraries/
+**/assets/
+*.log
+*.token
+# Owner-run probe reports are local runtime evidence
+**/probe-*.json
+.env
+.env.*
+!.env.example
+**/*credentials*.json
+**/*session*.json
+**/*relay*.json
+**/self-test-*/
+*.jar
+!client-mod/gradle/wrapper/gradle-wrapper.jar
+*.zip
+*.tar.gz
+
+# Local/editor files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Resident controller mailbox files are never source artifacts
+**/.runtime/
+**/mailbox/
+**/observation.json
+**/latest.png
+
+# Loaded-world observations are private runtime cache data
+**/scan_cache.json
+**/state.json
+**/state.tmp
+**/state-exporter.pid
+
+# Independent defense watchdog control data
+**/owner.lock
+**/STOP
+**/inbox/
+**/working/
+**/results/
+
+# Route checkpoints contain private session and world observations
+**/*route-checkpoint*.json
+**/checkpoints/

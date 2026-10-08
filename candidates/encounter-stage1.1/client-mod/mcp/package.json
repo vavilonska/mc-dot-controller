@@ -1,0 +1,13 @@
+{
+  "name": "mineclient-bridge",
+  "version": "1.1.7-integrated.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:portable && node self-test.mjs",
+    "test:portable": "node --test client-action-test.mjs encounter-contract-test.mjs && node ndjson-framing-test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

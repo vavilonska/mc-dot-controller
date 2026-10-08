@@ -1,0 +1,2506 @@
+package io.github.campione01.mineclientbridge;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.NativeImage;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.PriorityQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.client.ClientHooks;
+import org.lwjgl.glfw.GLFW;
+
+public final class BridgeServer {
+    private static final String PROTOCOL_NAME = "mineclient-bridge";
+    private static final int PROTOCOL_SCHEMA_VERSION = 2;
+    private static final int HTTP_BACKLOG = 16;
+    private static final int HTTP_WORKERS = 4;
+    private static final int MAX_BODY_BYTES = 64 * 1024;
+    private static final int MAX_JSON_BYTES = 256 * 1024;
+    private static final int MAX_FRAME_BYTES = 32 * 1024 * 1024;
+    private static final int MAX_TEXT_LENGTH = 512;
+    private static final int MAX_COMMAND_LENGTH = 256;
+    private static final int MAX_GLFW_KEY_CODE = 348;
+    private static final int MAX_KEYMAPS = 256;
+    private static final int MAX_STATUS_EFFECTS = 64;
+    private static final int MAX_NEARBY_ENTITIES = 64;
+    private static final int MAX_SCREEN_CHILDREN = 128;
+    private static final int MAX_CONTAINER_SLOTS = 256;
+    private static final double DEFAULT_ENTITY_RADIUS = 16.0;
+    private static final double MAX_ENTITY_RADIUS = 32.0;
+    private static final double MAX_GUI_COORDINATE = 1_000_000.0;
+    private static final long MINECRAFT_TIMEOUT_SECONDS = 5;
+    private static final long FRAME_TIMEOUT_SECONDS = 15;
+    private static final GuardedDispatch GUARDED_ACTIONS = new GuardedDispatch(System::nanoTime, false);
+    private static final TerrainDispatch TERRAIN_DISPATCH = new TerrainDispatch();
+    private static final AtomicInteger WORKER_SEQUENCE = new AtomicInteger();
+    private static final LinkedHashSet<InputConstants.Key> HELD_RAW_KEYS = new LinkedHashSet<>();
+    private static final LinkedHashSet<Integer> HELD_WORLD_MOUSE_BUTTONS = new LinkedHashSet<>();
+    private static volatile HttpServer server;
+    private static volatile ExecutorService serverExecutor;
+    private static volatile BridgeConfig config;
+
+    private BridgeServer() {
+    }
+
+    public static synchronized void start() {
+        if (server != null) {
+            return;
+        }
+
+        config = BridgeConfigStore.load();
+        if (!config.enabled()) {
+            BridgeLog.LOGGER.info("MineClient Bridge disabled by config");
+            return;
+        }
+
+        HttpServer createdServer = null;
+        ExecutorService createdExecutor = null;
+        try {
+            InetAddress bindAddress = InetAddress.getByName(config.host());
+            if (!bindAddress.isLoopbackAddress()) {
+                throw new IOException("MineClient Bridge refuses non-loopback host: " + config.host());
+            }
+
+            createdServer = HttpServer.create(new InetSocketAddress(bindAddress, config.port()), HTTP_BACKLOG);
+            createdServer.createContext("/control/status", BridgeServer::handleControlStatus);
+            createdServer.createContext("/control/capabilities", BridgeServer::handleControlCapabilities);
+            createdServer.createContext("/control/frame", BridgeServer::handleControlFrame);
+            createdServer.createContext("/control/keymaps", BridgeServer::handleControlKeymaps);
+            createdServer.createContext("/control/state", BridgeServer::handleControlState);
+            createdServer.createContext("/control/terrain", BridgeServer::handleControlTerrain);
+            createdServer.createContext("/control/scan", BridgeServer::handleScanStart);
+            createdServer.createContext("/control/scan/status", BridgeServer::handleScanStatus);
+            createdServer.createContext("/control/scan/cancel", BridgeServer::handleScanCancel);
+            createdServer.createContext("/control/screen", BridgeServer::handleControlScreen);
+            createdServer.createContext("/control/action", BridgeServer::handleClientAction);
+            createdServer.createContext("/control/action/status", BridgeServer::handleClientActionStatus);
+            createdServer.createContext("/control/action/cancel", BridgeServer::handleClientActionCancel);
+            createdServer.createContext("/control/key", BridgeServer::handleControlKey);
+            createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
+            createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
+            createdServer.createContext("/control/guarded-movement", BridgeServer::handleGuardedMovement);
+            createdServer.createContext("/control/guarded-turn", BridgeServer::handleGuardedTurn);
+            createdServer.createContext("/control/look", BridgeServer::handleControlLook);
+            createdServer.createContext("/control/mouse", BridgeServer::handleControlMouse);
+            createdServer.createContext("/control/text", BridgeServer::handleControlText);
+            createdServer.createContext("/control/command", BridgeServer::handleControlCommand);
+            createdServer.createContext("/control/release-all", BridgeServer::handleControlReleaseAll);
+            createdServer.createContext("/control/close", BridgeServer::handleControlClose);
+            createdServer.createContext("/", BridgeServer::handleRoot);
+
+            createdExecutor = Executors.newFixedThreadPool(HTTP_WORKERS, workerThreadFactory());
+            createdServer.setExecutor(createdExecutor);
+            server = createdServer;
+            serverExecutor = createdExecutor;
+            GUARDED_ACTIONS.openAdmission();
+            GuardedGameMovement.LEASES.openAdmission();
+            createdServer.start();
+            BridgeLog.LOGGER.info("MineClient Bridge listening on http://{}:{} auth_enabled={}",
+                    config.host(), config.port(), !config.token().isBlank());
+        } catch (IOException | RuntimeException e) {
+            GUARDED_ACTIONS.closeAdmission();
+            GuardedGameMovement.LEASES.closeAdmission();
+            server = null;
+            serverExecutor = null;
+            if (createdServer != null) {
+                createdServer.stop(0);
+            }
+            if (createdExecutor != null) {
+                createdExecutor.shutdownNow();
+            }
+            BridgeLog.LOGGER.warn("Failed to start MineClient Bridge", e);
+        }
+    }
+
+    public static synchronized void restart() {
+        stop();
+        start();
+    }
+
+    public static synchronized void stop() {
+        GUARDED_ACTIONS.closeAdmission();
+        GuardedGameMovement.LEASES.closeAdmission();
+        releaseAllOnMinecraftThread();
+
+        HttpServer currentServer = server;
+        server = null;
+        if (currentServer != null) {
+            currentServer.stop(0);
+        }
+
+        ExecutorService currentExecutor = serverExecutor;
+        serverExecutor = null;
+        if (currentExecutor != null) {
+            currentExecutor.shutdownNow();
+        }
+    }
+
+    public static boolean isRunning() {
+        return server != null;
+    }
+
+    public static BridgeConfig config() {
+        if (config == null) {
+            config = BridgeConfigStore.load();
+        }
+        return config;
+    }
+
+    private static ThreadFactory workerThreadFactory() {
+        return runnable -> {
+            Thread thread = new Thread(runnable,
+                    "MineClient-Bridge-" + WORKER_SEQUENCE.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    private static void handleRoot(HttpExchange exchange) throws IOException {
+        respondJson(exchange, 404, error("unknown_endpoint"));
+    }
+
+    private static void handleControlStatus(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/status", "GET")) return;
+
+        try {
+            JsonObject status = callOnMinecraftThread(
+                    BridgeServer::createControlStatus,
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, 200, status);
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "status_failed", e);
+        }
+    }
+
+    private static void handleControlCapabilities(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/capabilities", "GET")) return;
+        respondJson(exchange, 200, createCapabilities());
+    }
+
+    private static void handleControlFrame(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/frame", "GET")) return;
+
+        try {
+            byte[] png = callOnMinecraftThread(
+                    BridgeServer::captureFrame,
+                    FRAME_TIMEOUT_SECONDS);
+            respondBytes(exchange, 200, "image/png", png);
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "frame_capture_failed", e);
+        }
+    }
+
+    private static void handleControlKeymaps(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/keymaps", "GET")) return;
+
+        try {
+            JsonObject keymaps = callOnMinecraftThread(
+                    BridgeServer::createKeymapsSnapshot,
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, 200, keymaps);
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "keymaps_failed", e);
+        }
+    }
+
+    private static void handleControlState(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/state", "GET")) return;
+
+        final double radius;
+        try {
+            radius = queryDouble(exchange, "radius", DEFAULT_ENTITY_RADIUS, 0.0, MAX_ENTITY_RADIUS);
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> createStateSnapshot(radius),
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "state_failed", e);
+        }
+    }
+
+    private static void handleControlTerrain(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/terrain", "GET")) return;
+        final TerrainQuery query;
+        try {
+            query = TerrainQuery.parse(exchange.getRequestURI().getRawQuery());
+        } catch (IllegalArgumentException e) {
+            respondJson(exchange, 400, error("invalid_terrain_query", e.getMessage()));
+            return;
+        }
+        try {
+            EndpointResult result = TERRAIN_DISPATCH.call(
+                    task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)), () -> {
+                try {
+                    JsonObject body = protocolOk();
+                    for (var entry : TerrainReader.read(query).entrySet()) body.add(entry.getKey(), entry.getValue());
+                    return new EndpointResult(200, body);
+                } catch (TerrainScan.Failure e) {
+                    return new EndpointResult(e.status, error(e.getMessage()));
+                }
+            }, MINECRAFT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (result.status() == 429) exchange.getResponseHeaders().set("Retry-After", "1");
+            respondJson(exchange, result.status(), result.body());
+        } catch (TerrainScan.Failure e) {
+            exchange.getResponseHeaders().set("Retry-After", "1");
+            respondJson(exchange, e.status, error(e.getMessage()));
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "terrain_failed", e);
+        }
+    }
+
+    private static void handleScanStart(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scan", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final LoadedScanRequest request;
+        try { request = LoadedScanRequest.parse(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> LoadedWorldScanner.start(request), true);
+    }
+
+    private static void handleScanStatus(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scan/status", "GET")) return;
+        final String id;
+        try {
+            String raw = exchange.getRequestURI().getRawQuery();
+            if (raw == null || !raw.matches("id=[A-Za-z0-9_-]{1,64}")) throw new IllegalArgumentException();
+            id = raw.substring(3);
+        } catch (IllegalArgumentException failure) {
+            respondJson(exchange, 400, error("invalid_scan_id")); return;
+        }
+        respondActionOperation(exchange, () -> LoadedWorldScanner.status(id), false);
+    }
+
+    private static void handleScanCancel(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scan/cancel", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final String id;
+        try { LoadedScanRequest.keys(body, java.util.Set.of("id")); id = LoadedScanRequest.id(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> LoadedWorldScanner.cancel(id), false);
+    }
+
+    private static void handleControlScreen(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/screen", "GET")) return;
+
+        try {
+            JsonObject screen = callOnMinecraftThread(
+                    BridgeServer::createScreenSnapshot,
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, 200, screen);
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "screen_failed", e);
+        }
+    }
+
+    private static void handleClientAction(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/action", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final ClientActionRequest request;
+        try { request = ClientActionRequest.parse(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> ClientActions.start(request), true);
+    }
+
+    private static void handleClientActionStatus(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/action/status", "GET")) return;
+        String id = null;
+        try {
+            String query = exchange.getRequestURI().getRawQuery();
+            if (query != null) for (String part : query.split("&")) {
+                String[] pair = part.split("=", 2);
+                if (!URLDecoder.decode(pair[0], StandardCharsets.UTF_8).equals("action_id") || id != null || pair.length != 2)
+                    throw new IllegalArgumentException();
+                id = URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
+            }
+        } catch (IllegalArgumentException failure) {
+            respondJson(exchange, 400, error("invalid_query")); return;
+        }
+        final String actionId = id;
+        respondActionOperation(exchange, () -> ClientActions.status(actionId), false);
+    }
+
+    private static void handleClientActionCancel(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/action/cancel", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final String id, expectedSession;
+        try {
+            id = ClientActionRequest.string(body, "action_id");
+            expectedSession = body.has("expected_action_session")
+                    ? ClientActionRequest.string(body, "expected_action_session") : null;
+        }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> ClientActions.cancelId(id, expectedSession), false);
+    }
+
+    private static void respondActionOperation(HttpExchange exchange, Callable<JsonObject> operation, boolean start) throws IOException {
+        try {
+            EndpointResult result = callOnMinecraftThread(() -> {
+                try {
+                    JsonObject response = operation.call();
+                    response.addProperty("protocol", PROTOCOL_NAME);
+                    response.addProperty("schema_version", PROTOCOL_SCHEMA_VERSION);
+                    boolean running = response.has("status") && response.get("status").getAsString().equals("running");
+                    return new EndpointResult(start && running ? 202 : 200, response);
+                } catch (ClientActionRequest.Rejected failure) {
+                    return new EndpointResult(failure.httpStatus, error(failure.getMessage()));
+                }
+            }, MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception failure) { respondMinecraftFailure(exchange, "client_action_failed", failure); }
+    }
+
+    private static void handleControlKey(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/key", "POST")) return;
+
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+
+        final String mapping;
+        final String action;
+        final boolean exact;
+        try {
+            mapping = requiredString(body, "mapping");
+            action = requiredString(body, "action").trim().toLowerCase(Locale.ROOT);
+            exact = optionalBoolean(body, "exact", false);
+            if (mapping.isBlank()) {
+                throw new RequestException(400, "invalid_mapping", "mapping must not be blank");
+            }
+            if (!action.equals("down") && !action.equals("up") && !action.equals("click")) {
+                throw new RequestException(400, "invalid_action", "action must be down, up, or click");
+            }
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> { ClientActions.directTakeover(); return applyKeyAction(mapping, action, exact); },
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "key_action_failed", e);
+        }
+    }
+
+    private static void handleControlRawKey(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/raw-key", "POST")) return;
+
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+
+        final String key;
+        final String action;
+        try {
+            key = requiredString(body, "key");
+            action = requiredString(body, "action").trim().toLowerCase(Locale.ROOT);
+            if (key.isBlank()) {
+                throw new RequestException(400, "invalid_key", "key must not be blank");
+            }
+            if (!action.equals("down") && !action.equals("up") && !action.equals("click")) {
+                throw new RequestException(400, "invalid_action", "action must be down, up, or click");
+            }
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> { ClientActions.directTakeover(); return applyRawKeyAction(key, action); },
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "raw_key_action_failed", e);
+        }
+    }
+
+    private static void handleControlGuardedAction(HttpExchange exchange) throws IOException {
+        final long receivedNanos = System.nanoTime(); // Includes body parsing in the TTL.
+        final long bridgeEpoch = GUARDED_ACTIONS.epoch(); // Captured before parsing or queueing.
+        if (!requireControlAccess(exchange, "/control/guarded-action", "POST")) return;
+        if (exchange.getHttpContext().getServer() != server) {
+            respondJson(exchange, 409, error("bridge_lifecycle_changed"));
+            return;
+        }
+        if (!GuardedGameActions.enabled()) {
+            respondJson(exchange, 409, error("guarded_actions_disabled"));
+            return;
+        }
+        if (exchange.getRequestURI().getRawQuery() != null) {
+            respondJson(exchange, 400, error("unexpected_query"));
+            return;
+        }
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final GuardedAction.Request request;
+        try {
+            String action = requiredString(body, "action");
+            java.util.Set<String> fields = new java.util.HashSet<>(java.util.Set.of(
+                    "guard_schema_version", "action", "expected_world_generation", "expected_player_uuid",
+                    "expected_target_uuid", "expected_crosshair_uuid", "ttl_ms"));
+            if (action.equals("look")) { fields.add("yaw"); fields.add("pitch"); }
+            GuardedAction.require(body.keySet().equals(fields), "unexpected_or_missing_field");
+            GuardedAction.require(optionalInteger(body, "guard_schema_version", -1) == GuardedAction.SCHEMA,
+                    "unsupported_guard_schema");
+            String crosshair = body.get("expected_crosshair_uuid").isJsonNull()
+                    ? null : requiredString(body, "expected_crosshair_uuid");
+            request = new GuardedAction.Request(action,
+                    requiredString(body, "expected_world_generation"), requiredString(body, "expected_player_uuid"),
+                    requiredString(body, "expected_target_uuid"), crosshair,
+                    optionalInteger(body, "ttl_ms", -1),
+                    action.equals("look") ? requiredFiniteDouble(body, "yaw") : 0,
+                    action.equals("look") ? requiredFiniteDouble(body, "pitch") : 0);
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        } catch (GuardedAction.Rejected e) {
+            respondJson(exchange, 400, error(e.getMessage()));
+            return;
+        }
+        try {
+            GuardedDispatch.Ticket<GuardedGameActions.Outcome> ticket = GUARDED_ACTIONS.submit(
+                    Minecraft.getInstance()::execute, receivedNanos, request.ttlMs(), bridgeEpoch,
+                    active -> GuardedGameActions.apply(request, active));
+            GuardedGameActions.Outcome outcome = ticket.await();
+            JsonObject response = protocolOk();
+            response.addProperty("guard_schema_version", GuardedAction.SCHEMA);
+            response.addProperty("action", outcome.action());
+            response.addProperty("dispatched", true);
+            response.addProperty("damage_confirmed", false);
+            response.addProperty("world_generation", outcome.worldGeneration());
+            response.addProperty("player_uuid", outcome.playerUuid());
+            response.addProperty("target_uuid", outcome.targetUuid());
+            response.addProperty("yaw", outcome.yaw());
+            response.addProperty("pitch", outcome.pitch());
+            respondJson(exchange, 200, response);
+        } catch (TimeoutException e) {
+            respondJson(exchange, 408, error("guarded_action_expired"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            respondJson(exchange, 503, error("request_interrupted"));
+        } catch (Exception e) {
+            Throwable cause = e instanceof ExecutionException && e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof GuardedAction.Rejected rejected) {
+                int status = rejected.getMessage().equals("guarded_action_busy") ? 429
+                        : rejected.getMessage().equals("guarded_action_expired") ? 408 : 409;
+                respondJson(exchange, status, error(rejected.getMessage()));
+            } else {
+                respondJson(exchange, 500, error("guarded_action_failed"));
+            }
+        }
+    }
+
+    private static void handleGuardedMovement(HttpExchange exchange) throws IOException {
+        final long receivedNanos = System.nanoTime();
+        final String entrySession = GuardedGameMovement.LEASES.session();
+        if (!requireControlAccess(exchange, "/control/guarded-movement", "POST")) return;
+        if (exchange.getHttpContext().getServer() != server) {
+            respondJson(exchange, 409, error("bridge_lifecycle_changed")); return;
+        }
+        if (!GuardedGameMovement.enabled()) {
+            respondJson(exchange, 409, error("guarded_movement_disabled")); return;
+        }
+        if (exchange.getRequestURI().getRawQuery() != null) {
+            respondJson(exchange, 400, error("unexpected_query")); return;
+        }
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final GuardedMovement.Request request;
+        try {
+            GuardedAction.require(body.keySet().equals(java.util.Set.of("movement_schema_version", "action",
+                    "session", "request_id", "observation_id", "expected_world_generation", "expected_player_uuid", "expected_tick",
+                    "expected_x", "expected_y", "expected_z", "expected_yaw", "ttl_ms", "duration_ms")),
+                    "unexpected_or_missing_field");
+            GuardedAction.require(optionalInteger(body, "movement_schema_version", -1) == GuardedMovement.SCHEMA,
+                    "unsupported_movement_schema");
+            GuardedAction.require(requiredString(body, "action").equals("forward_sample"), "invalid_action");
+            double tick = requiredFiniteDouble(body, "expected_tick");
+            GuardedAction.require(tick >= 0 && tick <= 9_007_199_254_740_991d && tick == Math.rint(tick), "invalid_expected_tick");
+            request = new GuardedMovement.Request(requiredString(body, "session"), requiredString(body, "request_id"), requiredString(body, "observation_id"),
+                    requiredString(body, "expected_world_generation"), requiredString(body, "expected_player_uuid"),
+                    (long) tick, requiredFiniteDouble(body, "expected_x"), requiredFiniteDouble(body, "expected_y"),
+                    requiredFiniteDouble(body, "expected_z"), requiredFiniteDouble(body, "expected_yaw"),
+                    optionalInteger(body, "ttl_ms", -1), optionalInteger(body, "duration_ms", -1));
+        } catch (RequestException failure) { respondRequestFailure(exchange, failure); return;
+        } catch (GuardedAction.Rejected failure) { respondJson(exchange, 400, error(failure.getMessage())); return; }
+        GuardedMovement.Ticket movementTicket = null;
+        try {
+            movementTicket = GuardedGameMovement.LEASES.submit(request, receivedNanos, entrySession);
+            GuardedMovement.Outcome outcome = movementTicket.await();
+            boolean ok = outcome.reason().equals("sample_released");
+            JsonObject response = ok ? protocolOk() : error(outcome.reason());
+            response.addProperty("movement_schema_version", GuardedMovement.SCHEMA);
+            response.addProperty("request_id", outcome.requestId());
+            response.addProperty("sampled", outcome.sampled());
+            response.addProperty("released", outcome.released());
+            response.addProperty("movement_confirmed", false);
+            respondJson(exchange, ok ? 200 : outcome.reason().equals("movement_expired") ? 408 : 409, response);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            JsonObject response = error("request_interrupted");
+            GuardedMovement.Outcome outcome = movementTicket == null ? null : movementTicket.result.getNow(null);
+            if (outcome != null) {
+                response.addProperty("movement_schema_version", GuardedMovement.SCHEMA);
+                response.addProperty("request_id", outcome.requestId());
+                response.addProperty("sampled", outcome.sampled());
+                response.addProperty("released", outcome.released());
+                response.addProperty("movement_confirmed", false);
+            }
+            respondJson(exchange, 503, response);
+        } catch (GuardedAction.Rejected failure) {
+            int status = failure.getMessage().equals("movement_busy") ? 429 : failure.getMessage().equals("movement_expired") ? 408 : 409;
+            respondJson(exchange, status, error(failure.getMessage()));
+        } catch (Exception failure) { respondJson(exchange, 500, error("movement_failed")); }
+    }
+
+    private static void handleGuardedTurn(HttpExchange exchange) throws IOException {
+        final long receivedNanos = System.nanoTime();
+        final String entrySession = GuardedGameMovement.LEASES.session();
+        if (!requireControlAccess(exchange, "/control/guarded-turn", "POST")) return;
+        if (exchange.getHttpContext().getServer() != server) {
+            respondJson(exchange, 409, error("bridge_lifecycle_changed")); return;
+        }
+        if (!GuardedGameTurning.enabled()) {
+            respondJson(exchange, 409, error("guarded_turning_disabled")); return;
+        }
+        if (exchange.getRequestURI().getRawQuery() != null) {
+            respondJson(exchange, 400, error("unexpected_query")); return;
+        }
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final GuardedMovement.Request request;
+        final double targetYaw;
+        try {
+            GuardedAction.require(body.keySet().equals(java.util.Set.of("turn_schema_version", "action",
+                    "session", "request_id", "observation_id", "expected_world_generation", "expected_player_uuid", "expected_tick",
+                    "expected_x", "expected_y", "expected_z", "expected_yaw", "ttl_ms", "target_yaw")),
+                    "unexpected_or_missing_field");
+            GuardedAction.require(optionalInteger(body, "turn_schema_version", -1) == GuardedGameTurning.SCHEMA,
+                    "unsupported_turn_schema");
+            GuardedAction.require(requiredString(body, "action").equals("yaw"), "invalid_action");
+            double tick = requiredFiniteDouble(body, "expected_tick");
+            GuardedAction.require(tick >= 0 && tick <= 9_007_199_254_740_991d && tick == Math.rint(tick), "invalid_expected_tick");
+            int ttl = optionalInteger(body, "ttl_ms", -1);
+            GuardedAction.require(ttl >= 1 && ttl <= GuardedMovement.MAX_TURN_TTL_MS, "invalid_turn_ttl_ms");
+            targetYaw = requiredFiniteDouble(body, "target_yaw");
+            GuardedAction.require(targetYaw >= -180 && targetYaw < 180, "invalid_target_yaw");
+            request = new GuardedMovement.Request(requiredString(body, "session"), requiredString(body, "request_id"),
+                    requiredString(body, "observation_id"), requiredString(body, "expected_world_generation"),
+                    requiredString(body, "expected_player_uuid"), (long) tick, requiredFiniteDouble(body, "expected_x"),
+                    requiredFiniteDouble(body, "expected_y"), requiredFiniteDouble(body, "expected_z"),
+                    requiredFiniteDouble(body, "expected_yaw"), ttl, ttl);
+            GuardedAction.require(Math.abs(Math.IEEEremainder(targetYaw - request.yaw(), 360)) <= GuardedMovement.MAX_TURN_STEP,
+                    "turn_step_too_large");
+        } catch (RequestException failure) { respondRequestFailure(exchange, failure); return;
+        } catch (GuardedAction.Rejected failure) { respondJson(exchange, 400, error(failure.getMessage())); return; }
+        GuardedMovement.Ticket turnTicket = null;
+        try {
+            turnTicket = GuardedGameTurning.submit(request, targetYaw, receivedNanos, entrySession);
+            GuardedMovement.Outcome outcome = turnTicket.await();
+            boolean ok = outcome.reason().equals("turn_dispatched");
+            JsonObject response = turnOutcome(ok ? protocolOk() : error(outcome.reason()), outcome);
+            respondJson(exchange, ok ? 200 : outcome.reason().equals("movement_expired") ? 408 : 409, response);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            GuardedMovement.Outcome outcome = turnTicket == null ? null : turnTicket.result.getNow(null);
+            respondJson(exchange, 503, turnOutcome(error("request_interrupted"), outcome));
+        } catch (GuardedAction.Rejected failure) {
+            int status = failure.getMessage().equals("movement_busy") ? 429 : failure.getMessage().equals("movement_expired") ? 408 : 409;
+            respondJson(exchange, status, error(failure.getMessage()));
+        } catch (Exception failure) { respondJson(exchange, 500, error("turn_failed")); }
+    }
+
+    private static JsonObject turnOutcome(JsonObject response, GuardedMovement.Outcome outcome) {
+        if (outcome != null) {
+            response.addProperty("turn_schema_version", GuardedGameTurning.SCHEMA);
+            response.addProperty("request_id", outcome.requestId());
+            response.addProperty("dispatched", outcome.turned());
+            response.addProperty("released", outcome.released());
+            response.addProperty("turn_confirmed", false);
+        }
+        return response;
+    }
+
+    private static void handleControlLook(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/look", "POST")) return;
+
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+
+        final double yaw;
+        final double pitch;
+        final boolean relative;
+        final AimViewGuard guard;
+        try {
+            yaw = requiredFiniteDouble(body, "yaw");
+            pitch = requiredFiniteDouble(body, "pitch");
+            relative = optionalBoolean(body, "relative", false);
+            guard = body.has("guard") ? AimViewGuard.parse(body.get("guard")) : null;
+            if (guard != null && relative) throw new ClientActionRequest.Rejected(400, "guard_requires_absolute_look");
+        } catch (ClientActionRequest.Rejected e) {
+            respondJson(exchange, e.httpStatus, error(e.getMessage()));
+            return;
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> {
+                        if (guard != null) return applyGuardedAimLook(yaw, pitch, guard);
+                        ClientActions.directTakeover(); return applyLook(yaw, pitch, relative);
+                    },
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "look_action_failed", e);
+        }
+    }
+
+    private static void handleControlMouse(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/mouse", "POST")) return;
+
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+
+        final double x;
+        final double y;
+        final int button;
+        final String action;
+        final double scrollY;
+        try {
+            action = requiredString(body, "action").trim().toLowerCase(Locale.ROOT);
+            if (!action.equals("move") && !action.equals("down") && !action.equals("up")
+                    && !action.equals("release") && !action.equals("click") && !action.equals("scroll")) {
+                throw new RequestException(400, "invalid_action",
+                        "action must be move, down, up, release, click, or scroll");
+            }
+            boolean hasX = body.has("x");
+            boolean hasY = body.has("y");
+            if (hasX != hasY) {
+                throw new RequestException(400, "incomplete_coordinates",
+                        "x and y must either both be present or both be absent");
+            }
+            if (action.equals("move") && !hasX) {
+                throw new RequestException(400, "missing_coordinates",
+                        "move requires x and y");
+            }
+            x = hasX ? requiredBoundedCoordinate(body, "x") : Double.NaN;
+            y = hasY ? requiredBoundedCoordinate(body, "y") : Double.NaN;
+            button = optionalInteger(body, "button", 0);
+            if (button < 0 || button > 7) {
+                throw new RequestException(400, "invalid_button", "button must be between 0 and 7");
+            }
+            scrollY = action.equals("scroll") ? requiredFiniteDouble(body, "scrollY") : 0.0;
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> { ClientActions.directTakeover(); return applyMouseAction(x, y, button, action, scrollY); },
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "mouse_action_failed", e);
+        }
+    }
+
+    private static void handleControlText(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/text", "POST")) return;
+
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+
+        final String text;
+        final boolean submit;
+        try {
+            text = requiredString(body, "text");
+            submit = optionalBoolean(body, "submit", false);
+            validateScreenText(text);
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> { ClientActions.directTakeover(); return applyScreenText(text, submit); },
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "text_input_failed", e);
+        }
+    }
+
+    private static void handleControlCommand(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/command", "POST")) return;
+
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+
+        final String command;
+        try {
+            command = normalizeCommand(requiredString(body, "command"));
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return;
+        }
+
+        try {
+            EndpointResult result = callOnMinecraftThread(
+                    () -> { ClientActions.directTakeover(); return applyCommand(command); },
+                    MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, result.status(), result.body());
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "command_submission_failed", e);
+        }
+    }
+
+    private static void handleControlReleaseAll(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/release-all", "POST")) return;
+        if (readJsonObjectOrRespond(exchange, true) == null) return;
+
+        try {
+            JsonObject result = callOnMinecraftThread(() -> {
+                int rawKeysReleased = releaseAllInputs();
+                JsonObject obj = ok();
+                obj.addProperty("released", true);
+                obj.addProperty("raw_keys_released", rawKeysReleased);
+                return obj;
+            }, MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, 200, result);
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "release_all_failed", e);
+        }
+    }
+
+    private static void handleControlClose(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/close", "POST")) return;
+        if (readJsonObjectOrRespond(exchange, true) == null) return;
+
+        try {
+            JsonObject result = callOnMinecraftThread(() -> {
+                int rawKeysReleased = releaseAllInputs();
+                Minecraft.getInstance().stop();
+                JsonObject obj = ok();
+                obj.addProperty("released", true);
+                obj.addProperty("raw_keys_released", rawKeysReleased);
+                obj.addProperty("closing", true);
+                return obj;
+            }, MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange, 200, result);
+        } catch (Exception e) {
+            respondMinecraftFailure(exchange, "close_failed", e);
+        }
+    }
+
+    private static JsonObject createCapabilities() {
+        JsonObject obj = protocolOk();
+        JsonArray operations = new JsonArray();
+        addOperation(operations, "GET", "/control/status", "session_identity");
+        addOperation(operations, "GET", "/control/capabilities", "capability_discovery");
+        addOperation(operations, "GET", "/control/frame", "framebuffer_png");
+        addOperation(operations, "GET", "/control/keymaps", "keymap_discovery");
+        addOperation(operations, "GET", "/control/state", "client_state_snapshot");
+        addOperation(operations, "GET", "/control/terrain", "nearby_loaded_terrain");
+        addOperation(operations, "POST", "/control/scan", "read_only_loaded_world_scan");
+        addOperation(operations, "GET", "/control/scan/status", "loaded_world_scan_status");
+        addOperation(operations, "POST", "/control/scan/cancel", "cancel_read_only_scan");
+        addOperation(operations, "GET", "/control/screen", "screen_snapshot");
+        addOperation(operations, "POST", "/control/action", "continuous_client_action");
+        addOperation(operations, "GET", "/control/action/status", "client_action_status");
+        addOperation(operations, "POST", "/control/action/cancel", "cancel_client_action");
+        addOperation(operations, "POST", "/control/key", "keymap_input");
+        addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
+        addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
+        addOperation(operations, "POST", "/control/guarded-movement", "guarded_local_movement_sample");
+        addOperation(operations, "POST", "/control/guarded-turn", "guarded_local_player_yaw");
+        addOperation(operations, "POST", "/control/look", "player_view");
+        addOperation(operations, "POST", "/control/mouse", "screen_mouse_input");
+        addOperation(operations, "POST", "/control/text", "focused_screen_text");
+        addOperation(operations, "POST", "/control/command", "minecraft_command");
+        addOperation(operations, "POST", "/control/release-all", "release_keymaps");
+        addOperation(operations, "POST", "/control/close", "graceful_client_stop");
+        obj.add("operations", operations);
+        JsonObject actions = new JsonObject();
+        actions.addProperty("schema_version", 1);
+        actions.addProperty("session", ClientActions.session());
+        actions.addProperty("single_flight", true);
+        actions.addProperty("multiplayer", true);
+        actions.addProperty("tick_driven", true);
+        actions.addProperty("direct_input_takeover", true);
+        actions.addProperty("deduplicate_action_ids", true);
+        JsonArray actionNames = new JsonArray();
+        ClientActionRequest.ACTIONS.stream().sorted().forEach(actionNames::add);
+        actions.add("actions", actionNames);
+        obj.add("client_actions", actions);
+        obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        obj.addProperty("combat_observation_schema_version", 1);
+        JsonObject guarded = new JsonObject();
+        guarded.addProperty("schema_version", GuardedAction.SCHEMA);
+        guarded.addProperty("enabled", GuardedGameActions.enabled());
+        guarded.addProperty("max_ttl_ms", GuardedAction.MAX_TTL_MS);
+        guarded.addProperty("max_range", GuardedAction.MAX_RANGE);
+        guarded.addProperty("max_yaw_step", GuardedAction.MAX_YAW_STEP);
+        guarded.addProperty("max_pitch_step", GuardedAction.MAX_PITCH_STEP);
+        guarded.addProperty("local_unpublished_survival_only", true);
+        guarded.addProperty("single_flight", true);
+        guarded.addProperty("synchronous_attack_attempt", true);
+        guarded.addProperty("held_input", false);
+        guarded.addProperty("unenchanted_axe_only", true);
+        JsonArray targets = new JsonArray();
+        GuardedAction.HOSTILE_TYPES.stream().sorted().forEach(targets::add);
+        guarded.add("allowed_target_types", targets);
+        obj.add("guarded_actions", guarded);
+        obj.add("guarded_movement", GuardedGameMovement.status());
+        obj.add("guarded_turn", GuardedGameTurning.capabilities());
+
+        JsonObject limits = new JsonObject();
+        limits.addProperty("request_body_bytes", MAX_BODY_BYTES);
+        limits.addProperty("json_response_bytes", MAX_JSON_BYTES);
+        limits.addProperty("frame_bytes", MAX_FRAME_BYTES);
+        limits.addProperty("minecraft_timeout_seconds", MINECRAFT_TIMEOUT_SECONDS);
+        limits.addProperty("frame_timeout_seconds", FRAME_TIMEOUT_SECONDS);
+        limits.addProperty("scan_tick_block_reads_max", LoadedScan.BLOCKS_PER_TICK);
+        limits.addProperty("scan_tick_budget_micros", LoadedScan.BUDGET_NANOS / 1000);
+        limits.addProperty("scan_results_max", 256);
+        limits.addProperty("scan_chunks_max", 8192);
+        limits.addProperty("terrain_radius_max", TerrainQuery.MAX_RADIUS);
+        limits.addProperty("terrain_vertical_max", TerrainQuery.MAX_VERTICAL);
+        limits.addProperty("terrain_page_cells_max", TerrainQuery.MAX_LIMIT);
+        limits.addProperty("terrain_total_cells_max", TerrainQuery.MAX_BLOCKS);
+        limits.addProperty("terrain_page_budget_micros", TerrainScan.PAGE_BUDGET_NANOS / 1000);
+        limits.addProperty("terrain_min_page_interval_ms", TerrainScan.MIN_PAGE_INTERVAL_NANOS / 1_000_000);
+        limits.addProperty("terrain_cursor_ttl_seconds", TerrainScan.MAX_AGE_NANOS / 1_000_000_000);
+        limits.addProperty("nearby_radius_max", MAX_ENTITY_RADIUS);
+        limits.addProperty("nearby_entities_max", MAX_NEARBY_ENTITIES);
+        limits.addProperty("keymaps_max", MAX_KEYMAPS);
+        limits.addProperty("screen_children_max", MAX_SCREEN_CHILDREN);
+        limits.addProperty("container_slots_max", MAX_CONTAINER_SLOTS);
+        limits.addProperty("text_characters_max", MAX_TEXT_LENGTH);
+        limits.addProperty("command_characters_max", MAX_COMMAND_LENGTH);
+        obj.add("limits", limits);
+
+        JsonObject safety = new JsonObject();
+        safety.addProperty("loopback_only", true);
+        safety.addProperty("bearer_required", true);
+        safety.addProperty("authenticated_minecraft_commands", true);
+        safety.addProperty("internal_keyboard_events", true);
+        safety.addProperty("internal_mouse_events", true);
+        safety.addProperty("mod_input_events_observed", InputEventProbe.installed());
+        safety.addProperty("arbitrary_scripts", false);
+        safety.addProperty("direct_file_api", false);
+        safety.addProperty("direct_outbound_network_api", false);
+        safety.addProperty("direct_world_mutation_api", false);
+        safety.addProperty("input_can_trigger_gameplay_and_gui_actions", true);
+        safety.addProperty("os_input", false);
+        obj.add("safety", safety);
+        return obj;
+    }
+
+    private static void addOperation(JsonArray operations, String method, String path, String capability) {
+        JsonObject operation = new JsonObject();
+        operation.addProperty("method", method);
+        operation.addProperty("path", path);
+        operation.addProperty("capability", capability);
+        operations.add(operation);
+    }
+
+    private static JsonObject createKeymapsSnapshot() {
+        Minecraft mc = Minecraft.getInstance();
+        JsonObject obj = protocolOk();
+        JsonArray entries = new JsonArray();
+        int total = mc.options.keyMappings.length;
+        int returned = Math.min(total, MAX_KEYMAPS);
+        for (int i = 0; i < returned; i++) {
+            KeyMapping mapping = mc.options.keyMappings[i];
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", boundedText(mapping.getName()));
+            entry.addProperty("category", boundedText(mapping.getCategory()));
+            entry.addProperty("bound_key", boundedText(mapping.saveString()));
+            entry.addProperty("down", mapping.isDown());
+            entry.addProperty("unbound", mapping.isUnbound());
+            entries.add(entry);
+        }
+        obj.addProperty("total", total);
+        obj.addProperty("returned", returned);
+        obj.addProperty("truncated", total > returned);
+        obj.add("keymaps", entries);
+        return obj;
+    }
+
+    private static EndpointResult createStateSnapshot(double radius) {
+        Minecraft mc = Minecraft.getInstance();
+        WorldGeneration.current(mc.level);
+        if (mc.player == null || mc.level == null) {
+            return new EndpointResult(409, error("not_in_world"));
+        }
+
+        JsonObject obj = protocolOk();
+        obj.add("client_action", ClientActions.status(null));
+        obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        obj.addProperty("combat_observation_schema_version", 1);
+        obj.addProperty("screen_open", mc.screen != null);
+        obj.addProperty("paused", mc.isPaused());
+        obj.add("menu", menuSnapshot(mc.player.containerMenu));
+        JsonObject player = new JsonObject();
+        player.addProperty("uuid", mc.player.getUUID().toString());
+        player.addProperty("name", boundedText(mc.player.getGameProfile().getName()));
+        player.addProperty("x", mc.player.getX());
+        player.addProperty("y", mc.player.getY());
+        player.addProperty("z", mc.player.getZ());
+        player.addProperty("yaw", mc.player.getYRot());
+        player.addProperty("pitch", mc.player.getXRot());
+        player.add("velocity", vector(mc.player.getDeltaMovement()));
+        player.add("vehicle", BoatObservation.snapshot(mc));
+        player.add("eye_position", vector(mc.player.getEyePosition()));
+        player.addProperty("alive", mc.player.isAlive());
+        player.addProperty("health", mc.player.getHealth());
+        player.addProperty("max_health", mc.player.getMaxHealth());
+        player.addProperty("food", mc.player.getFoodData().getFoodLevel());
+        player.addProperty("saturation", mc.player.getFoodData().getSaturationLevel());
+        player.addProperty("air", mc.player.getAirSupply());
+        player.addProperty("max_air", mc.player.getMaxAirSupply());
+        player.addProperty("xp_level", mc.player.experienceLevel);
+        player.addProperty("xp_progress", mc.player.experienceProgress);
+        player.addProperty("xp_total", mc.player.totalExperience);
+        player.addProperty("gamemode", mc.gameMode == null
+                ? "unknown"
+                : mc.gameMode.getPlayerMode().getName());
+        player.addProperty("dimension", mc.level.dimension().location().toString());
+        player.addProperty("on_ground", mc.player.onGround());
+        player.addProperty("sprinting", mc.player.isSprinting());
+        // Read the real client cooldown and item-use state. These are observed
+        // mechanics, not confirmation that a later server attack will land.
+        player.addProperty("attack_strength", mc.player.getAttackStrengthScale(0.5F));
+        player.addProperty("attack_speed", mc.player.getAttributeValue(Attributes.ATTACK_SPEED));
+        player.addProperty("entity_interaction_range", mc.player.entityInteractionRange());
+        player.addProperty("using_item", mc.player.isUsingItem());
+        player.addProperty("blocking", mc.player.isBlocking());
+        player.addProperty("use_ticks", mc.player.getTicksUsingItem());
+        player.addProperty("shield_cooldown", mc.player.getCooldowns().isOnCooldown(Items.SHIELD));
+
+        Inventory inventory = mc.player.getInventory();
+        player.addProperty("selected_slot", inventory.selected);
+        JsonArray inventoryItems = new JsonArray();
+        for (int slot = 0; slot < inventory.items.size(); slot++) {
+            JsonObject item = itemSnapshot(inventory.items.get(slot));
+            item.addProperty("slot", slot);
+            inventoryItems.add(item);
+        }
+        player.addProperty("inventory_total", inventory.items.size());
+        player.addProperty("inventory_truncated", false);
+        player.add("inventory", inventoryItems);
+
+        JsonArray armor = new JsonArray();
+        for (EquipmentSlot slot : new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET}) {
+            JsonObject item = itemSnapshot(mc.player.getItemBySlot(slot));
+            item.addProperty("slot", slot.getName());
+            armor.add(item);
+        }
+        player.add("armor", armor);
+        player.add("offhand", itemSnapshot(mc.player.getOffhandItem()));
+
+        JsonArray effects = new JsonArray();
+        int effectTotal = mc.player.getActiveEffects().size();
+        int effectCount = 0;
+        for (MobEffectInstance effect : mc.player.getActiveEffects()) {
+            if (effectCount >= MAX_STATUS_EFFECTS) break;
+            JsonObject effectJson = new JsonObject();
+            effectJson.addProperty("id", BuiltInRegistries.MOB_EFFECT
+                    .getKey(effect.getEffect().value()).toString());
+            effectJson.addProperty("amplifier", effect.getAmplifier());
+            effectJson.addProperty("duration_ticks", effect.getDuration());
+            effectJson.addProperty("ambient", effect.isAmbient());
+            effectJson.addProperty("visible", effect.isVisible());
+            effects.add(effectJson);
+            effectCount++;
+        }
+        player.addProperty("effects_total", effectTotal);
+        player.addProperty("effects_returned", effectCount);
+        player.addProperty("effects_truncated", effectTotal > effectCount);
+        player.add("effects", effects);
+        obj.add("player", player);
+
+        obj.add("crosshair", crosshairSnapshot(mc));
+
+        JsonObject world = new JsonObject();
+        world.addProperty("dimension", mc.level.dimension().location().toString());
+        // A registry fact at the player's feet, not an inference from nearby trees/blocks.
+        world.addProperty("biome_id", mc.level.getBiome(mc.player.blockPosition())
+                .unwrapKey().map(key -> key.location().toString()).orElse(null));
+        world.addProperty("game_time", mc.level.getGameTime());
+        world.addProperty("world_generation", WorldGeneration.current(mc.level));
+        world.add("navigation_guard", NavigationPositionGuard.snapshot(mc));
+        world.addProperty("day_time", mc.level.getDayTime());
+        world.addProperty("raining", mc.level.isRaining());
+        world.addProperty("thundering", mc.level.isThundering());
+        world.addProperty("rain_level", mc.level.getRainLevel(1.0F));
+        world.addProperty("thunder_level", mc.level.getThunderLevel(1.0F));
+        obj.add("world", world);
+        obj.add("guarded_movement", GuardedGameMovement.observedStatus(mc));
+        obj.add("guarded_turn", GuardedGameTurning.capabilities());
+        obj.add("nearby", nearbyEntitiesSnapshot(mc, radius));
+        return new EndpointResult(200, obj);
+    }
+
+    private static JsonObject crosshairSnapshot(Minecraft mc) {
+        JsonObject target = new JsonObject();
+        HitResult hit = mc.hitResult;
+        if (hit == null || hit.getType() == HitResult.Type.MISS) {
+            target.addProperty("type", "miss");
+            return target;
+        }
+
+        target.addProperty("distance", hit.distanceTo(mc.player)); // Legacy field is squared; preserved for compatibility.
+        target.addProperty("distance_squared", hit.distanceTo(mc.player));
+        target.addProperty("distance_euclidean", Math.sqrt(hit.distanceTo(mc.player)));
+        target.add("location", vector(hit.getLocation()));
+        if (hit instanceof BlockHitResult blockHit) {
+            BlockPos pos = blockHit.getBlockPos();
+            target.addProperty("type", "block");
+            target.addProperty("id", BuiltInRegistries.BLOCK
+                    .getKey(mc.level.getBlockState(pos).getBlock()).toString());
+            target.addProperty("x", pos.getX());
+            target.addProperty("y", pos.getY());
+            target.addProperty("z", pos.getZ());
+            target.addProperty("face", blockHit.getDirection().getName());
+            return target;
+        }
+        if (hit instanceof EntityHitResult entityHit) {
+            Entity entity = entityHit.getEntity();
+            target.addProperty("type", "entity");
+            target.addProperty("entity_id", entity.getId());
+            target.addProperty("uuid", entity.getUUID().toString());
+            target.addProperty("entity_type", BuiltInRegistries.ENTITY_TYPE
+                    .getKey(entity.getType()).toString());
+            target.addProperty("name", boundedText(entity.getName().getString()));
+            return target;
+        }
+        target.addProperty("type", hit.getType().name().toLowerCase(Locale.ROOT));
+        return target;
+    }
+
+    private static JsonObject nearbyEntitiesSnapshot(Minecraft mc, double radius) {
+        Comparator<EntityDistance> farthestFirst = Comparator
+                .comparingDouble(EntityDistance::distance)
+                .reversed();
+        PriorityQueue<EntityDistance> nearest = new PriorityQueue<>(MAX_NEARBY_ENTITIES, farthestFirst);
+        int total = 0;
+        double radiusSquared = radius * radius;
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (entity == mc.player) continue;
+            double distanceSquared = entity.distanceToSqr(mc.player);
+            if (distanceSquared > radiusSquared) continue;
+            total++;
+            EntityDistance candidate = new EntityDistance(entity, Math.sqrt(distanceSquared));
+            if (nearest.size() < MAX_NEARBY_ENTITIES) {
+                nearest.add(candidate);
+            } else if (candidate.distance() < nearest.peek().distance()) {
+                nearest.poll();
+                nearest.add(candidate);
+            }
+        }
+
+        ArrayList<EntityDistance> sorted = new ArrayList<>(nearest);
+        sorted.sort(Comparator.comparingDouble(EntityDistance::distance));
+        JsonArray entities = new JsonArray();
+        for (EntityDistance entry : sorted) {
+            Entity entity = entry.entity();
+            JsonObject entityJson = new JsonObject();
+            entityJson.addProperty("entity_id", entity.getId());
+            entityJson.addProperty("uuid", entity.getUUID().toString());
+            entityJson.addProperty("type", BuiltInRegistries.ENTITY_TYPE
+                    .getKey(entity.getType()).toString());
+            entityJson.addProperty("class", boundedText(entity.getClass().getName()));
+            entityJson.addProperty("name", boundedText(entity.getName().getString()));
+            entityJson.addProperty("x", entity.getX());
+            entityJson.addProperty("y", entity.getY());
+            entityJson.addProperty("z", entity.getZ());
+            entityJson.addProperty("yaw", entity.getYRot());
+            entityJson.addProperty("pitch", entity.getXRot());
+            entityJson.add("velocity", vector(entity.getDeltaMovement()));
+            entityJson.addProperty("distance", entry.distance());
+            entityJson.addProperty("alive", entity.isAlive());
+            var bounds = entity.getBoundingBox();
+            JsonObject box = new JsonObject();
+            box.add("min", vector(new Vec3(bounds.minX, bounds.minY, bounds.minZ)));
+            box.add("max", vector(new Vec3(bounds.maxX, bounds.maxY, bounds.maxZ)));
+            entityJson.add("bounding_box", box);
+            entityJson.addProperty("on_ground", entity.onGround());
+            if (entity instanceof LivingEntity living) {
+                entityJson.addProperty("health", living.getHealth());
+                entityJson.addProperty("max_health", living.getMaxHealth());
+                entityJson.addProperty("hurt_time", living.hurtTime);
+                entityJson.addProperty("using_item", living.isUsingItem());
+                entityJson.addProperty("use_ticks", living.getTicksUsingItem());
+                entityJson.add("mainhand", itemSnapshot(living.getMainHandItem()));
+            }
+            entities.add(entityJson);
+        }
+
+        JsonObject nearby = new JsonObject();
+        nearby.addProperty("radius", radius);
+        nearby.addProperty("total", total);
+        nearby.addProperty("returned", sorted.size());
+        nearby.addProperty("truncated", total > sorted.size());
+        nearby.add("entities", entities);
+        return nearby;
+    }
+
+    private static JsonObject createScreenSnapshot() {
+        BoundedContainerSnapshot.beginSnapshot();
+        Minecraft mc = Minecraft.getInstance();
+        JsonObject obj = protocolOk();
+        Screen screen = mc.screen;
+        if (mc.player != null) obj.add("menu", menuSnapshot(mc.player.containerMenu));
+        obj.addProperty("open", screen != null);
+        if (screen == null) {
+            obj.addProperty("children_total", 0);
+            obj.addProperty("children_returned", 0);
+            obj.addProperty("children_truncated", false);
+            obj.add("children", new JsonArray());
+            return obj;
+        }
+
+        obj.addProperty("class", screen.getClass().getName());
+        obj.addProperty("title", boundedText(screen.getTitle().getString()));
+        obj.addProperty("gui_width", screen.width);
+        obj.addProperty("gui_height", screen.height);
+        GuiEventListener focused = screen.getFocused();
+        obj.addProperty("focused_class", focused == null ? "" : focused.getClass().getName());
+
+        JsonArray children = new JsonArray();
+        int totalChildren = screen.children().size();
+        int childLimit = Math.min(totalChildren, MAX_SCREEN_CHILDREN);
+        for (int i = 0; i < childLimit; i++) {
+            GuiEventListener child = screen.children().get(i);
+            JsonObject childJson = new JsonObject();
+            childJson.addProperty("index", i);
+            childJson.addProperty("class", boundedText(child.getClass().getName()));
+            childJson.addProperty("focused", child == focused || child.isFocused());
+            if (child instanceof AbstractWidget widget) {
+                childJson.addProperty("visible", widget.visible);
+                childJson.addProperty("active", widget.active);
+                childJson.addProperty("message", boundedText(widget.getMessage().getString()));
+                childJson.addProperty("x", widget.getX());
+                childJson.addProperty("y", widget.getY());
+                childJson.addProperty("width", widget.getWidth());
+                childJson.addProperty("height", widget.getHeight());
+            } else {
+                addChildRectangle(childJson, child);
+            }
+            children.add(childJson);
+        }
+        obj.addProperty("children_total", totalChildren);
+        obj.addProperty("children_returned", childLimit);
+        obj.addProperty("children_truncated", totalChildren > childLimit);
+        obj.add("children", children);
+
+        if (screen instanceof AbstractContainerScreen<?> containerScreen) {
+            AbstractContainerMenu menu = containerScreen.getMenu();
+            obj.addProperty("menu_class", menu.getClass().getName());
+            obj.addProperty("container_id", menu.containerId);
+            JsonArray slots = new JsonArray();
+            int totalSlots = menu.slots.size();
+            int slotLimit = Math.min(totalSlots, MAX_CONTAINER_SLOTS);
+            for (int i = 0; i < slotLimit; i++) {
+                Slot slot = menu.slots.get(i);
+                JsonObject slotJson = new JsonObject();
+                slotJson.addProperty("menu_index", i);
+                slotJson.addProperty("slot_index", slot.index);
+                slotJson.addProperty("container_slot", slot.getContainerSlot());
+                slotJson.addProperty("x", slot.x);
+                slotJson.addProperty("y", slot.y);
+                slotJson.addProperty("active", slot.isActive());
+                slotJson.add("item", itemSnapshot(slot.getItem()));
+                slots.add(slotJson);
+            }
+            obj.addProperty("slots_total", totalSlots);
+            obj.addProperty("slots_returned", slotLimit);
+            obj.addProperty("slots_truncated", totalSlots > slotLimit);
+            obj.add("slots", slots);
+        }
+        return obj;
+    }
+
+    static JsonObject menuSnapshot(AbstractContainerMenu menu) {
+        BoundedContainerSnapshot.beginSnapshot();
+        Minecraft mc = Minecraft.getInstance();
+        JsonObject obj = new JsonObject();
+        obj.addProperty("menu_class", menu.getClass().getName());
+        obj.addProperty("container_id", menu.containerId);
+        obj.addProperty("state_id", menu.getStateId());
+        obj.add("carried", itemSnapshot(menu.getCarried()));
+        JsonArray slots = new JsonArray();
+        int limit = Math.min(menu.slots.size(), MAX_CONTAINER_SLOTS);
+        for (int i = 0; i < limit; i++) {
+            Slot slot = menu.slots.get(i);
+            JsonObject entry = new JsonObject();
+            entry.addProperty("menu_index", i);
+            entry.addProperty("slot_index", slot.index);
+            entry.addProperty("container_slot", slot.getContainerSlot());
+            boolean inventory = mc.player != null && slot.container == mc.player.getInventory();
+            entry.addProperty("player_inventory", inventory);
+            if (inventory) entry.addProperty("inventory_index", slot.getContainerSlot());
+            entry.addProperty("active", slot.isActive());
+            entry.add("item", itemSnapshot(slot.getItem()));
+            slots.add(entry);
+        }
+        obj.add("slots", slots);
+        obj.addProperty("slots_total", menu.slots.size());
+        obj.addProperty("slots_returned", limit);
+        obj.addProperty("slots_truncated", menu.slots.size() > limit);
+        return obj;
+    }
+
+    private static void addChildRectangle(JsonObject childJson, GuiEventListener child) {
+        try {
+            ScreenRectangle rectangle = child.getRectangle();
+            childJson.addProperty("x", rectangle.left());
+            childJson.addProperty("y", rectangle.top());
+            childJson.addProperty("width", rectangle.width());
+            childJson.addProperty("height", rectangle.height());
+            childJson.addProperty("geometry_available", true);
+        } catch (RuntimeException e) {
+            childJson.addProperty("geometry_available", false);
+        }
+    }
+
+    private static JsonObject itemSnapshot(ItemStack stack) {
+        JsonObject item = new JsonObject();
+        boolean empty = stack == null || stack.isEmpty();
+        item.addProperty("empty", empty);
+        if (empty) {
+            item.addProperty("id", "");
+            item.addProperty("count", 0);
+            item.addProperty("damage", 0);
+            item.addProperty("max_damage", 0);
+            return item;
+        }
+        item.addProperty("id", BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+        item.addProperty("count", stack.getCount());
+        item.addProperty("damage", stack.getDamageValue());
+        item.addProperty("max_damage", stack.getMaxDamage());
+        BoundedContainerSnapshot.append(stack, item);
+        return item;
+    }
+
+    private static JsonObject vector(Vec3 vector) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("x", vector.x);
+        obj.addProperty("y", vector.y);
+        obj.addProperty("z", vector.z);
+        return obj;
+    }
+
+    private static JsonObject protocolOk() {
+        JsonObject obj = ok();
+        obj.addProperty("protocol", PROTOCOL_NAME);
+        obj.addProperty("schema_version", PROTOCOL_SCHEMA_VERSION);
+        return obj;
+    }
+
+    private static JsonObject createControlStatus() {
+        Minecraft mc = Minecraft.getInstance();
+        WorldGeneration.current(mc.level);
+        JsonObject obj = ok();
+        obj.addProperty("process_id", ProcessHandle.current().pid());
+        obj.addProperty("protocol", PROTOCOL_NAME);
+        obj.addProperty("schema_version", PROTOCOL_SCHEMA_VERSION);
+        obj.addProperty("run_id", runId());
+        obj.addProperty("desktop_name", identityValue(
+                "mineclientBridge.desktopName",
+                "MINECLIENT_BRIDGE_DESKTOP_NAME"));
+        obj.addProperty("runtime_root", identityValue(
+                "mineclientBridge.runtimeRoot",
+                "MINECLIENT_BRIDGE_RUNTIME_ROOT"));
+        obj.addProperty("evidence_root", identityValue(
+                "mineclientBridge.evidenceRoot",
+                "MINECLIENT_BRIDGE_EVIDENCE_ROOT"));
+        obj.add("client_action", ClientActions.status(null));
+        obj.addProperty("bridge_running", isRunning());
+        obj.addProperty("in_world", mc.level != null && mc.player != null);
+
+        JsonObject world = new JsonObject();
+        world.addProperty("present", mc.level != null);
+        if (mc.level != null) {
+            world.addProperty("dimension", mc.level.dimension().location().toString());
+            world.addProperty("game_time", mc.level.getGameTime());
+            world.addProperty("world_generation", WorldGeneration.current(mc.level));
+        }
+        obj.add("world", world);
+        obj.add("guarded_movement", GuardedGameMovement.status());
+        obj.add("guarded_turn", GuardedGameTurning.capabilities());
+
+        JsonObject player = new JsonObject();
+        player.addProperty("present", mc.player != null);
+        if (mc.player != null) {
+            player.addProperty("name", boundedText(mc.player.getGameProfile().getName()));
+            player.addProperty("uuid", mc.player.getUUID().toString());
+            player.addProperty("x", mc.player.getX());
+            player.addProperty("y", mc.player.getY());
+            player.addProperty("z", mc.player.getZ());
+            player.addProperty("yaw", mc.player.getYRot());
+            player.addProperty("pitch", mc.player.getXRot());
+        }
+        obj.add("player", player);
+
+        Screen currentScreen = mc.screen;
+        JsonObject screen = new JsonObject();
+        screen.addProperty("present", currentScreen != null);
+        if (currentScreen != null) {
+            screen.addProperty("class", currentScreen.getClass().getName());
+            screen.addProperty("title", boundedText(currentScreen.getTitle().getString()));
+            screen.addProperty("width", currentScreen.width);
+            screen.addProperty("height", currentScreen.height);
+        }
+        obj.add("screen", screen);
+
+        JsonObject window = new JsonObject();
+        window.addProperty("width", mc.getWindow().getWidth());
+        window.addProperty("height", mc.getWindow().getHeight());
+        window.addProperty("screen_width", mc.getWindow().getScreenWidth());
+        window.addProperty("screen_height", mc.getWindow().getScreenHeight());
+        window.addProperty("gui_width", mc.getWindow().getGuiScaledWidth());
+        window.addProperty("gui_height", mc.getWindow().getGuiScaledHeight());
+        window.addProperty("gui_scale", mc.getWindow().getGuiScale());
+        window.addProperty("fullscreen", mc.getWindow().isFullscreen());
+        window.addProperty("active", mc.isWindowActive());
+        obj.add("window", window);
+
+        JsonObject pointer = new JsonObject();
+        pointer.addProperty("grabbed", mc.mouseHandler.isMouseGrabbed());
+        pointer.addProperty("left_pressed", mc.mouseHandler.isLeftPressed());
+        pointer.addProperty("right_pressed", mc.mouseHandler.isRightPressed());
+        pointer.addProperty("middle_pressed", mc.mouseHandler.isMiddlePressed());
+        JsonArray heldButtons = new JsonArray();
+        for (int button : HELD_WORLD_MOUSE_BUTTONS) {
+            heldButtons.add(button);
+        }
+        pointer.add("held_world_buttons", heldButtons);
+        obj.add("mouse", pointer);
+
+        JsonArray heldMappings = new JsonArray();
+        for (KeyMapping mapping : mc.options.keyMappings) {
+            if (mapping.isDown()) {
+                heldMappings.add(mapping.getName());
+            }
+        }
+        obj.add("held_mappings", heldMappings);
+        ClientInputIsolation.Statistics isolationStats = ClientInputIsolation.statistics();
+        JsonObject isolation = new JsonObject();
+        isolation.addProperty("enabled", ClientInputIsolation.enabled());
+        isolation.addProperty("mode", ClientInputIsolation.enabled() ? "process_local_virtual" : "native");
+        isolation.addProperty("synthetic_dispatches", isolationStats.syntheticDispatches());
+        isolation.addProperty("synthetic_input_callbacks", isolationStats.syntheticInputCallbacks());
+        isolation.addProperty("suppressed_native_callbacks", isolationStats.suppressedNativeCallbacks());
+        isolation.addProperty("native_callback_registration_blocks", isolationStats.suppressedNativeRegistrations());
+        isolation.addProperty("suppressed_cursor_operations", isolationStats.suppressedCursorOperations());
+        isolation.addProperty("suppressed_raw_mouse_updates", isolationStats.suppressedRawMouseUpdates());
+        isolation.addProperty("virtual_key_reads", isolationStats.virtualKeyReads());
+        isolation.addProperty("virtual_clipboard_reads", isolationStats.virtualClipboardReads());
+        isolation.addProperty("virtual_clipboard_writes", isolationStats.virtualClipboardWrites());
+        isolation.addProperty("held_keys", isolationStats.heldKeys());
+        obj.add("input_isolation", isolation);
+
+        InputEventProbe.Statistics probeStats = InputEventProbe.statistics();
+        JsonObject probe = new JsonObject();
+        probe.addProperty("installed", probeStats.installed());
+        probe.addProperty("mouse_button_events", probeStats.mouseButtonEvents());
+        probe.addProperty("mouse_button_events_cancelled_by_mods", probeStats.mouseButtonEventsCancelled());
+        probe.addProperty("key_events", probeStats.keyEvents());
+        probe.addProperty("scroll_events", probeStats.scrollEvents());
+        probe.addProperty("scroll_events_cancelled_by_mods", probeStats.scrollEventsCancelled());
+        probe.addProperty("interaction_events", probeStats.interactionEvents());
+        probe.addProperty("interaction_events_cancelled_by_mods", probeStats.interactionEventsCancelled());
+        addObservation(probe, "last_mouse_button", probeStats.lastMouseButton());
+        addObservation(probe, "last_key", probeStats.lastKey());
+        addObservation(probe, "last_scroll", probeStats.lastScroll());
+        addObservation(probe, "last_interaction", probeStats.lastInteraction());
+        obj.add("mod_input_events", probe);
+        return obj;
+    }
+
+    private static void addObservation(JsonObject parent, String name, InputEventProbe.Observation observation) {
+        if (observation == null) {
+            return;
+        }
+        JsonObject entry = new JsonObject();
+        entry.addProperty("device", observation.device());
+        if (observation.code() >= 0) {
+            entry.addProperty("code", observation.code());
+        }
+        if (observation.action() >= 0) {
+            entry.addProperty("action", observation.action());
+        }
+        entry.addProperty("cancelled_by_mod", observation.cancelled());
+        if (!observation.mapping().isEmpty()) {
+            entry.addProperty("mapping", observation.mapping());
+        }
+        parent.add(name, entry);
+    }
+
+    private static byte[] captureFrame() throws IOException {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getMainRenderTarget() == null) {
+            throw new IOException("Minecraft main render target is unavailable");
+        }
+
+        try (NativeImage image = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
+            byte[] png = image.asByteArray();
+            if (png.length > MAX_FRAME_BYTES) {
+                throw new FrameTooLargeException(png.length);
+            }
+            return png;
+        }
+    }
+
+    private static EndpointResult applyKeyAction(String mappingName, String action, boolean exact) {
+        Minecraft mc = Minecraft.getInstance();
+        KeyMapping selected = null;
+        for (KeyMapping mapping : mc.options.keyMappings) {
+            if (mappingName.equals(mapping.getName())) {
+                selected = mapping;
+                break;
+            }
+        }
+
+        if (selected == null) {
+            return new EndpointResult(404, error("mapping_not_found", "No exact KeyMapping.getName() match"));
+        }
+
+        // A mapping is only a name for the key the player would press. Drive that key through the
+        // same client handler a real device drives, so KeyMapping bookkeeping and the NeoForge
+        // input events both happen exactly as they do for a physical press.
+        InputConstants.Key boundKey = selected.getKey();
+        if (!exact && boundKey.getType() == InputConstants.Type.MOUSE && mc.screen != null) {
+            // The screen route clicks whatever the virtual pointer sits on rather than publishing a
+            // button event, so it would press a random widget instead of activating the mapping.
+            return new EndpointResult(409, error(
+                    "mouse_mapping_requires_no_screen",
+                    "This mapping is bound to a mouse button. Close the screen, or use kind mouse "
+                            + "with x and y for a GUI click, or exact for the mapping alone"));
+        }
+        EndpointResult delivered = exact ? borrowKeyForMapping(mc, selected, action) : switch (boundKey.getType()) {
+            case MOUSE -> applyMouseAction(Double.NaN, Double.NaN, boundKey.getValue(), action, 0.0);
+            case KEYSYM -> boundKey.getValue() < 0
+                    ? borrowKeyForMapping(mc, selected, action)
+                    : applyRawKeyForKey(mc, boundKey, action);
+            default -> borrowKeyForMapping(mc, selected, action);
+        };
+
+        JsonObject obj = delivered.body().deepCopy();
+        obj.addProperty("mapping", selected.getName());
+        obj.addProperty("action", action);
+        obj.addProperty("key", selected.saveString());
+        obj.addProperty("key_type", boundKey.getType().name().toLowerCase(Locale.ROOT));
+        obj.addProperty("exact", exact);
+        obj.addProperty("mapping_down", selected.isDown());
+        return new EndpointResult(delivered.status(), obj);
+    }
+
+    /**
+     * Borrows a spare keyboard key for the length of one real keyboard event and gives it straight
+     * back. This is how an unbound mapping is driven at all, and how an exact request activates only
+     * the mapping it names instead of every mapping that shares the same physical key.
+     */
+    private static EndpointResult borrowKeyForMapping(Minecraft mc, KeyMapping selected, String action) {
+        InputConstants.Key temporaryKey = findUnusedKeyboardKey(mc);
+        if (temporaryKey == null) {
+            return new EndpointResult(409, error(
+                    "no_temporary_mapping_key",
+                    "No unused keyboard key is available for an exact mapping click"));
+        }
+        if (!action.equals("click")) {
+            // The mapping is only bound to the borrowed key for the length of one event, so a hold
+            // cannot be delivered this way. Setting the mapping down by hand instead would publish
+            // no event at all, which is the gap this route exists to close, so refuse it plainly.
+            return new EndpointResult(409, error(
+                    "borrowed_key_hold_unsupported",
+                    "Only a click can be delivered for an unbound or exact mapping. Bind the mapping "
+                            + "to a key, or use kind raw_key or mouse to hold that key"));
+        }
+
+        InputConstants.Key originalKey = selected.getKey();
+        selected.setKey(temporaryKey);
+        KeyMapping.resetMapping();
+        try {
+            EndpointResult borrowed = applyRawKeyForKey(mc, temporaryKey, "click");
+            // The borrowed key is an implementation detail; do not report it as the mapping's key.
+            JsonObject obj = borrowed.body().deepCopy();
+            obj.remove("key");
+            obj.addProperty("borrowed_key", temporaryKey.getName());
+            obj.addProperty("borrowed_key_code", obj.remove("key_code").getAsInt());
+            return new EndpointResult(borrowed.status(), obj);
+        } finally {
+            // The release dispatched above already cleared the mapping through KeyMapping.set,
+            // so nothing here may touch its down state: it could belong to another held input.
+            selected.setKey(originalKey);
+            KeyMapping.resetMapping();
+        }
+    }
+
+    private static InputConstants.Key findUnusedKeyboardKey(Minecraft mc) {
+        for (int keyCode = MAX_GLFW_KEY_CODE; keyCode >= 32; keyCode--) {
+            InputConstants.Key candidate = InputConstants.Type.KEYSYM.getOrCreate(keyCode);
+            boolean used = false;
+            for (KeyMapping mapping : mc.options.keyMappings) {
+                if (candidate.equals(mapping.getKey())) {
+                    used = true;
+                    break;
+                }
+            }
+            if (!used) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static EndpointResult applyRawKeyAction(String keyName, String action) {
+        final InputConstants.Key key;
+        try {
+            key = resolveKeyboardKey(keyName);
+        } catch (IllegalArgumentException e) {
+            return new EndpointResult(400, error("invalid_key", e.getMessage()));
+        }
+        return applyRawKeyForKey(Minecraft.getInstance(), key, action);
+    }
+
+    private static EndpointResult applyRawKeyForKey(Minecraft mc, InputConstants.Key key, String action) {
+        if (!mc.isSameThread()) {
+            throw new IllegalStateException("Raw key input must run on the Minecraft thread");
+        }
+        long window = mc.getWindow().getWindow();
+        boolean wasDown = HELD_RAW_KEYS.contains(key);
+        ArrayList<InputEventProbe.Observation> observed = new ArrayList<>();
+        int events = 0;
+        switch (action) {
+            case "down" -> {
+                if (!wasDown) {
+                    HELD_RAW_KEYS.add(key);
+                    addObserved(observed, dispatchRawKeyboard(mc, window, key, InputConstants.PRESS));
+                    events = 1;
+                }
+            }
+            case "up" -> {
+                if (wasDown) {
+                    addObserved(observed, dispatchRawKeyboard(mc, window, key, InputConstants.RELEASE));
+                    HELD_RAW_KEYS.remove(key);
+                    events = 1;
+                }
+            }
+            case "click" -> {
+                if (!wasDown) {
+                    HELD_RAW_KEYS.add(key);
+                    addObserved(observed, dispatchRawKeyboard(mc, window, key, InputConstants.PRESS));
+                    events++;
+                }
+                addObserved(observed, dispatchRawKeyboard(mc, window, key, InputConstants.RELEASE));
+                HELD_RAW_KEYS.remove(key);
+                events++;
+            }
+            default -> throw new IllegalArgumentException("Unsupported raw key action: " + action);
+        }
+
+        JsonObject obj = ok();
+        obj.addProperty("key", key.getName());
+        obj.addProperty("key_code", key.getValue());
+        obj.addProperty("action", action);
+        obj.addProperty("was_down", wasDown);
+        obj.addProperty("down", HELD_RAW_KEYS.contains(key));
+        obj.addProperty("events", events);
+        addEventDelivery(obj, observed);
+        return new EndpointResult(200, obj);
+    }
+
+    private static InputEventProbe.Observation dispatchRawKeyboard(
+            Minecraft mc, long window, InputConstants.Key key, int action) {
+        ClientInputIsolation.setKeyDown(key.getValue(), action != InputConstants.RELEASE);
+        long probeSequence = InputEventProbe.keySequence();
+        mc.keyboardHandler.keyPress(window, key.getValue(), -1, action, ClientInputIsolation.modifiers());
+        return InputEventProbe.keySince(probeSequence, key.getValue(), action);
+    }
+
+    /**
+     * Reports what a dispatch published. A press and its release are separate events and a mod may
+     * cancel either, so each is listed; {@code event_cancelled_by_mod} is true when a mod cancelled
+     * any of them. {@code event_fired} false does not always mean the input was lost: a screen that
+     * consumes a key returns before Minecraft publishes the event, exactly as it does for a device.
+     */
+    private static void addEventDelivery(JsonObject obj, List<InputEventProbe.Observation> observations) {
+        JsonObject delivery = new JsonObject();
+        delivery.addProperty("probe_installed", InputEventProbe.installed());
+        delivery.addProperty("event_fired", !observations.isEmpty());
+        boolean cancelled = false;
+        JsonArray events = new JsonArray();
+        for (InputEventProbe.Observation observation : observations) {
+            cancelled |= observation.cancelled();
+            JsonObject entry = new JsonObject();
+            entry.addProperty("action", observation.action());
+            entry.addProperty("cancelled_by_mod", observation.cancelled());
+            events.add(entry);
+        }
+        delivery.addProperty("event_cancelled_by_mod", cancelled);
+        delivery.add("events", events);
+        obj.add("mod_input_event", delivery);
+    }
+
+    private static void addObserved(
+            List<InputEventProbe.Observation> observations, InputEventProbe.Observation observation) {
+        if (observation != null) {
+            observations.add(observation);
+        }
+    }
+
+    private static InputConstants.Key resolveKeyboardKey(String input) {
+        String keyName = input.trim().toLowerCase(Locale.ROOT);
+        if (!keyName.startsWith("key.keyboard.")) {
+            keyName = "key.keyboard." + keyName
+                    .replace('_', '.')
+                    .replace('-', '.')
+                    .replace(' ', '.');
+        }
+
+        InputConstants.Key key = InputConstants.getKey(keyName);
+        if (key.getType() != InputConstants.Type.KEYSYM
+                || key.getValue() < 0
+                || key.getValue() > MAX_GLFW_KEY_CODE) {
+            throw new IllegalArgumentException("key must identify a valid GLFW keyboard key");
+        }
+        return key;
+    }
+
+    /** Compare and apply on the same game-thread turn, without taking any key ownership. */
+    private static EndpointResult applyGuardedAimLook(double yaw, double pitch, AimViewGuard guard) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return new EndpointResult(409, error("not_in_world"));
+        if (!mc.player.isAlive()) return new EndpointResult(409, error("player_unavailable"));
+        if (mc.screen != null) return new EndpointResult(409, error("screen_opened"));
+        if (mc.isPaused()) return new EndpointResult(409, error("game_paused"));
+        if (ClientActions.ownsInput() || GuardedGameMovement.LEASES.status().ownerRequestId() != null)
+            return new EndpointResult(409, error("action_owns_view"));
+        Entity target = mc.level.getEntity(guard.entityId());
+        String rejected = guard.rejection(WorldGeneration.current(mc.level), mc.player.getUUID().toString(),
+                ClientActions.session(), mc.level.getGameTime(), mc.player.getYRot(), mc.player.getXRot(),
+                target == null ? null : target.getUUID().toString(), target != null && target.isAlive());
+        if (rejected != null) return new EndpointResult(409, error(rejected));
+        EndpointResult result = applyLook(yaw, pitch, false);
+        result.body().addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        return result;
+    }
+
+    private static EndpointResult applyLook(double yawInput, double pitchInput, boolean relative) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) {
+            return new EndpointResult(409, error("not_in_world"));
+        }
+        if (Math.abs(yawInput) > 1_000_000.0 || Math.abs(pitchInput) > 1_000_000.0) {
+            return new EndpointResult(400, error("look_value_out_of_range"));
+        }
+
+        float yaw = relative
+                ? mc.player.getYRot() + (float) yawInput
+                : (float) yawInput;
+        float pitch = relative
+                ? mc.player.getXRot() + (float) pitchInput
+                : (float) pitchInput;
+        yaw = Mth.wrapDegrees(yaw);
+        pitch = Mth.clamp(pitch, -90.0F, 90.0F);
+        mc.player.setYRot(yaw);
+        mc.player.setXRot(pitch);
+        mc.player.setYHeadRot(yaw);
+        mc.player.setYBodyRot(yaw);
+
+        JsonObject obj = ok();
+        obj.addProperty("yaw", mc.player.getYRot());
+        obj.addProperty("pitch", mc.player.getXRot());
+        obj.addProperty("relative", relative);
+        return new EndpointResult(200, obj);
+    }
+
+    private static EndpointResult applyMouseAction(
+            double x,
+            double y,
+            int button,
+            String action,
+            double scrollY) {
+        Minecraft mc = Minecraft.getInstance();
+        Screen currentScreen = mc.screen;
+        if (currentScreen == null) {
+            return applyWorldMouseAction(mc, button, action, scrollY);
+        }
+
+        if (HELD_WORLD_MOUSE_BUTTONS.contains(button) && action.equals("down")) {
+            JsonObject obj = ok();
+            obj.addProperty("screen", currentScreen.getClass().getName());
+            obj.addProperty("action", action);
+            obj.addProperty("scope", "world");
+            obj.addProperty("button", button);
+            obj.addProperty("handled", true);
+            obj.addProperty("screen_transition", true);
+            obj.addProperty("down", true);
+            return new EndpointResult(200, obj);
+        }
+
+        if (HELD_WORLD_MOUSE_BUTTONS.contains(button)
+                && (action.equals("up") || action.equals("release") || action.equals("click"))) {
+            ArrayList<InputEventProbe.Observation> observed = new ArrayList<>();
+            releaseHeldWorldMouseButton(mc, button, observed);
+            JsonObject obj = ok();
+            obj.addProperty("screen", currentScreen.getClass().getName());
+            obj.addProperty("action", action);
+            obj.addProperty("scope", "world");
+            obj.addProperty("button", button);
+            obj.addProperty("handled", true);
+            obj.addProperty("screen_transition", true);
+            obj.addProperty("down", false);
+            addEventDelivery(obj, observed);
+            return new EndpointResult(200, obj);
+        }
+
+        double screenX = Double.isNaN(x)
+                ? mc.mouseHandler.xpos() * currentScreen.width / mc.getWindow().getScreenWidth()
+                : x;
+        double screenY = Double.isNaN(y)
+                ? mc.mouseHandler.ypos() * currentScreen.height / mc.getWindow().getScreenHeight()
+                : y;
+        currentScreen.mouseMoved(screenX, screenY);
+        boolean handled = false;
+        boolean pressed = false;
+        boolean released = false;
+        switch (action) {
+            case "move" -> handled = true;
+            case "down" -> handled = pressed = currentScreen.mouseClicked(screenX, screenY, button);
+            case "up", "release" -> handled = released = currentScreen.mouseReleased(screenX, screenY, button);
+            case "click" -> {
+                pressed = currentScreen.mouseClicked(screenX, screenY, button);
+                released = currentScreen.mouseReleased(screenX, screenY, button);
+                handled = pressed || released;
+            }
+            case "scroll" -> handled = currentScreen.mouseScrolled(screenX, screenY, 0.0, scrollY);
+            default -> throw new IllegalArgumentException("Unsupported mouse action: " + action);
+        }
+
+        JsonObject obj = ok();
+        obj.addProperty("screen", currentScreen.getClass().getName());
+        obj.addProperty("action", action);
+        obj.addProperty("scope", "screen");
+        obj.addProperty("x", screenX);
+        obj.addProperty("y", screenY);
+        obj.addProperty("button", button);
+        obj.addProperty("scroll_y", scrollY);
+        obj.addProperty("handled", handled);
+        if (action.equals("click")) {
+            obj.addProperty("pressed", pressed);
+            obj.addProperty("released", released);
+        }
+        return new EndpointResult(200, obj);
+    }
+
+    private static EndpointResult applyWorldMouseAction(
+            Minecraft mc,
+            int button,
+            String action,
+            double scrollY) {
+        if (mc.player == null || mc.level == null) {
+            return new EndpointResult(409, error("not_in_world"));
+        }
+        if (action.equals("move")) {
+            return new EndpointResult(409, error(
+                    "world_move_requires_look",
+                    "Use /control/look for world camera movement"));
+        }
+
+        boolean wasDown = HELD_WORLD_MOUSE_BUTTONS.contains(button);
+        ArrayList<InputEventProbe.Observation> observed = new ArrayList<>();
+        int events = 0;
+        boolean handled;
+        if (action.equals("scroll")) {
+            long probeSequence = InputEventProbe.scrollSequence();
+            handled = ClientHooks.onMouseScroll(mc.mouseHandler, 0.0, scrollY);
+            addObserved(observed, InputEventProbe.scrollSince(probeSequence));
+            events = 1;
+            if (!handled) {
+                mc.player.getInventory().swapPaint(scrollY);
+                handled = true;
+            }
+        } else {
+            switch (action) {
+                case "down" -> {
+                    if (HELD_WORLD_MOUSE_BUTTONS.add(button)) {
+                        addObserved(observed, dispatchWorldMouseButton(mc, button, GLFW.GLFW_PRESS));
+                        events = 1;
+                    }
+                }
+                case "up", "release" -> {
+                    if (releaseHeldWorldMouseButton(mc, button, observed)) {
+                        events = 1;
+                    }
+                }
+                case "click" -> {
+                    if (HELD_WORLD_MOUSE_BUTTONS.contains(button)) {
+                        releaseHeldWorldMouseButton(mc, button, observed);
+                        events = 1;
+                    } else {
+                        try {
+                            addObserved(observed, dispatchWorldMouseButton(mc, button, GLFW.GLFW_PRESS));
+                            events++;
+                        } finally {
+                            releaseWorldMouseButton(mc, button, observed);
+                            events++;
+                        }
+                    }
+                }
+                default -> throw new IllegalArgumentException("Unsupported mouse action: " + action);
+            }
+            handled = true;
+        }
+
+        JsonObject obj = ok();
+        obj.addProperty("scope", "world");
+        obj.addProperty("action", action);
+        obj.addProperty("button", button);
+        obj.addProperty("scroll_y", scrollY);
+        obj.addProperty("handled", handled);
+        obj.addProperty("was_down", wasDown);
+        obj.addProperty("down", HELD_WORLD_MOUSE_BUTTONS.contains(button));
+        obj.addProperty("events", events);
+        obj.addProperty("mouse_grabbed", mc.mouseHandler.isMouseGrabbed());
+        addEventDelivery(obj, observed);
+        return new EndpointResult(200, obj);
+    }
+
+    private static InputEventProbe.Observation dispatchWorldMouseButton(Minecraft mc, int button, int action) {
+        long probeSequence = InputEventProbe.mouseButtonSequence();
+        mc.mouseHandler.onPress(mc.getWindow().getWindow(), button, action, ClientInputIsolation.modifiers());
+        return InputEventProbe.mouseButtonSince(probeSequence, button, action);
+    }
+
+    private static boolean releaseHeldWorldMouseButton(
+            Minecraft mc, int button, List<InputEventProbe.Observation> observed) {
+        if (HELD_WORLD_MOUSE_BUTTONS.remove(button)) {
+            releaseWorldMouseButton(mc, button, observed);
+            return true;
+        }
+        return false;
+    }
+
+    private static void releaseWorldMouseButton(
+            Minecraft mc, int button, List<InputEventProbe.Observation> observed) {
+        try {
+            addObserved(observed, dispatchWorldMouseButton(mc, button, GLFW.GLFW_RELEASE));
+        } finally {
+            KeyMapping.set(InputConstants.Type.MOUSE.getOrCreate(button), false);
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                mc.mouseHandler.isLeftPressed = false;
+            } else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                mc.mouseHandler.isRightPressed = false;
+            } else if (button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE) {
+                mc.mouseHandler.isMiddlePressed = false;
+            }
+        }
+    }
+
+    private static EndpointResult applyScreenText(String text, boolean submit) {
+        Minecraft mc = Minecraft.getInstance();
+        Screen currentScreen = mc.screen;
+        if (currentScreen == null) {
+            return new EndpointResult(409, error("no_active_screen"));
+        }
+
+        if (submit) {
+            if (!(currentScreen instanceof ChatScreen chatScreen)) {
+                return new EndpointResult(409, error(
+                        "submit_requires_chat_screen",
+                        "submit=true is supported only for an active ChatScreen"));
+            }
+            chatScreen.handleChatInput(text, true);
+            boolean closed = mc.screen == chatScreen;
+            if (closed) {
+                mc.setScreen(null);
+            }
+            JsonObject obj = ok();
+            obj.addProperty("screen", chatScreen.getClass().getName());
+            obj.addProperty("submitted", true);
+            obj.addProperty("closed", closed);
+            return new EndpointResult(200, obj);
+        }
+
+        GuiEventListener focused = currentScreen.getFocused();
+        if (focused == null) {
+            return new EndpointResult(409, error("no_focused_widget"));
+        }
+        int handledCharacters = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (currentScreen.charTyped(text.charAt(i), 0)) {
+                handledCharacters++;
+            }
+        }
+
+        JsonObject obj = ok();
+        obj.addProperty("screen", currentScreen.getClass().getName());
+        obj.addProperty("focused", focused.getClass().getName());
+        obj.addProperty("characters", text.length());
+        obj.addProperty("handled_characters", handledCharacters);
+        obj.addProperty("handled", handledCharacters > 0);
+        obj.addProperty("submitted", false);
+        return new EndpointResult(200, obj);
+    }
+
+    private static EndpointResult applyCommand(String command) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.getConnection() == null) {
+            return new EndpointResult(409, error("not_in_world"));
+        }
+
+        mc.getConnection().sendCommand(command);
+        JsonObject obj = ok();
+        obj.addProperty("submitted", true);
+        return new EndpointResult(200, obj);
+    }
+
+    private static <T> T callOnMinecraftThread(Callable<T> operation, long timeoutSeconds)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        CompletableFuture<T> result = new CompletableFuture<>();
+        try {
+            Minecraft.getInstance().execute(() -> {
+                if (result.isDone()) {
+                    return;
+                }
+                ClientInputIsolation.syntheticDispatch(() -> {
+                    try {
+                        result.complete(operation.call());
+                    } catch (Throwable error) {
+                        result.completeExceptionally(error);
+                    }
+                });
+            });
+        } catch (RejectedExecutionException | IllegalStateException e) {
+            result.completeExceptionally(e);
+        }
+        try {
+            return result.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            result.cancel(false);
+            throw e;
+        }
+    }
+
+    private static boolean requireControlAccess(HttpExchange exchange, String path, String method)
+            throws IOException {
+        if (!path.equals(exchange.getRequestURI().getPath())) {
+            respondJson(exchange, 404, error("unknown_endpoint"));
+            return false;
+        }
+
+        InetAddress remoteAddress = exchange.getRemoteAddress().getAddress();
+        if (remoteAddress == null || !remoteAddress.isLoopbackAddress()) {
+            respondJson(exchange, 403, error("loopback_only"));
+            return false;
+        }
+        if (!isBearerAuthorized(exchange)) {
+            exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+            respondJson(exchange, 401, error("unauthorized"));
+            return false;
+        }
+        return requireMethod(exchange, method);
+    }
+
+    private static boolean requireMethod(HttpExchange exchange, String method) throws IOException {
+        if (method.equalsIgnoreCase(exchange.getRequestMethod())) {
+            return true;
+        }
+        exchange.getResponseHeaders().add("Allow", method.toUpperCase(Locale.ROOT));
+        respondJson(exchange, 405, error("method_not_allowed"));
+        return false;
+    }
+
+    private static boolean isBearerAuthorized(HttpExchange exchange) {
+        String expected = config().token();
+        if (expected.isBlank()) {
+            return false;
+        }
+
+        String authorization = exchange.getRequestHeaders().getFirst("Authorization");
+        if (authorization == null || !authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return false;
+        }
+        String supplied = authorization.substring(7);
+        return BridgeSecurity.bearerMatches(expected, authorization);
+    }
+
+    private static JsonObject readJsonObjectOrRespond(HttpExchange exchange, boolean allowEmpty)
+            throws IOException {
+        try {
+            byte[] bytes = readBody(exchange);
+            if (bytes.length == 0) {
+                if (allowEmpty) {
+                    return new JsonObject();
+                }
+                throw new RequestException(400, "empty_body", "A JSON object body is required");
+            }
+
+            JsonElement parsed;
+            try {
+                parsed = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8));
+            } catch (RuntimeException e) {
+                throw new RequestException(400, "invalid_json", "Request body is not valid JSON");
+            }
+            if (!parsed.isJsonObject()) {
+                throw new RequestException(400, "invalid_json", "Request body must be a JSON object");
+            }
+            return parsed.getAsJsonObject();
+        } catch (RequestException e) {
+            respondRequestFailure(exchange, e);
+            return null;
+        }
+    }
+
+    private static byte[] readBody(HttpExchange exchange) throws IOException, RequestException {
+        String contentLength = exchange.getRequestHeaders().getFirst("Content-Length");
+        if (contentLength != null) {
+            try {
+                long declaredLength = Long.parseLong(contentLength);
+                if (declaredLength < 0) {
+                    throw new RequestException(400, "invalid_content_length", "Content-Length must not be negative");
+                }
+                if (declaredLength > MAX_BODY_BYTES) {
+                    throw new RequestException(413, "body_too_large",
+                            "Request body exceeds " + MAX_BODY_BYTES + " bytes");
+                }
+            } catch (NumberFormatException e) {
+                throw new RequestException(400, "invalid_content_length", "Content-Length is not a number");
+            }
+        }
+
+        try (InputStream in = exchange.getRequestBody()) {
+            byte[] bytes = in.readNBytes(MAX_BODY_BYTES + 1);
+            if (bytes.length > MAX_BODY_BYTES) {
+                throw new RequestException(413, "body_too_large",
+                        "Request body exceeds " + MAX_BODY_BYTES + " bytes");
+            }
+            return bytes;
+        }
+    }
+
+    private static void respondRequestFailure(HttpExchange exchange, RequestException e) throws IOException {
+        respondJson(exchange, e.status(), error(e.code(), e.getMessage()));
+    }
+
+    private static void respondMinecraftFailure(HttpExchange exchange, String operationCode, Exception e)
+            throws IOException {
+        if (e instanceof TimeoutException) {
+            respondJson(exchange, 504, error("minecraft_thread_timeout",
+                    "Minecraft did not complete the operation within the configured timeout"));
+            return;
+        }
+        if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+            respondJson(exchange, 503, error("request_interrupted"));
+            return;
+        }
+
+        Throwable cause = e instanceof ExecutionException && e.getCause() != null ? e.getCause() : e;
+        if (cause instanceof FrameTooLargeException frameTooLarge) {
+            respondJson(exchange, 500, error("frame_too_large", frameTooLarge.getMessage()));
+            return;
+        }
+
+        JsonObject obj = error(operationCode);
+        obj.addProperty("detail", exceptionDetail(cause));
+        respondJson(exchange, 500, obj);
+    }
+
+    private static void respondJson(HttpExchange exchange, int status, JsonObject body) throws IOException {
+        byte[] bytes = BridgeJson.toJson(body).getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_JSON_BYTES) {
+            status = 500;
+            bytes = BridgeJson.toJson(error("response_too_large",
+                    "JSON response exceeds " + MAX_JSON_BYTES + " bytes"))
+                    .getBytes(StandardCharsets.UTF_8);
+        }
+        respondBytes(exchange, status, "application/json; charset=utf-8", bytes);
+    }
+
+    private static void respondBytes(HttpExchange exchange, int status, String contentType, byte[] bytes)
+            throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
+    }
+
+    private static JsonObject ok() {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("ok", true);
+        return obj;
+    }
+
+    private static JsonObject error(String code) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("ok", false);
+        obj.addProperty("error", code);
+        return obj;
+    }
+
+    private static JsonObject error(String code, String message) {
+        JsonObject obj = error(code);
+        obj.addProperty("message", boundedText(message));
+        return obj;
+    }
+
+    private static String requiredString(JsonObject obj, String key) throws RequestException {
+        JsonElement value = obj.get(key);
+        if (value == null || value.isJsonNull() || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isString()) {
+            throw new RequestException(400, "invalid_" + key, key + " must be a string");
+        }
+        String text = value.getAsString();
+        if (text.length() > MAX_TEXT_LENGTH) {
+            throw new RequestException(400, "invalid_" + key,
+                    key + " exceeds " + MAX_TEXT_LENGTH + " characters");
+        }
+        return text;
+    }
+
+    private static double requiredFiniteDouble(JsonObject obj, String key) throws RequestException {
+        JsonElement value = obj.get(key);
+        if (value == null || value.isJsonNull() || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isNumber()) {
+            throw new RequestException(400, "invalid_" + key, key + " must be a number");
+        }
+        double number = value.getAsDouble();
+        if (!Double.isFinite(number)) {
+            throw new RequestException(400, "invalid_" + key, key + " must be finite");
+        }
+        return number;
+    }
+
+    private static double requiredBoundedCoordinate(JsonObject obj, String key) throws RequestException {
+        double coordinate = requiredFiniteDouble(obj, key);
+        if (Math.abs(coordinate) > MAX_GUI_COORDINATE) {
+            throw new RequestException(400, "invalid_" + key,
+                    key + " is outside the supported GUI coordinate range");
+        }
+        return coordinate;
+    }
+
+    private static boolean optionalBoolean(JsonObject obj, String key, boolean fallback)
+            throws RequestException {
+        JsonElement value = obj.get(key);
+        if (value == null || value.isJsonNull()) return fallback;
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            throw new RequestException(400, "invalid_" + key, key + " must be a boolean");
+        }
+        return value.getAsBoolean();
+    }
+
+    private static int optionalInteger(JsonObject obj, String key, int fallback) throws RequestException {
+        JsonElement value = obj.get(key);
+        if (value == null || value.isJsonNull()) return fallback;
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+            throw new RequestException(400, "invalid_" + key, key + " must be an integer");
+        }
+        double number = value.getAsDouble();
+        if (!Double.isFinite(number) || number != Math.rint(number)
+                || number < Integer.MIN_VALUE || number > Integer.MAX_VALUE) {
+            throw new RequestException(400, "invalid_" + key, key + " must be an integer");
+        }
+        return (int) number;
+    }
+
+    private static double queryDouble(
+            HttpExchange exchange,
+            String key,
+            double fallback,
+            double minimum,
+            double maximum) throws RequestException {
+        String rawQuery = exchange.getRequestURI().getRawQuery();
+        if (rawQuery == null || rawQuery.isBlank()) return fallback;
+
+        String found = null;
+        try {
+            for (String part : rawQuery.split("&")) {
+                int separator = part.indexOf('=');
+                String rawName = separator < 0 ? part : part.substring(0, separator);
+                String name = URLDecoder.decode(rawName, StandardCharsets.UTF_8);
+                if (!key.equals(name)) continue;
+                if (found != null) {
+                    throw new RequestException(400, "duplicate_" + key,
+                            key + " must be supplied at most once");
+                }
+                String rawValue = separator < 0 ? "" : part.substring(separator + 1);
+                found = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+            }
+        } catch (IllegalArgumentException e) {
+            throw new RequestException(400, "invalid_query", "Query string encoding is invalid");
+        }
+        if (found == null) return fallback;
+
+        final double value;
+        try {
+            value = Double.parseDouble(found);
+        } catch (NumberFormatException e) {
+            throw new RequestException(400, "invalid_" + key, key + " must be a number");
+        }
+        if (!Double.isFinite(value) || value < minimum || value > maximum) {
+            throw new RequestException(400, "invalid_" + key,
+                    key + " must be between " + minimum + " and " + maximum);
+        }
+        return value;
+    }
+
+    private static void validateScreenText(String text) throws RequestException {
+        if (text.isEmpty()) {
+            throw new RequestException(400, "empty_text", "text must not be empty");
+        }
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            if (codePoint > Character.MAX_VALUE) {
+                throw new RequestException(400, "unsupported_character",
+                        "The active Screen charTyped API accepts only BMP characters");
+            }
+            if (Character.isISOControl(codePoint)) {
+                throw new RequestException(400, "unsupported_character",
+                        "Control characters are not accepted by the text endpoint");
+            }
+            offset += Character.charCount(codePoint);
+        }
+    }
+
+    private static String normalizeCommand(String input) throws RequestException {
+        String command = input.trim();
+        if (command.startsWith("/")) {
+            command = command.substring(1).stripLeading();
+        }
+        if (command.isEmpty()) {
+            throw new RequestException(400, "empty_command", "command must not be empty");
+        }
+        if (command.length() > MAX_COMMAND_LENGTH) {
+            throw new RequestException(400, "invalid_command",
+                    "command exceeds " + MAX_COMMAND_LENGTH + " characters");
+        }
+        for (int offset = 0; offset < command.length();) {
+            int codePoint = command.codePointAt(offset);
+            if (Character.isISOControl(codePoint)) {
+                throw new RequestException(400, "unsupported_character",
+                        "Control characters are not accepted by the command endpoint");
+            }
+            offset += Character.charCount(codePoint);
+        }
+        return command;
+    }
+
+    private static String runId() {
+        String value = identityValue(
+                "mineclientBridge.runId",
+                "MINECLIENT_BRIDGE_RUN_ID");
+        if (value.isBlank()) {
+            return "manual";
+        }
+        return value;
+    }
+
+    private static String identityValue(String propertyName, String environmentName) {
+        String value = System.getProperty(propertyName);
+        if (value == null || value.isBlank()) {
+            value = System.getenv(environmentName);
+        }
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim();
+    }
+
+    private static String boundedText(String value) {
+        if (value == null) return "";
+        if (value.length() <= MAX_TEXT_LENGTH) return value;
+        return value.substring(0, MAX_TEXT_LENGTH);
+    }
+
+    private static String exceptionDetail(Throwable error) {
+        String message = error.getMessage();
+        String detail = error.getClass().getSimpleName();
+        if (message != null && !message.isBlank()) {
+            detail += ": " + message;
+        }
+        return boundedText(detail);
+    }
+
+    private static void releaseAllOnMinecraftThread() {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.isSameThread()) {
+                ClientInputIsolation.syntheticDispatch(() -> {
+                    releaseAllInputs();
+                });
+                return;
+            }
+            callOnMinecraftThread(() -> {
+                releaseAllInputs();
+                return null;
+            }, MINECRAFT_TIMEOUT_SECONDS);
+        } catch (Exception e) {
+            BridgeLog.LOGGER.warn("Failed to release held input while stopping bridge", e);
+        }
+    }
+
+    static boolean hasHeldInputs() { return !HELD_RAW_KEYS.isEmpty() || !HELD_WORLD_MOUSE_BUTTONS.isEmpty(); }
+
+    static int releaseAllInputs() {
+        ClientActions.cancel("inputs_released");
+        GuardedGameMovement.cancelOnGameThread("inputs_released");
+        Minecraft mc = Minecraft.getInstance();
+        if (!mc.isSameThread()) {
+            throw new IllegalStateException("Input cleanup must run on the Minecraft thread");
+        }
+
+        ArrayList<InputConstants.Key> rawKeys = new ArrayList<>(HELD_RAW_KEYS);
+        RuntimeException failure = null;
+        for (InputConstants.Key key : rawKeys) {
+            try {
+                dispatchRawKeyboard(mc, mc.getWindow().getWindow(), key, InputConstants.RELEASE);
+                HELD_RAW_KEYS.remove(key);
+            } catch (RuntimeException e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+
+        ArrayList<Integer> worldMouseButtons = new ArrayList<>(HELD_WORLD_MOUSE_BUTTONS);
+        for (int button : worldMouseButtons) {
+            try {
+                releaseHeldWorldMouseButton(mc, button, new ArrayList<>());
+            } catch (RuntimeException e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        KeyMapping.releaseAll();
+        ClientInputIsolation.releaseAllKeys();
+        if (failure != null) {
+            throw failure;
+        }
+        return rawKeys.size();
+    }
+
+    private record EntityDistance(Entity entity, double distance) {
+    }
+
+    private record EndpointResult(int status, JsonObject body) {
+    }
+
+    private static final class RequestException extends Exception {
+        private final int status;
+        private final String code;
+
+        private RequestException(int status, String code, String message) {
+            super(message);
+            this.status = status;
+            this.code = code;
+        }
+
+        private int status() {
+            return status;
+        }
+
+        private String code() {
+            return code;
+        }
+    }
+
+    private static final class FrameTooLargeException extends IOException {
+        private FrameTooLargeException(int bytes) {
+            super("Captured PNG is " + bytes + " bytes; limit is " + MAX_FRAME_BYTES + " bytes");
+        }
+    }
+}

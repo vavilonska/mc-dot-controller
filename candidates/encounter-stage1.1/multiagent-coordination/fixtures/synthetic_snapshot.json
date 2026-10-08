@@ -1,0 +1,647 @@
+{
+  "context": {
+    "dimension": "minecraft:overworld",
+    "world_generation": "11111111-1111-1111-1111-111111111111",
+    "player_id": "22222222-2222-2222-2222-222222222222",
+    "action_session": "33333333-3333-3333-3333-333333333333",
+    "resident_session": "resident-test"
+  },
+  "sections": {
+    "player": {
+      "x": 0.5,
+      "y": 64,
+      "z": 0.5,
+      "health": 20,
+      "food": 20,
+      "alive": true,
+      "grounded": true,
+      "screen_closed": true
+    },
+    "terrain": {
+      "cells": [
+        {
+          "x": 0,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 0,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 0,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 1,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 1,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 1,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 2,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 2,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 2,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 3,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 3,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 3,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 4,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 4,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 4,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 5,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 5,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 5,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 6,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 6,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 6,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 7,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 7,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 7,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 8,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 8,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 8,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 9,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 9,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 9,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 10,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 10,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 10,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 11,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 11,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 11,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 12,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 12,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 12,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 13,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 13,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 13,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 14,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 14,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 14,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 15,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 15,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 15,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 16,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 16,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 16,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 17,
+          "y": 63,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:stone",
+          "passable": false,
+          "full_support": true,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 17,
+          "y": 64,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        },
+        {
+          "x": 17,
+          "y": 65,
+          "z": 0,
+          "loaded": true,
+          "block_id": "minecraft:air",
+          "passable": true,
+          "full_support": false,
+          "hazard": false,
+          "fluid": false
+        }
+      ],
+      "complete": true
+    },
+    "entities": {
+      "entities": [
+        {
+          "uuid": "44444444-4444-4444-4444-444444444444",
+          "entity_id": 7,
+          "type": "minecraft:zombie",
+          "alive": true,
+          "attackable": true
+        }
+      ],
+      "truncated": false
+    },
+    "inventory": {
+      "slots": [
+        {
+          "slot": 0,
+          "count": 1,
+          "item_id": "minecraft:stone_sword"
+        }
+      ],
+      "complete": true
+    },
+    "action": {
+      "status": "idle",
+      "input_released": true,
+      "action_id": null
+    }
+  }
+}
