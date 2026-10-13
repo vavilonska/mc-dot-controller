@@ -58,6 +58,7 @@ def safe_edge(grid, source, target, diagonals=True, step_down=True):
     diagonal = bool(dx and dz)
     if diagonal:
         return (diagonals and dy == 0
+                and not any(getattr(grid.cells.get(p.offset(y=-1)), "partial", False) for p in (source, target, source.offset(x=dx), source.offset(z=dz)))
                 and grid.standable(source.offset(x=dx))
                 and grid.standable(source.offset(z=dz)))
     if dy == -1:

@@ -105,3 +105,30 @@ Success is **client-observed**, including Minecraft prediction, not a claimed au
 ## Verification scope
 
 The source is compiled and tested against cached official Minecraft 1.21.1 / NeoForge 21.1.255 binaries with Java 21 and ModDevGradle's binary pipeline. Unit checks cover wire parsing, one-owner action admission, duplicate and cancelled IDs, copied results, null serialization, tick steering, turning, jump selection and endpoint/auth/vanilla-API wiring. These checks do not initialize a game or prove multiplayer gameplay. Installed-profile replacement, launch, connection, live walk/mining/crafting/pillar validation and viewer verification are separate coordinated steps.
+
+## Mainline path execution increment
+
+`follow_path` accepts an optional strictly boolean `sprint` (default `false`).
+It requests the ordinary sprint key only while moving forward; Minecraft still
+controls food, collision and item-use eligibility. Other action kinds reject
+that field. Existing action contracts, including environment recovery's zero-lifetime
+contract, are preserved.
+
+The final waypoint requires two grounded low-horizontal-speed samples within
+0.23 horizontal and 0.15 vertical blocks. Intermediate waypoints retain their
+previous tolerance. An explicit waypoint jump is consumed once rather than
+repeatedly requested after landing. Cancellation, timeout and path completion
+release owned sprint state before publishing the path terminal. Failed release
+reports `input_release_unconfirmed` with the requested terminal status/reason;
+it cannot report success. Non-path actions retain their prior terminal fields
+and cleanup behavior, including stable mining/placement and environment recovery.
+
+This is offline-verified source integration, not live movement acceptance.
+
+## Mainline boat execution increment
+
+The native action list now additionally includes `boat_drive`, `boat_mount` and
+`boat_dismount`. The original five main actions remain available. These use the
+existing authenticated action/status/cancel endpoints; no new endpoint is added.
+See [the bounded boat contracts](mainline-boat-actions.md). This source increment
+does not enable combat/encounter or the separate pause endpoint.

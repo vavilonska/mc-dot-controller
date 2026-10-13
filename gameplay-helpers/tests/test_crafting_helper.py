@@ -19,6 +19,7 @@ SHAPES = {
     "stone_axe": ("CC.", "CS.", ".S."),
     "iron_pickaxe": ("III", ".S.", ".S."),
     "iron_axe": ("II.", "IS.", ".S."),
+    "shulker_box": ("H..", "B..", "H.."),
     "iron_sword": ("I..", "I..", "S.."),
     "shield": ("PIP", "PPP", ".P."),
     "furnace": ("CCC", "C.C", "CCC"),
@@ -52,7 +53,8 @@ class FakeQueueClient:
         self.slots.update({s: item() for s in self.storage.values()})
         stock = stock if stock is not None else {
             0: ("iron_ingot", 64), 5: ("cobblestone", 64),
-            9: ("stick", 10), 31: ("oak_planks", 64), 35: ("coal", 8)}
+            9: ("stick", 10), 31: ("oak_planks", 64), 35: ("coal", 8),
+            20: ("shulker_shell", 2), 21: ("chest", 1)}
         for index, (name, count) in stock.items():
             self.slots[self.storage[index]] = item(name, count)
         self.carried = item()
@@ -99,6 +101,7 @@ class FakeQueueClient:
             symbol = ("P" if name.endswith("_planks") else
                       "C" if name in ("cobblestone", "blackstone", "cobbled_deepslate") else
                       "I" if name == "iron_ingot" else "S" if name == "stick" else
+                      "H" if name == "shulker_shell" else "B" if name == "chest" else
                       "F" if name in ("coal", "charcoal") else "." if not name else "?")
             symbols.append(symbol)
         padded = tuple("".join(symbols[r * self.width:(r + 1) * self.width]).ljust(3, ".")
@@ -205,7 +208,7 @@ class CraftChecks(unittest.TestCase):
         for name in ("crafting_table", "stick", "torch"):
             with self.subTest(name=name):
                 self.craft(FakeQueueClient(width=2), name)
-        for name in ("iron_boots", "bucket", "iron_hoe", "wooden_pickaxe", "furnace"):
+        for name in ("iron_boots", "bucket", "iron_hoe", "wooden_pickaxe", "furnace", "shulker_box"):
             client = FakeQueueClient(width=2)
             with self.assertRaisesRegex(CraftStopped, "3x3"):
                 self.craft(client, name)

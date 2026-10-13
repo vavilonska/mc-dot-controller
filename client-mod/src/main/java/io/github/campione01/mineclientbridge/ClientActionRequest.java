@@ -12,7 +12,9 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         int containerId, int slot, int button, String clickType, JsonObject original) {
     record Point(double x, double y, double z, boolean jump) { }
     record Cell(int x, int y, int z) { }
-    static final Set<String> ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot", "recover_environment");
+    static final Set<String> LEGACY_ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot", "recover_environment", "combat_entity", "boat_drive", "boat_mount", "boat_dismount");
+    static final Set<String> CAPABILITY_ACTIONS = Set.of("interact_block", "use_item", "select_hotbar", "close_menu", "attack_entity", "shoot_entity", "gateway_pearl", "movement_budget_start", "movement_budget_finish");
+    static final Set<String> ACTIONS = java.util.stream.Stream.concat(LEGACY_ACTIONS.stream(), CAPABILITY_ACTIONS.stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());
     static final Set<String> FACES = Set.of("up", "down", "north", "south", "east", "west");
     static final Set<String> CLICKS = Set.of("pickup", "quick_move", "swap", "throw", "pickup_all", "quick_craft");
 
@@ -21,6 +23,14 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         require(!id.isBlank() && id.length() <= 128, "invalid_action_id");
         String action = string(body, "action");
         require(ACTIONS.contains(action), "unsupported_action");
+        if(body.has("encounter_mode") || body.has("encounter_scope") || body.has(EncounterRequest.PAUSE_ON_TERMINAL))
+            require(action.equals("combat_entity"),"encounter_requires_combat_entity");
+        if (body.has("sprint")) {
+            bool(body, "sprint", false);
+            require(action.equals("follow_path"), "sprint_requires_follow_path");
+        }
+        if (action.equals("follow_path") || action.equals("break_block") || action.equals("place_block"))
+            validateNavigationBinding(body);
         boolean recovery = action.equals("recover_environment");
         long timeout = integer(body, "timeout_ms", recovery ? 0 : 15000);
         require((recovery && timeout == 0) || (timeout >= 50 && timeout <= 600000), "invalid_timeout_ms");
@@ -38,12 +48,33 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
                 points.add(new Point(number(point, "x"), number(point, "y"), number(point, "z"), bool(point, "jump", false)));
             }
             require((recovery || !points.isEmpty()) && points.size() <= 512, "invalid_waypoints");
-        } else if (action.equals("break_block")) {
+        } else if (action.equals("break_block") || action.equals("interact_block")) {
             target = cell(body, "target");
+            if(action.equals("interact_block")){ face=string(body,"face"); require(FACES.contains(face),"invalid_face"); }
         } else if (action.equals("place_block")) {
             support = cell(body, "support");
             face = string(body, "face");
             require(FACES.contains(face), "invalid_face");
+        } else if (MovementBudget.budgetAction(action)) {
+            // Explicit no-input lifetime operation, with normal action-ID deduplication.
+        } else if (action.equals("gateway_pearl")) {
+            target=cell(body,"target");CapabilityGateway.validate(body);
+        } else if (action.equals("use_item")) {
+            require(hotbar>=0,"use_item_hotbar_required");
+            int ticks=integer(body,"use_ticks",40);
+            require(ticks>=1 && ticks<=100,"invalid_use_ticks");
+        } else if (action.equals("select_hotbar")) {
+            require(hotbar>=0,"select_hotbar_required");
+        } else if (action.equals("close_menu")) {
+            require(integer(body,"container_id",-1)>=0,"invalid_container_id");
+        } else if (action.equals("attack_entity") || action.equals("shoot_entity")) {
+            CapabilityTargetAction.validate(body);
+        } else if (action.equals("boat_mount") || action.equals("boat_dismount")) {
+            BoatTransferRequest.parse(body);
+        } else if (action.equals("boat_drive")) {
+            BoatDriveRequest.parse(body);
+        } else if (action.equals("combat_entity")) {
+            BoundedCombatRequest.parse(body);
         } else {
             container = integer(body, "container_id", -1);
             require(container >= 0, "invalid_container_id");
@@ -61,8 +92,23 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             }, "invalid_button");
             require(slot >= 0 || slot == -999, "invalid_slot");
         }
-        return new ClientActionRequest(id, action, timeout, List.copyOf(points), target, support, face, hotbar,
+        ClientActionRequest request = new ClientActionRequest(id, action, timeout, List.copyOf(points), target, support, face, hotbar,
                 bool(body, "jump", false), bool(body, "sneak", false), container, slot, button, click, body.deepCopy());
+        CoordinationStepGuard.validate(request);
+        CapabilityGuard.validate(request);
+        MovementBudget.validate(request);
+        return request;
+    }
+
+    private static void validateNavigationBinding(JsonObject body) {
+        boolean epoch = body.has("expected_navigation_epoch"), origin = body.has("expected_origin");
+        require(epoch == origin, "navigation_binding_pair_required");
+        if (!epoch) return;
+        double n = number(body, "expected_navigation_epoch");
+        require(n >= 0 && n <= 9007199254740991L && n == Math.rint(n), "invalid_navigation_epoch");
+        require(body.get("expected_origin").isJsonObject(), "invalid_expected_origin");
+        JsonObject point = body.getAsJsonObject("expected_origin");
+        number(point, "x"); number(point, "y"); number(point, "z");
     }
 
     static String string(JsonObject body, String key) {
@@ -70,7 +116,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         require(v != null && v.isJsonPrimitive() && v.getAsJsonPrimitive().isString(), "invalid_" + key);
         return v.getAsString();
     }
-    private static boolean bool(JsonObject body, String key, boolean fallback) {
+    static boolean bool(JsonObject body, String key, boolean fallback) {
         if (!body.has(key)) return fallback;
         JsonElement v = body.get(key);
         require(v.isJsonPrimitive() && v.getAsJsonPrimitive().isBoolean(), "invalid_" + key);
@@ -83,7 +129,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         require(Double.isFinite(n), "invalid_" + key);
         return n;
     }
-    private static int integer(JsonObject body, String key, int fallback) {
+    static int integer(JsonObject body, String key, int fallback) {
         if (!body.has(key)) return fallback;
         double n = number(body, key);
         require(n == Math.rint(n) && n >= Integer.MIN_VALUE && n <= Integer.MAX_VALUE, "invalid_" + key);
@@ -100,6 +146,18 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
     }
     static final class Rejected extends RuntimeException {
         final int httpStatus;
-        Rejected(int httpStatus, String reason) { super(reason); this.httpStatus = httpStatus; }
+        final JsonObject capabilitySourceFreshness;
+        Rejected(int httpStatus, String reason) { this(httpStatus, reason, null); }
+        Rejected(int httpStatus, String reason, JsonObject freshness) {
+            super(reason); this.httpStatus = httpStatus;
+            capabilitySourceFreshness = freshness == null ? null : freshness.deepCopy();
+        }
+        JsonObject response() {
+            JsonObject body = new JsonObject();
+            body.addProperty("ok", false); body.addProperty("error", getMessage());
+            if (capabilitySourceFreshness != null)
+                body.add("capability_source_freshness", capabilitySourceFreshness.deepCopy());
+            return body;
+        }
     }
 }

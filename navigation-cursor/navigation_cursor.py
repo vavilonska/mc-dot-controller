@@ -12,8 +12,32 @@ import os
 import time
 from pathlib import Path
 import uuid
+from navigation_binding import (NativeBindingContext,
+                                NAVIGATION_REJECTIONS, no_effect_navigation_rejection,
+                                discontinuity_release_confirmed, task_handoff_required)
 
 TERMINAL = {'succeeded', 'failed', 'cancelled', 'uncertain'}
+
+
+def input_release_unconfirmed(response):
+    if not isinstance(response, dict) or response.get('status') not in ('failed', 'cancelled', 'uncertain'):
+        return False
+    if response.get('reason') == 'input_release_unconfirmed':
+        return True
+    nested = response.get('result')
+    if response.get('reason') == 'position_discontinuity_rebind_required':
+        return not (response.get('status') == 'cancelled'
+                    and discontinuity_release_confirmed(response.get('action')))
+    for receipt in (response.get('action'), nested.get('action') if isinstance(nested, dict) else None):
+        if isinstance(receipt, dict):
+            result = receipt.get('result')
+            if (receipt.get('reason') == 'input_release_unconfirmed'
+                    or receipt.get('reason') == 'position_discontinuity_rebind_required'
+                    and not discontinuity_release_confirmed(receipt)
+                    or isinstance(result, dict) and 'input_release_confirmed' in result
+                    and result['input_release_confirmed'] is not True):
+                return True
+    return False
 
 
 def block(player):
@@ -298,18 +322,21 @@ class Navigator:
                      'forbidden': [], 'completed_legs': [], 'replans': 0, 'blocked': None,
                      'observation_epoch': None, 'force_replan': False,
                      'support_misses': 0, 'anchor_attempts': 0, 'anchor_relocalized': False,
-                     'deferred_navigation_action': None}
+                     'deferred_navigation_action': None, 'native_context': None,
+                     'native_replan_pending': None, 'native_binding': {'seen': False}}
         if self.checkpoint and self.checkpoint.exists():
             loaded = json.loads(self.checkpoint.read_text())
             if loaded.get('schema') != 2:
                 raise ValueError('unsupported_navigation_checkpoint')
             self.data.update(loaded)
+        self.native_binding = NativeBindingContext(self.data.get('native_binding'))
 
     @property
     def route(self):
         return RouteCursor(**self.data['route']) if self.data['route'] else None
 
     def save(self):
+        self.data['native_binding'] = self.native_binding.dump()
         if self.checkpoint:
             self.checkpoint.parent.mkdir(parents=True, exist_ok=True)
             temp = self.checkpoint.with_name('.' + self.checkpoint.name + '.' + uuid.uuid4().hex)
@@ -376,8 +403,16 @@ class Navigator:
         return None
 
     def process_observation(self, observation):
+        if self.data['blocked']:
+            return self.result('blocked', self.data['blocked'])
         state = observation.get('state', {})
+        if not isinstance(state, dict):
+            return self.stop('invalid_observation_structure')
         p, world = state.get('player', {}), state.get('world', {})
+        try:
+            binding = self.native_binding.observe(state)
+        except ValueError as exc:
+            return self.stop('invalid_observation_' + str(exc))
         if p.get('alive') is not True or p.get('health', 0) <= 0:
             return self.stop('player_not_alive')
         if state.get('paused') or state.get('screen_open'):
@@ -389,9 +424,18 @@ class Navigator:
             self.data['world'] = identity
         elif self.data['world'] != identity:
             return self.stop('world_changed_start_new_navigation_explicitly')
+        if binding:
+            context = [binding['expected_world_generation'], world['dimension'],
+                       binding['expected_player_uuid'], binding['expected_action_session']]
+            if self.data['native_context'] not in (None, context):
+                return self.stop('native_context_changed_start_new_navigation_explicitly')
+            self.data['native_context'] = context
+            if world['navigation_guard']['rebind_ready'] is not True:
+                return self.result('waiting', 'native_navigation_not_settled_reobserve')
         if observation.get('combat', {}).get('active') is True:
             return self.result('waiting', 'combat_active_reobserve_before_resume')
-        if observation.get('action', {}).get('status') == 'running':
+        if (observation.get('action', {}).get('status') == 'running'
+                or state.get('client_action', {}).get('status') == 'running'):
             return self.result('waiting', 'another_action_running')
         if not p.get('on_ground'):
             return self.result('waiting', 'await_grounded_observation')
@@ -404,7 +448,8 @@ class Navigator:
         previous_action = self.data.get('last_action') or {}
         was_anchor = previous_action.get('purpose') == 'ground_anchor'
         if not terrain.stand(start):
-            if was_anchor and previous_action.get('status') == 'cancelled':
+            if (was_anchor and previous_action.get('status') == 'cancelled'
+                    and previous_action.get('reason') != 'position_discontinuity_rebind_required'):
                 # Defense cancellation does not count as a failed centering try.
                 self.data['anchor_attempts'] = max(0, self.data['anchor_attempts'] - 1)
                 self.data['last_action'] = None
@@ -424,7 +469,7 @@ class Navigator:
             result = self.submit('action', {'op': 'action', 'action': 'follow_path',
                                           'waypoints': [{'x': anchor[0] + .5, 'y': anchor[1],
                                                          'z': anchor[2] + .5, 'jump': False}],
-                                          'timeout_ms': 4000},
+                                          'timeout_ms': 4000, **binding},
                                  purpose='ground_anchor', anchor=list(anchor),
                                  start_index=route.index if route else 0,
                                  end_index=route.index if route else 0)
@@ -444,7 +489,9 @@ class Navigator:
         route = self.route
         action = self.data.pop('last_action', None)
         self.data['last_action'] = None
-        replan_reason = None
+        native_replan = self.data.pop('native_replan_pending', None)
+        self.data['native_replan_pending'] = None
+        replan_reason = native_replan
         relocated = self.data.pop('anchor_relocalized', False)
         self.data['anchor_relocalized'] = False
         forced = self.data.pop('force_replan', False)
@@ -453,7 +500,18 @@ class Navigator:
             old_index = route.index
             route.reconcile(p)
             self.data['route'] = route.dump()
-            if route.done:
+            if native_replan:
+                # The terminal handler already charged the budget. Relocation
+                # onto an old endpoint cannot erase it or authorize its tail.
+                replan_reason = native_replan
+                if route.done:
+                    end = list(route.nodes[-1])
+                    if end in self.data['completed_legs']:
+                        return self.stop('repeated_local_leg_without_global_progress')
+                    self.data['completed_legs'].append(end)
+                    self.data['route'] = None
+                    route = None  # Preserve the charged budget when starting the next leg.
+            elif route.done:
                 end = route.nodes[-1]
                 if list(end) in self.data['completed_legs']:
                     return self.stop('repeated_local_leg_without_global_progress')
@@ -484,7 +542,7 @@ class Navigator:
                             break
                         a = b
         if replan_reason:
-            if replan_reason not in ('combat_preempted', 'ground_anchor_relocalized'):
+            if replan_reason not in ('combat_preempted', 'ground_anchor_relocalized') and not native_replan:
                 self.data['replans'] += 1
             if self.data['replans'] > self.max_replans:
                 return self.stop('bounded_alternative_routes_exhausted')
@@ -509,7 +567,7 @@ class Navigator:
         if not way:
             return self.stop('no_observed_safe_execution_prefix')
         return self.submit('action', {'op': 'action', 'action': 'follow_path',
-                                     'waypoints': way, 'timeout_ms': max(15000, len(way) * 1200)},
+                                     'waypoints': way, 'timeout_ms': max(15000, len(way) * 1200), **binding},
                            start_index=route.index, end_index=route.index + len(way))
 
     def tick(self, target):
@@ -536,12 +594,40 @@ class Navigator:
         pending = self.data['pending']
         if pending:
             response = self.gateway.result(pending['id'])
+            if response is not None and not isinstance(response, dict):
+                return self.stop('invalid_gateway_result_status')
             if response is None or response.get('status') == 'pending':
                 return self.result('pending', 'same_request_still_pending', request_id=pending['id'])
-            if response.get('status') not in TERMINAL:
+            if not isinstance(response.get('status'), str) or response['status'] not in TERMINAL:
                 return self.stop('invalid_gateway_result_status')
-            if response['status'] == 'uncertain':
+            if pending['kind'] == 'action' and input_release_unconfirmed(response):
+                # Retain the original pending ID and route for operator inspection.
+                return self.stop('input_release_unconfirmed_requires_operator')
+            if pending['kind'] == 'action' and task_handoff_required(response):
+                return self.stop('encounter_requires_handoff')
+            if (response['status'] == 'uncertain'
+                    or any(k in response and response[k] is not False for k in ('post_uncertain', 'uncertain', 'unknown_outcome'))):
                 return self.stop('action_outcome_uncertain_no_replay')
+            if pending['kind'] == 'action':
+                reason = response.get('reason')
+                if reason is not None and not isinstance(reason, str):
+                    return self.stop('invalid_gateway_result_reason')
+                fresh_plan = no_effect_navigation_rejection(response)
+                if fresh_plan:
+                    self.native_binding.seen = True
+                    if pending.get('purpose') == 'ground_anchor':
+                        self.data['anchor_attempts'] = max(0, self.data['anchor_attempts'] - 1)
+                elif ('action_admission' in response or reason in NAVIGATION_REJECTIONS
+                      or reason in ('world_generation_changed', 'player_changed', 'action_session_changed')):
+                    return self.stop('native_action_rejection_requires_new_explicit_request')
+                discontinuity = (response['status'] == 'cancelled'
+                                 and reason == 'position_discontinuity_rebind_required')
+                if fresh_plan or discontinuity:
+                    self.data['replans'] += 1
+                    if self.data['replans'] > self.max_replans:
+                        return self.stop('bounded_alternative_routes_exhausted')
+                    self.data['native_replan_pending'] = ('native_admission_rejected' if fresh_plan
+                                                          else 'position_discontinuity')
             self.data['pending'] = None
             if pending['kind'] == 'action':
                 self.data['last_action'] = {'status': response['status'], 'reason': response.get('reason'),

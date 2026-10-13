@@ -2,10 +2,12 @@ package io.github.campione01.mineclientbridge;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonElement;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -30,11 +32,48 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 final class TerrainReader {
     private static TerrainScan.Page<JsonObject> lastPage;
     private static long sampledGameTime;
+    private static ObservationClientClock.Stamp sampledClock,scanClock;
     private static final TerrainScan<JsonObject> SCAN = new TerrainScan<>(System::nanoTime);
+    private static final Pattern SAFE_PROPERTY = Pattern.compile("[a-zA-Z0-9_.:/-]{1,32}");
     private static final Set<String> CONTACT_HAZARDS = Set.of("minecraft:fire", "minecraft:soul_fire",
             "minecraft:cactus", "minecraft:magma_block", "minecraft:sweet_berry_bush", "minecraft:wither_rose");
 
     private TerrainReader() { }
+
+    /** Compatibility entry point; callers needing evidence should retain flatStepResult. */
+    static boolean flatStepClear(Minecraft mc, double dx, double dz) {
+        return flatStepResult(mc, dx, dz).clear();
+    }
+
+    /** Fresh client-thread pose and exact continuous square sweep, never cached terrain pages. */
+    static FlatStepCorridor.Result flatStepResult(Minecraft mc, double dx, double dz) {
+        if (!mc.isSameThread()) throw new IllegalStateException("minecraft_thread_required");
+        FlatStepCorridor.Pose pose = mc.player == null ? null : new FlatStepCorridor.Pose(
+                mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.onGround(), mc.player.getYRot());
+        if (mc.player == null || mc.level == null)
+            return FlatStepCorridor.rejected("not_in_world", pose, dx, dz);
+        return FlatStepCorridor.check(pose, dx, dz, flatCellSource(mc));
+    }
+
+    /** Optional per-source aggregate diagnostics; callers must keep the same client-thread/tick scope. */
+    static final class ReadMetrics {
+        long stateReads, fluidReads, shapeContextReads;
+        long chunkRequests, chunkCacheHits, chunkFetches, loadedCellReads;
+        // Nested shape-context state reads also belong to collisionNanos; times are not additive.
+        long stateReadNanos, metadataPreflightNanos, fluidHazardNanos, collisionNanos;
+    }
+
+    /** Fresh loaded cells for a bounded same-tick hypothetical flat route. Never cached across ticks. */
+    static FlatStepCorridor.CellSource flatCellSource(Minecraft mc) {
+        return flatCellSource(mc, null);
+    }
+
+    static FlatStepCorridor.CellSource flatCellSource(Minecraft mc, ReadMetrics metrics) {
+        if (!mc.isSameThread()) throw new IllegalStateException("minecraft_thread_required");
+        if (mc.level == null || mc.player == null) throw new IllegalStateException("not_in_world");
+        LoadedSource source = new LoadedSource(mc.level, CollisionContext.of(mc.player), metrics);
+        return source::readFlatCell;
+    }
 
     static JsonObject read(TerrainQuery query) {
         Minecraft mc = Minecraft.getInstance();
@@ -42,21 +81,58 @@ final class TerrainReader {
         WorldGeneration.current(mc.level);
         if (mc.level == null || mc.player == null) {
             SCAN.clear();
-            throw new TerrainScan.Failure(409, "not_in_world");
+            throw new TerrainScan.Failure(409, query.observationClock()?"observation_clock_unavailable":"not_in_world");
         }
         ClientLevel level = mc.level;
+        ObservationClientClock.Stamp before=null;
+        try {
+            if(query.observationClock()) {
+                before=ObservationClockBridge.sample();
+                if(query.cursor()!=null && (scanClock==null || !scanClock.sameDomain(before)))
+                    throw new ObservationClientClock.Unavailable("context_changed");
+            }
+        } catch(ObservationClientClock.Unavailable failure) {SCAN.clear();sampledClock=scanClock=null;throw new TerrainScan.Failure(409,failure.getMessage());}
         BlockPos origin = mc.player.blockPosition();
         TerrainScan.Page<JsonObject> page = SCAN.page(query, level, origin.getX(), origin.getY(), origin.getZ(),
                 new LoadedSource(level, CollisionContext.of(mc.player)));
-        if (page != lastPage) { sampledGameTime = level.getGameTime(); lastPage = page; }
+        ObservationClientClock.Stamp response=null;
+        try {
+            if(query.observationClock()) {response=ObservationClockBridge.sample();ObservationClockBridge.requireSame(before,response);}
+        } catch(ObservationClientClock.Unavailable failure) {SCAN.clear();sampledClock=scanClock=null;throw new TerrainScan.Failure(409,failure.getMessage());}
+        if (page != lastPage) {
+            sampledGameTime = level.getGameTime();lastPage = page;sampledClock=before;
+            if(query.cursor()==null)scanClock=before;
+        }
+        JsonObject result=pageJson(page, WorldGeneration.current(level), level.dimension().location().toString(),
+                sampledGameTime, level.getGameTime());
+        if(query.observationClock()) {
+            if(sampledClock==null || !sampledClock.sameDomain(response)) {SCAN.clear();throw new TerrainScan.Failure(409,"observation_clock_unavailable");}
+            clockPage(result,sampledClock,response);
+        }
+        return result;
+    }
+
+    static JsonObject clockPage(JsonObject original,ObservationClientClock.Stamp source,ObservationClientClock.Stamp response) {
+        try {return ObservationClockWire.page(original,source,response);}
+        catch(ObservationClientClock.Unavailable invalid){throw new TerrainScan.Failure(409,invalid.getMessage());}
+    }
+
+    /** Same response assembly used by the live reader; it never samples world state. */
+    static JsonObject pageJson(TerrainScan.Page<JsonObject> page, String worldGeneration,
+            String dimension, long sampledTick, long responseTick) {
         JsonObject obj = new JsonObject();
-        obj.addProperty("world_generation", WorldGeneration.current(level));
+        obj.addProperty("world_generation", worldGeneration);
         obj.addProperty("terrain_schema_version", 1);
-        obj.addProperty("dimension", level.dimension().location().toString());
+        obj.addProperty("dimension", dimension);
         obj.addProperty("generation", page.generation());
         obj.addProperty("consistency", "live_pages");
-        obj.addProperty("game_time", sampledGameTime);
-        obj.addProperty("response_game_time", level.getGameTime());
+        obj.addProperty("game_time", sampledTick);
+        obj.addProperty("response_game_time", responseTick);
+        if (page.capability()) {
+            obj.addProperty("capability_page_schema_version", 1);
+            obj.addProperty("page_limit", page.pageLimit());
+            obj.addProperty("payload_budget_exhausted", page.payloadBudgetExhausted());
+        }
         obj.addProperty("read_only", true);
         obj.addProperty("loaded_chunks_only", true);
         JsonObject originJson = new JsonObject();
@@ -74,37 +150,121 @@ final class TerrainReader {
         JsonArray cells = new JsonArray();
         int unknown = 0;
         for (TerrainScan.Cell<JsonObject> cell : page.cells()) {
-            JsonObject data = cell.data() == null ? new JsonObject() : cell.data().deepCopy();
-            data.addProperty("x", cell.x()); data.addProperty("y", cell.y()); data.addProperty("z", cell.z());
-            data.addProperty("status", cell.availability().name().toLowerCase(Locale.ROOT));
             if (cell.availability() != TerrainScan.Availability.LOADED) {
-                data.addProperty("known", false);
                 unknown++;
             }
-            cells.add(data);
+            cells.add(cellJson(cell));
         }
         obj.addProperty("unknown_cells", unknown);
         obj.add("cells", cells);
         return obj;
     }
 
+    private static JsonObject cellJson(TerrainScan.Cell<JsonObject> cell) {
+        JsonObject data = cell.data() == null ? new JsonObject() : cell.data().deepCopy();
+        data.addProperty("x", cell.x()); data.addProperty("y", cell.y()); data.addProperty("z", cell.z());
+        data.addProperty("status", cell.availability().name().toLowerCase(Locale.ROOT));
+        if (cell.availability() != TerrainScan.Availability.LOADED) data.addProperty("known", false);
+        return data;
+    }
+
+    static int encodedCellBytes(TerrainScan.Cell<JsonObject> cell) {
+        // Do not allocate a second cell graph, JSON string and UTF-8 byte[] per read.
+        // Counting null members and replaced coordinate/status keys is conservative:
+        // the HTTP encoder can omit/replace them, but can never produce more bytes.
+        long bytes = cell.data() == null ? 2 : jsonByteUpperBound(cell.data());
+        bytes += 5 + integerBytes(cell.x()); // comma + "x": + integer
+        bytes += 5 + integerBytes(cell.y());
+        bytes += 5 + integerBytes(cell.z());
+        bytes += 12 + cell.availability().name().length(); // comma + "status":"..."
+        if (cell.availability() != TerrainScan.Availability.LOADED) bytes += 14; // ,"known":false
+        return saturatedCellBytes(bytes + 1); // Array separator, also counted after the final cell.
+    }
+
+    /** Values above the limit need only retain the explicit oversized sentinel. */
+    private static int saturatedCellBytes(long bytes) {
+        return (int) Math.min(TerrainScan.CAPABILITY_CELL_BYTES + 1L, bytes);
+    }
+
+    private static int integerBytes(int value) {
+        long remaining = value < 0 ? -(long) value : value;
+        int bytes = value < 0 ? 2 : 1;
+        while (remaining >= 10) { remaining /= 10; bytes++; }
+        return bytes;
+    }
+
+    private static long jsonByteUpperBound(JsonElement value) {
+        if (value == null || value.isJsonNull()) return 4;
+        if (value.isJsonObject()) {
+            long bytes = 2; boolean first = true;
+            for (var entry : value.getAsJsonObject().entrySet()) {
+                if (!first) bytes++;
+                bytes += quotedUtf8Bytes(entry.getKey()) + 1 + jsonByteUpperBound(entry.getValue());
+                if (bytes > TerrainScan.CAPABILITY_CELL_BYTES) return TerrainScan.CAPABILITY_CELL_BYTES + 1L;
+                first = false;
+            }
+            return bytes;
+        }
+        if (value.isJsonArray()) {
+            long bytes = 2; boolean first = true;
+            for (var item : value.getAsJsonArray()) {
+                if (!first) bytes++;
+                bytes += jsonByteUpperBound(item); first = false;
+                if (bytes > TerrainScan.CAPABILITY_CELL_BYTES) return TerrainScan.CAPABILITY_CELL_BYTES + 1L;
+            }
+            return bytes;
+        }
+        var primitive = value.getAsJsonPrimitive();
+        return primitive.isString() ? quotedUtf8Bytes(primitive.getAsString()) : saturatedCellBytes(primitive.getAsString().length());
+    }
+
+    /** Gson's non-HTML-safe string escaping; unpaired UTF-16 surrogates overcount replacement bytes. */
+    private static long quotedUtf8Bytes(String value) {
+        long bytes = 2;
+        for (int index = 0; index < value.length(); index++) {
+            char c = value.charAt(index);
+            if (c == '"' || c == '\\' || c == '\b' || c == '\f' || c == '\n' || c == '\r' || c == '\t') bytes += 2;
+            else if (c < 0x20 || c == '\u2028' || c == '\u2029') bytes += 6;
+            else if (c < 0x80) bytes++;
+            else if (c < 0x800) bytes += 2;
+            else if (Character.isHighSurrogate(c) && index + 1 < value.length()
+                    && Character.isLowSurrogate(value.charAt(index + 1))) { bytes += 4; index++; }
+            else bytes += 3;
+            if (bytes > TerrainScan.CAPABILITY_CELL_BYTES) return TerrainScan.CAPABILITY_CELL_BYTES + 1L;
+        }
+        return bytes;
+    }
+
     static void clear() { SCAN.clear(); }
+
+    static boolean acquisitionEligible(long now) { return SCAN.eligible(now); }
+    static long lastActualStart() { return SCAN.lastActualStart(); }
 
     private static final class LoadedSource implements TerrainScan.Source<JsonObject> {
         private final ClientLevel level;
         private final CollisionContext collisionContext;
         private final Map<Long, LevelChunk> chunks = new HashMap<>();
+        private final ReadMetrics metrics;
 
         LoadedSource(ClientLevel level, CollisionContext collisionContext) {
+            this(level, collisionContext, null);
+        }
+
+        LoadedSource(ClientLevel level, CollisionContext collisionContext, ReadMetrics metrics) {
             this.level = level;
             this.collisionContext = collisionContext;
+            this.metrics = metrics;
         }
 
         private LevelChunk loadedChunk(int x, int z) {
+            if (metrics != null) metrics.chunkRequests++;
             long key = ((long) (x >> 4) << 32) | ((z >> 4) & 0xffffffffL);
             if (!chunks.containsKey(key)) {
+                if (metrics != null) metrics.chunkFetches++;
                 // false is essential: missing client chunks stay unknown. No level.getChunk convenience call.
                 chunks.put(key, level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.FULL, false));
+            } else if (metrics != null) {
+                metrics.chunkCacheHits++;
             }
             return chunks.get(key);
         }
@@ -114,79 +274,182 @@ final class TerrainReader {
             return loadedChunk(x, z) == null ? TerrainScan.Availability.UNLOADED : TerrainScan.Availability.LOADED;
         }
 
-        @Override public JsonObject readLoaded(int x, int y, int z) {
+        @Override public int encodedCellBytes(TerrainScan.Cell<JsonObject> cell) {
+            return TerrainReader.encodedCellBytes(cell);
+        }
+
+        private BlockState readBlockState(BlockPos pos) {
+            long started = metrics == null ? 0 : System.nanoTime();
+            try {
+                LevelChunk chunk = loadedChunk(pos.getX(), pos.getZ());
+                if (metrics != null) metrics.stateReads++;
+                return chunk.getBlockState(pos);
+            } finally {
+                if (metrics != null) metrics.stateReadNanos += System.nanoTime() - started;
+            }
+        }
+
+        private BlockFacts readBlock(int x, int y, int z) {
+            if (metrics != null) metrics.loadedCellReads++;
             BlockPos pos = new BlockPos(x, y, z);
-            BlockState state = loadedChunk(x, z).getBlockState(pos);
+            BlockState state = readBlockState(pos);
+            long started = metrics == null ? 0 : System.nanoTime();
+            try {
+                String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+                return new BlockFacts(pos, state, id, state.isAir());
+            } finally {
+                if (metrics != null) metrics.metadataPreflightNanos += System.nanoTime() - started;
+            }
+        }
+
+        FlatStepCorridor.Cell readFlatCell(int x, int y, int z) {
+            TerrainScan.Availability availability = availability(x, y, z);
+            if (availability != TerrainScan.Availability.LOADED) {
+                FlatStepCorridor.Availability unavailable = switch (availability) {
+                    case OUT_OF_WORLD -> FlatStepCorridor.Availability.OUT_OF_WORLD;
+                    case UNLOADED -> FlatStepCorridor.Availability.UNLOADED;
+                    default -> FlatStepCorridor.Availability.UNKNOWN;
+                };
+                return new FlatStepCorridor.Cell(unavailable, null, false, false, false, null, false);
+            }
+            BlockFacts block = readBlock(x, y, z);
+            // Preserve export-hook failures without allocating the legacy export JSON graph.
+            // Omitting these callbacks could admit a cell the legacy adapter rejected.
+            readProperties(block.state(), null);
+            FluidFacts fluid = readFluid(block);
+            CollisionFacts collision = readCollision(block);
+            return new FlatStepCorridor.Cell(FlatStepCorridor.Availability.LOADED,
+                    bounded(block.id(), 160), collision.known(), collision.empty(), collision.topFull(),
+                    bounded(fluid.id(), 160), fluid.hazards() != 0);
+        }
+
+        @Override public JsonObject readLoaded(int x, int y, int z) {
+            BlockFacts block = readBlock(x, y, z);
+            BlockState state = block.state();
             JsonObject obj = new JsonObject();
             obj.addProperty("known", true);
-            String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-            obj.addProperty("id", bounded(id, 160));
-            obj.addProperty("id_truncated", id.length() > 160);
-            obj.addProperty("air", state.isAir());
+            obj.addProperty("block_light",level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK,block.pos()));
+            obj.addProperty("sky_light",level.getBrightness(net.minecraft.world.level.LightLayer.SKY,block.pos()));
+            obj.addProperty("id", bounded(block.id(), 160));
+            obj.addProperty("id_truncated", block.id().length() > 160);
+            obj.addProperty("air", block.air());
             JsonObject properties = new JsonObject();
-            int count = 0;
-            boolean propertiesTruncated = state.getValues().size() > 8;
-            for (Map.Entry<Property<?>, Comparable<?>> property : state.getValues().entrySet()) {
-                if (count++ == 8) break;
-                String name = property.getKey().getName();
-                String value = propertyName(property.getKey(), property.getValue());
-                // Keep pathological mod strings from multiplying escaped JSON beyond the response cap.
-                if (!name.matches("[a-zA-Z0-9_.:/-]{1,32}") || !value.matches("[a-zA-Z0-9_.:/-]{1,32}")) {
-                    propertiesTruncated = true;
-                    continue;
-                }
-                properties.addProperty(name, value);
-            }
+            boolean propertiesTruncated = readProperties(state, properties);
             obj.add("properties", properties);
             obj.addProperty("properties_truncated", propertiesTruncated);
-            FluidState fluid = state.getFluidState();
-            String fluidId = BuiltInRegistries.FLUID.getKey(fluid.getType()).toString();
-            obj.addProperty("fluid", bounded(fluidId, 160));
-            obj.addProperty("fluid_truncated", fluidId.length() > 160);
-            obj.addProperty("fluid_source", fluid.isSource());
+            FluidFacts fluid = readFluid(block);
+            obj.addProperty("fluid", bounded(fluid.id(), 160));
+            obj.addProperty("fluid_truncated", fluid.id().length() > 160);
+            obj.addProperty("fluid_source", fluid.source());
             JsonArray hazards = new JsonArray();
-            if (fluid.is(FluidTags.LAVA)) hazards.add("lava");
-            if (fluid.is(FluidTags.WATER)) hazards.add("water");
-            if (CONTACT_HAZARDS.contains(id)) hazards.add("contact_damage");
-            if ((id.equals("minecraft:campfire") || id.equals("minecraft:soul_campfire"))
-                    && state.hasProperty(BlockStateProperties.LIT) && state.getValue(BlockStateProperties.LIT)) hazards.add("contact_damage");
-            if (id.equals("minecraft:powder_snow")) hazards.add("powder_snow");
-            if (id.equals("minecraft:cobweb")) hazards.add("slowdown");
+            if ((fluid.hazards() & LAVA) != 0) hazards.add("lava");
+            if ((fluid.hazards() & WATER) != 0) hazards.add("water");
+            if ((fluid.hazards() & CONTACT_DAMAGE) != 0) hazards.add("contact_damage");
+            if ((fluid.hazards() & POWDER_SNOW) != 0) hazards.add("powder_snow");
+            if ((fluid.hazards() & SLOWDOWN) != 0) hazards.add("slowdown");
             obj.add("hazards", hazards);
             obj.addProperty("hazards_exhaustive", false);
+            CollisionFacts collision = readCollision(block);
+            obj.addProperty("collision_known", collision.known());
+            if (collision.known()) {
+                obj.addProperty("collision_empty", collision.empty());
+                obj.addProperty("full_top_support", collision.topFull());
+                AABB bounds = collision.bounds();
+                if (bounds != null) {
+                    JsonArray box = new JsonArray();
+                    box.add(bounds.minX); box.add(bounds.minY); box.add(bounds.minZ);
+                    box.add(bounds.maxX); box.add(bounds.maxY); box.add(bounds.maxZ);
+                    obj.add("collision_bounds", box);
+                }
+            } else {
+                obj.addProperty("collision_unknown_reason", collision.unknownReason());
+            }
+            return obj;
+        }
+
+        /** Keep property callback order/failure behavior even when only typed safety facts are needed. */
+        private boolean readProperties(BlockState state, JsonObject properties) {
+            long started = metrics == null ? 0 : System.nanoTime();
+            try {
+                int count = 0;
+                boolean propertiesTruncated = state.getValues().size() > 8;
+                for (Map.Entry<Property<?>, Comparable<?>> property : state.getValues().entrySet()) {
+                    if (count++ == 8) break;
+                    String name = property.getKey().getName();
+                    String value = propertyName(property.getKey(), property.getValue());
+                    // Keep pathological mod strings from multiplying escaped JSON beyond the response cap.
+                    if (!SAFE_PROPERTY.matcher(name).matches() || !SAFE_PROPERTY.matcher(value).matches()) {
+                        propertiesTruncated = true;
+                        continue;
+                    }
+                    if (properties != null) properties.addProperty(name, value);
+                }
+                return propertiesTruncated;
+            } finally {
+                if (metrics != null) metrics.metadataPreflightNanos += System.nanoTime() - started;
+            }
+        }
+
+        private FluidState readFluidState(BlockState state) {
+            if (metrics != null) metrics.fluidReads++;
+            return state.getFluidState();
+        }
+
+        private FluidFacts readFluid(BlockFacts block) {
+            long started = metrics == null ? 0 : System.nanoTime();
+            try {
+                BlockState state = block.state();
+                String id = block.id();
+                FluidState fluid = readFluidState(state);
+                String fluidId = BuiltInRegistries.FLUID.getKey(fluid.getType()).toString();
+                boolean source = fluid.isSource();
+                int hazards = 0;
+                if (fluid.is(FluidTags.LAVA)) hazards |= LAVA;
+                if (fluid.is(FluidTags.WATER)) hazards |= WATER;
+                if (CONTACT_HAZARDS.contains(id)) hazards |= CONTACT_DAMAGE;
+                if ((id.equals("minecraft:campfire") || id.equals("minecraft:soul_campfire"))
+                        && state.hasProperty(BlockStateProperties.LIT) && state.getValue(BlockStateProperties.LIT)) hazards |= CONTACT_DAMAGE;
+                if (id.equals("minecraft:powder_snow")) hazards |= POWDER_SNOW;
+                if (id.equals("minecraft:cobweb")) hazards |= SLOWDOWN;
+                return new FluidFacts(fluidId, source, hazards);
+            } finally {
+                if (metrics != null) metrics.fluidHazardNanos += System.nanoTime() - started;
+            }
+        }
+
+        private CollisionFacts readCollision(BlockFacts block) {
+            long started = metrics == null ? 0 : System.nanoTime();
+            BlockPos pos = block.pos();
             ShapeView view = new ShapeView(this, pos);
             try {
-                VoxelShape shape = state.getCollisionShape(view, pos, collisionContext);
+                VoxelShape shape = block.state().getCollisionShape(view, pos, collisionContext);
                 boolean empty = shape.isEmpty();
                 boolean topFull = !empty && Block.isFaceFull(shape, Direction.UP);
-                JsonArray box = null;
+                AABB bounds = null;
                 if (!empty) {
-                    AABB bounds = shape.bounds();
+                    bounds = shape.bounds();
                     if (!Double.isFinite(bounds.minX) || !Double.isFinite(bounds.minY) || !Double.isFinite(bounds.minZ)
                             || !Double.isFinite(bounds.maxX) || !Double.isFinite(bounds.maxY) || !Double.isFinite(bounds.maxZ)) {
                         throw new IllegalStateException("Nonfinite collision bounds");
                     }
-                    box = new JsonArray();
-                    box.add(bounds.minX); box.add(bounds.minY); box.add(bounds.minZ);
-                    box.add(bounds.maxX); box.add(bounds.maxY); box.add(bounds.maxZ);
                 }
                 // Publish facts atomically, only after every mod-provided shape operation succeeds.
-                if (!view.unknown) {
-                    obj.addProperty("collision_known", true);
-                    obj.addProperty("collision_empty", empty);
-                    obj.addProperty("full_top_support", topFull);
-                    if (box != null) obj.add("collision_bounds", box);
-                } else {
-                    obj.addProperty("collision_known", false);
-                    obj.addProperty("collision_unknown_reason", "unavailable_shape_context");
-                }
+                return !view.unknown ? new CollisionFacts(true, empty, topFull, bounds, null)
+                        : CollisionFacts.unknown("unavailable_shape_context");
             } catch (RuntimeException exception) {
                 // A custom block must not make unloaded terrain look like walkable air.
-                obj.addProperty("collision_known", false);
-                obj.addProperty("collision_unknown_reason", "block_shape_failed");
+                return CollisionFacts.unknown("block_shape_failed");
+            } finally {
+                if (metrics != null) metrics.collisionNanos += System.nanoTime() - started;
             }
-            return obj;
         }
+    }
+
+    private static final int LAVA = 1, WATER = 2, CONTACT_DAMAGE = 4, POWDER_SNOW = 8, SLOWDOWN = 16;
+    private record BlockFacts(BlockPos pos, BlockState state, String id, boolean air) { }
+    private record FluidFacts(String id, boolean source, int hazards) { }
+    private record CollisionFacts(boolean known, boolean empty, boolean topFull, AABB bounds, String unknownReason) {
+        static CollisionFacts unknown(String reason) { return new CollisionFacts(false, false, false, null, reason); }
     }
 
     /** Collision hooks get a bounded, read-only neighborhood and never a live Level. */
@@ -197,15 +460,16 @@ final class TerrainReader {
         private boolean unknown;
         ShapeView(LoadedSource source, BlockPos center) { this.source = source; this.center = center; }
         @Override public BlockState getBlockState(BlockPos pos) {
+            if (source.metrics != null) source.metrics.shapeContextReads++;
             if (++reads > 64 || Math.abs((long) pos.getX() - center.getX()) > 1
                     || Math.abs((long) pos.getY() - center.getY()) > 1 || Math.abs((long) pos.getZ() - center.getZ()) > 1
                     || source.availability(pos.getX(), pos.getY(), pos.getZ()) != TerrainScan.Availability.LOADED) {
                 unknown = true;
                 return Blocks.AIR.defaultBlockState();
             }
-            return source.loadedChunk(pos.getX(), pos.getZ()).getBlockState(pos);
+            return source.readBlockState(pos);
         }
-        @Override public FluidState getFluidState(BlockPos pos) { return getBlockState(pos).getFluidState(); }
+        @Override public FluidState getFluidState(BlockPos pos) { return source.readFluidState(getBlockState(pos)); }
         @Override public BlockEntity getBlockEntity(BlockPos pos) { unknown = true; return null; }
         @Override public int getHeight() { return source.level.getHeight(); }
         @Override public int getMinBuildHeight() { return source.level.getMinBuildHeight(); }

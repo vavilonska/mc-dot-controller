@@ -1,6 +1,7 @@
 package io.github.campione01.mineclientbridge.mixin;
 
 import io.github.campione01.mineclientbridge.ClientInputIsolation;
+import io.github.campione01.mineclientbridge.MovementBudget;
 import net.minecraft.client.KeyboardHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,7 +14,7 @@ public abstract class KeyboardHandlerMixin {
     @Inject(method = "keyPress(JIIII)V", at = @At("HEAD"), cancellable = true)
     private void mineclientBridge$filterNativeKey(
             long windowPointer, int key, int scanCode, int action, int modifiers, CallbackInfo callback) {
-        if (!ClientInputIsolation.acceptsInputCallback()) {
+        if (!MovementBudget.acceptsInputCallback()) {
             callback.cancel();
         }
     }
@@ -21,7 +22,7 @@ public abstract class KeyboardHandlerMixin {
     @Inject(method = "charTyped(JII)V", at = @At("HEAD"), cancellable = true)
     private void mineclientBridge$filterNativeCharacter(
             long windowPointer, int codePoint, int modifiers, CallbackInfo callback) {
-        if (!ClientInputIsolation.acceptsInputCallback()) {
+        if (!MovementBudget.acceptsInputCallback()) {
             callback.cancel();
         }
     }

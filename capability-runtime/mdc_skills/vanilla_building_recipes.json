@@ -1,0 +1,1765 @@
+{
+  "schema_version": 1,
+  "source_version": "1.21.1",
+  "source_jar_sha256": "499f6897d1837516680f3114072d8106e11c9adcd933fe5cf051b551089b0c99",
+  "recipes": {
+    "acacia_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:acacia_planks"
+        ]
+      },
+      "count": 3
+    },
+    "acacia_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:acacia_planks"
+        ]
+      },
+      "count": 3
+    },
+    "acacia_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:acacia_planks"
+        ]
+      },
+      "count": 6
+    },
+    "acacia_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:acacia_planks"
+        ]
+      },
+      "count": 4
+    },
+    "andesite_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:andesite"
+        ]
+      },
+      "count": 6
+    },
+    "andesite_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:andesite"
+        ]
+      },
+      "count": 4
+    },
+    "bamboo_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:bamboo_planks"
+        ]
+      },
+      "count": 3
+    },
+    "bamboo_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:bamboo_planks"
+        ]
+      },
+      "count": 3
+    },
+    "bamboo_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:bamboo_planks"
+        ]
+      },
+      "count": 6
+    },
+    "bamboo_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:bamboo_planks"
+        ]
+      },
+      "count": 4
+    },
+    "birch_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:birch_planks"
+        ]
+      },
+      "count": 3
+    },
+    "birch_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:birch_planks"
+        ]
+      },
+      "count": 3
+    },
+    "birch_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:birch_planks"
+        ]
+      },
+      "count": 6
+    },
+    "birch_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:birch_planks"
+        ]
+      },
+      "count": 4
+    },
+    "blackstone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:blackstone"
+        ]
+      },
+      "count": 6
+    },
+    "blackstone_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:blackstone"
+        ]
+      },
+      "count": 4
+    },
+    "blast_furnace": {
+      "pattern": [
+        "III",
+        "IXI",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:smooth_stone"
+        ],
+        "I": [
+          "minecraft:iron_ingot"
+        ],
+        "X": [
+          "minecraft:furnace"
+        ]
+      },
+      "count": 1
+    },
+    "brick_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:bricks"
+        ]
+      },
+      "count": 6
+    },
+    "brick_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:bricks"
+        ]
+      },
+      "count": 4
+    },
+    "bricks": {
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:brick"
+        ]
+      },
+      "count": 1
+    },
+    "cherry_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cherry_planks"
+        ]
+      },
+      "count": 3
+    },
+    "cherry_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:cherry_planks"
+        ]
+      },
+      "count": 3
+    },
+    "cherry_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cherry_planks"
+        ]
+      },
+      "count": 6
+    },
+    "cherry_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cherry_planks"
+        ]
+      },
+      "count": 4
+    },
+    "chest": {
+      "pattern": [
+        "###",
+        "# #",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:oak_planks",
+          "minecraft:spruce_planks",
+          "minecraft:birch_planks",
+          "minecraft:jungle_planks",
+          "minecraft:acacia_planks",
+          "minecraft:dark_oak_planks",
+          "minecraft:crimson_planks",
+          "minecraft:warped_planks",
+          "minecraft:mangrove_planks",
+          "minecraft:bamboo_planks",
+          "minecraft:cherry_planks"
+        ]
+      },
+      "count": 1
+    },
+    "cobbled_deepslate_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cobbled_deepslate"
+        ]
+      },
+      "count": 6
+    },
+    "cobbled_deepslate_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cobbled_deepslate"
+        ]
+      },
+      "count": 4
+    },
+    "cobblestone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cobblestone"
+        ]
+      },
+      "count": 6
+    },
+    "cobblestone_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:cobblestone"
+        ]
+      },
+      "count": 4
+    },
+    "crimson_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:crimson_planks"
+        ]
+      },
+      "count": 3
+    },
+    "crimson_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:crimson_planks"
+        ]
+      },
+      "count": 3
+    },
+    "crimson_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:crimson_planks"
+        ]
+      },
+      "count": 6
+    },
+    "crimson_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:crimson_planks"
+        ]
+      },
+      "count": 4
+    },
+    "dark_oak_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:dark_oak_planks"
+        ]
+      },
+      "count": 3
+    },
+    "dark_oak_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:dark_oak_planks"
+        ]
+      },
+      "count": 3
+    },
+    "dark_oak_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:dark_oak_planks"
+        ]
+      },
+      "count": 6
+    },
+    "dark_oak_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:dark_oak_planks"
+        ]
+      },
+      "count": 4
+    },
+    "deepslate_brick_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:deepslate_bricks"
+        ]
+      },
+      "count": 6
+    },
+    "deepslate_brick_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:deepslate_bricks"
+        ]
+      },
+      "count": 4
+    },
+    "deepslate_bricks": {
+      "pattern": [
+        "SS",
+        "SS"
+      ],
+      "ingredients": {
+        "S": [
+          "minecraft:polished_deepslate"
+        ]
+      },
+      "count": 4
+    },
+    "deepslate_tile_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:deepslate_tiles"
+        ]
+      },
+      "count": 6
+    },
+    "deepslate_tile_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:deepslate_tiles"
+        ]
+      },
+      "count": 4
+    },
+    "deepslate_tiles": {
+      "pattern": [
+        "SS",
+        "SS"
+      ],
+      "ingredients": {
+        "S": [
+          "minecraft:deepslate_bricks"
+        ]
+      },
+      "count": 4
+    },
+    "diorite_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:diorite"
+        ]
+      },
+      "count": 6
+    },
+    "diorite_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:diorite"
+        ]
+      },
+      "count": 4
+    },
+    "end_stone_brick_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:end_stone_bricks"
+        ]
+      },
+      "count": 6
+    },
+    "end_stone_brick_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:end_stone_bricks"
+        ]
+      },
+      "count": 4
+    },
+    "end_stone_bricks": {
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:end_stone"
+        ]
+      },
+      "count": 4
+    },
+    "glass_pane": {
+      "pattern": [
+        "###",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:glass"
+        ]
+      },
+      "count": 16
+    },
+    "granite_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:granite"
+        ]
+      },
+      "count": 6
+    },
+    "granite_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:granite"
+        ]
+      },
+      "count": 4
+    },
+    "iron_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:iron_ingot"
+        ]
+      },
+      "count": 3
+    },
+    "jungle_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:jungle_planks"
+        ]
+      },
+      "count": 3
+    },
+    "jungle_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:jungle_planks"
+        ]
+      },
+      "count": 3
+    },
+    "jungle_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:jungle_planks"
+        ]
+      },
+      "count": 6
+    },
+    "jungle_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:jungle_planks"
+        ]
+      },
+      "count": 4
+    },
+    "mangrove_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:mangrove_planks"
+        ]
+      },
+      "count": 3
+    },
+    "mangrove_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:mangrove_planks"
+        ]
+      },
+      "count": 3
+    },
+    "mangrove_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:mangrove_planks"
+        ]
+      },
+      "count": 6
+    },
+    "mangrove_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:mangrove_planks"
+        ]
+      },
+      "count": 4
+    },
+    "nether_brick_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:nether_brick"
+        ],
+        "W": [
+          "minecraft:nether_bricks"
+        ]
+      },
+      "count": 6
+    },
+    "oak_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:oak_planks"
+        ]
+      },
+      "count": 3
+    },
+    "oak_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:oak_planks"
+        ]
+      },
+      "count": 3
+    },
+    "oak_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:oak_planks"
+        ]
+      },
+      "count": 6
+    },
+    "oak_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:oak_planks"
+        ]
+      },
+      "count": 4
+    },
+    "polished_blackstone": {
+      "pattern": [
+        "SS",
+        "SS"
+      ],
+      "ingredients": {
+        "S": [
+          "minecraft:blackstone"
+        ]
+      },
+      "count": 4
+    },
+    "polished_blackstone_brick_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:polished_blackstone_bricks"
+        ]
+      },
+      "count": 6
+    },
+    "polished_blackstone_brick_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:polished_blackstone_bricks"
+        ]
+      },
+      "count": 4
+    },
+    "polished_blackstone_bricks": {
+      "pattern": [
+        "SS",
+        "SS"
+      ],
+      "ingredients": {
+        "S": [
+          "minecraft:polished_blackstone"
+        ]
+      },
+      "count": 4
+    },
+    "polished_blackstone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:polished_blackstone"
+        ]
+      },
+      "count": 6
+    },
+    "polished_blackstone_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:polished_blackstone"
+        ]
+      },
+      "count": 4
+    },
+    "quartz_block": {
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:quartz"
+        ]
+      },
+      "count": 1
+    },
+    "quartz_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:chiseled_quartz_block",
+          "minecraft:quartz_block",
+          "minecraft:quartz_pillar"
+        ]
+      },
+      "count": 6
+    },
+    "quartz_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:chiseled_quartz_block",
+          "minecraft:quartz_block",
+          "minecraft:quartz_pillar"
+        ]
+      },
+      "count": 4
+    },
+    "sandstone": {
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:sand"
+        ]
+      },
+      "count": 1
+    },
+    "sandstone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:sandstone",
+          "minecraft:chiseled_sandstone"
+        ]
+      },
+      "count": 6
+    },
+    "sandstone_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:sandstone",
+          "minecraft:chiseled_sandstone",
+          "minecraft:cut_sandstone"
+        ]
+      },
+      "count": 4
+    },
+    "smoker": {
+      "pattern": [
+        " # ",
+        "#X#",
+        " # "
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:dark_oak_log",
+          "minecraft:dark_oak_wood",
+          "minecraft:stripped_dark_oak_log",
+          "minecraft:stripped_dark_oak_wood",
+          "minecraft:oak_log",
+          "minecraft:oak_wood",
+          "minecraft:stripped_oak_log",
+          "minecraft:stripped_oak_wood",
+          "minecraft:acacia_log",
+          "minecraft:acacia_wood",
+          "minecraft:stripped_acacia_log",
+          "minecraft:stripped_acacia_wood",
+          "minecraft:birch_log",
+          "minecraft:birch_wood",
+          "minecraft:stripped_birch_log",
+          "minecraft:stripped_birch_wood",
+          "minecraft:jungle_log",
+          "minecraft:jungle_wood",
+          "minecraft:stripped_jungle_log",
+          "minecraft:stripped_jungle_wood",
+          "minecraft:spruce_log",
+          "minecraft:spruce_wood",
+          "minecraft:stripped_spruce_log",
+          "minecraft:stripped_spruce_wood",
+          "minecraft:mangrove_log",
+          "minecraft:mangrove_wood",
+          "minecraft:stripped_mangrove_log",
+          "minecraft:stripped_mangrove_wood",
+          "minecraft:cherry_log",
+          "minecraft:cherry_wood",
+          "minecraft:stripped_cherry_log",
+          "minecraft:stripped_cherry_wood",
+          "minecraft:crimson_stem",
+          "minecraft:stripped_crimson_stem",
+          "minecraft:crimson_hyphae",
+          "minecraft:stripped_crimson_hyphae",
+          "minecraft:warped_stem",
+          "minecraft:stripped_warped_stem",
+          "minecraft:warped_hyphae",
+          "minecraft:stripped_warped_hyphae"
+        ],
+        "X": [
+          "minecraft:furnace"
+        ]
+      },
+      "count": 1
+    },
+    "smooth_quartz_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:smooth_quartz"
+        ]
+      },
+      "count": 6
+    },
+    "smooth_quartz_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:smooth_quartz"
+        ]
+      },
+      "count": 4
+    },
+    "smooth_sandstone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:smooth_sandstone"
+        ]
+      },
+      "count": 6
+    },
+    "smooth_sandstone_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:smooth_sandstone"
+        ]
+      },
+      "count": 4
+    },
+    "smooth_stone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:smooth_stone"
+        ]
+      },
+      "count": 6
+    },
+    "soul_torch": {
+      "pattern": [
+        "X",
+        "#",
+        "S"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "S": [
+          "minecraft:soul_sand",
+          "minecraft:soul_soil"
+        ],
+        "X": [
+          "minecraft:coal",
+          "minecraft:charcoal"
+        ]
+      },
+      "count": 4
+    },
+    "spruce_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:spruce_planks"
+        ]
+      },
+      "count": 3
+    },
+    "spruce_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:spruce_planks"
+        ]
+      },
+      "count": 3
+    },
+    "spruce_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:spruce_planks"
+        ]
+      },
+      "count": 6
+    },
+    "spruce_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:spruce_planks"
+        ]
+      },
+      "count": 4
+    },
+    "stone_brick_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stone_bricks"
+        ]
+      },
+      "count": 6
+    },
+    "stone_brick_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stone_bricks"
+        ]
+      },
+      "count": 4
+    },
+    "stone_bricks": {
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stone"
+        ]
+      },
+      "count": 4
+    },
+    "stone_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stone"
+        ]
+      },
+      "count": 6
+    },
+    "stone_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stone"
+        ]
+      },
+      "count": 4
+    },
+    "warped_door": {
+      "pattern": [
+        "##",
+        "##",
+        "##"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:warped_planks"
+        ]
+      },
+      "count": 3
+    },
+    "warped_fence": {
+      "pattern": [
+        "W#W",
+        "W#W"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "W": [
+          "minecraft:warped_planks"
+        ]
+      },
+      "count": 3
+    },
+    "warped_slab": {
+      "pattern": [
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:warped_planks"
+        ]
+      },
+      "count": 6
+    },
+    "warped_stairs": {
+      "pattern": [
+        "#  ",
+        "## ",
+        "###"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:warped_planks"
+        ]
+      },
+      "count": 4
+    },
+    "blaze_powder": {
+      "pattern": [
+        "A"
+      ],
+      "ingredients": {
+        "A": [
+          "minecraft:blaze_rod"
+        ]
+      },
+      "count": 2,
+      "source_type": "minecraft:crafting_shapeless",
+      "canonical_grid_placement": true
+    },
+    "ender_eye": {
+      "pattern": [
+        "AB"
+      ],
+      "ingredients": {
+        "A": [
+          "minecraft:ender_pearl"
+        ],
+        "B": [
+          "minecraft:blaze_powder"
+        ]
+      },
+      "count": 1,
+      "source_type": "minecraft:crafting_shapeless",
+      "canonical_grid_placement": true
+    },
+    "bow": {
+      "pattern": [
+        " #X",
+        "# X",
+        " #X"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "X": [
+          "minecraft:string"
+        ]
+      },
+      "count": 1
+    },
+    "arrow": {
+      "pattern": [
+        "X",
+        "#",
+        "Y"
+      ],
+      "ingredients": {
+        "#": [
+          "minecraft:stick"
+        ],
+        "X": [
+          "minecraft:flint"
+        ],
+        "Y": [
+          "minecraft:feather"
+        ]
+      },
+      "count": 4
+    }
+  },
+  "provenance": {
+    "acacia_door": {
+      "path": "data/minecraft/recipe/acacia_door.json",
+      "sha256": "c35c7fcdd481ca3f58ca1b4892bdfcfa88539b7f2354e455f823d3fb8879ac9f"
+    },
+    "acacia_fence": {
+      "path": "data/minecraft/recipe/acacia_fence.json",
+      "sha256": "99e725ac72ba2e0e367d5685698aba6707935fb1623b57ec55176027f48c34d6"
+    },
+    "acacia_slab": {
+      "path": "data/minecraft/recipe/acacia_slab.json",
+      "sha256": "99f00d5c6bfc9ddfea7b262c11cc8431d8d1fe235c060cb5c44602543c331dd4"
+    },
+    "acacia_stairs": {
+      "path": "data/minecraft/recipe/acacia_stairs.json",
+      "sha256": "817afe6bc85977a3fd358a2194511cb4d6e11aa81b31b40e580c6fc9ae4228a4"
+    },
+    "andesite_slab": {
+      "path": "data/minecraft/recipe/andesite_slab.json",
+      "sha256": "f02c2276c321668ccb99e63a15036b898cbb5fa3084372770985f62b6fae20ac"
+    },
+    "andesite_stairs": {
+      "path": "data/minecraft/recipe/andesite_stairs.json",
+      "sha256": "76db67535acfef277f0eccb8d36d964f75a53138c918d4a9864456b5b6185dae"
+    },
+    "bamboo_door": {
+      "path": "data/minecraft/recipe/bamboo_door.json",
+      "sha256": "247c137af08c59e642910485a98ad2aa4f817a0e4654b82f8fa8360f72dcd893"
+    },
+    "bamboo_fence": {
+      "path": "data/minecraft/recipe/bamboo_fence.json",
+      "sha256": "e1aed881df2e7ebfc8aca67f61d91d123bf11209d891fe060b82ea5c68dddc18"
+    },
+    "bamboo_slab": {
+      "path": "data/minecraft/recipe/bamboo_slab.json",
+      "sha256": "f45d2ca4a8c57eafeabbf84162ae9f4b26e3b8d1bd3290d477b1e74b7a62883c"
+    },
+    "bamboo_stairs": {
+      "path": "data/minecraft/recipe/bamboo_stairs.json",
+      "sha256": "633c9c86573c59e03b8e0bbe9725b293c7adf86e81804b5a178002b0c5ac1f00"
+    },
+    "birch_door": {
+      "path": "data/minecraft/recipe/birch_door.json",
+      "sha256": "d47e7ef0a7b40d543a62eb55154d3d65efed81b352639a77a8138fa7349b1394"
+    },
+    "birch_fence": {
+      "path": "data/minecraft/recipe/birch_fence.json",
+      "sha256": "05563f39f3e144c95aa3f4fbe46a82052c86286360d28a642f690d3d3a8cbc33"
+    },
+    "birch_slab": {
+      "path": "data/minecraft/recipe/birch_slab.json",
+      "sha256": "0193dceef8244e3bc65b8c7c4f7b28e0684c7c4c6a66a6d845a304b450dffe90"
+    },
+    "birch_stairs": {
+      "path": "data/minecraft/recipe/birch_stairs.json",
+      "sha256": "fbda04ff4a3fe9a4dddb7847a1100b10971981e6b02bcf759dbc98ac8f1b7548"
+    },
+    "blackstone_slab": {
+      "path": "data/minecraft/recipe/blackstone_slab.json",
+      "sha256": "ded904665751e044ff6378cdb635b844cda15677d69cbccceabc625a065a920f"
+    },
+    "blackstone_stairs": {
+      "path": "data/minecraft/recipe/blackstone_stairs.json",
+      "sha256": "02c74599663405c360b78c23dccbf1f4eaf3054b7fc0f6b4bebcd551ffcfaffe"
+    },
+    "blast_furnace": {
+      "path": "data/minecraft/recipe/blast_furnace.json",
+      "sha256": "080e16853955483420b3903381f16e8be7af50862ebe06980efb2e71bd168f22"
+    },
+    "brick_slab": {
+      "path": "data/minecraft/recipe/brick_slab.json",
+      "sha256": "d4d78c7d9c5d6b5ced48edd7d555fef821e1a99eeefcf42cec64f4ea8d488302"
+    },
+    "brick_stairs": {
+      "path": "data/minecraft/recipe/brick_stairs.json",
+      "sha256": "9d50bacafde7d58bc37eae904ade78d50496912d24a416789407fe1d159df11f"
+    },
+    "bricks": {
+      "path": "data/minecraft/recipe/bricks.json",
+      "sha256": "2d3851c9bb77b07cc96b478e2c0a03a37f5ce5d33500d683582bdb86f049e7cd"
+    },
+    "cherry_door": {
+      "path": "data/minecraft/recipe/cherry_door.json",
+      "sha256": "72f5dc027df95000ff07164574a2097b0928422cdef6a2a355fe46d0c0fee58f"
+    },
+    "cherry_fence": {
+      "path": "data/minecraft/recipe/cherry_fence.json",
+      "sha256": "d05a4002127c383e57928c462325ccaade8b849cf1fdb9ca0435c740ec13ebbb"
+    },
+    "cherry_slab": {
+      "path": "data/minecraft/recipe/cherry_slab.json",
+      "sha256": "b52a4ec209bde4aff1d1eea2815e15a084a7b1359aa80d76dc7e3f6cce067874"
+    },
+    "cherry_stairs": {
+      "path": "data/minecraft/recipe/cherry_stairs.json",
+      "sha256": "fbc2bc1f7187ade0c3d4510b1f0c676cb1cfebf0089147c45050281657adabfd"
+    },
+    "chest": {
+      "path": "data/minecraft/recipe/chest.json",
+      "sha256": "ec812b771094ef8e9106c16f28806e62b3ef9e9857d849afe93a822904ffe0c5"
+    },
+    "cobbled_deepslate_slab": {
+      "path": "data/minecraft/recipe/cobbled_deepslate_slab.json",
+      "sha256": "bb52085dfa105fd39d0f79898dfdf10827b1eae0803eb6adef629807e5123be7"
+    },
+    "cobbled_deepslate_stairs": {
+      "path": "data/minecraft/recipe/cobbled_deepslate_stairs.json",
+      "sha256": "03bbd03dd7a9b793c8de088fb403c88bb1e8f138fb9796f0eb4d66d96d9fcd3c"
+    },
+    "cobblestone_slab": {
+      "path": "data/minecraft/recipe/cobblestone_slab.json",
+      "sha256": "01ba1964f4a15cb7d4bd74f3b2195cbd05b23f85b91a4ea93485ac9877ebf2f1"
+    },
+    "cobblestone_stairs": {
+      "path": "data/minecraft/recipe/cobblestone_stairs.json",
+      "sha256": "ecdf031f92238b101c5a8ee0a40fc0fe426d4bb6a9e8c802e938cba1546c2896"
+    },
+    "crimson_door": {
+      "path": "data/minecraft/recipe/crimson_door.json",
+      "sha256": "ff7da7bf081276459d08be1b110aea4d9f3513f6c54920a101ee2e9bfb2a91de"
+    },
+    "crimson_fence": {
+      "path": "data/minecraft/recipe/crimson_fence.json",
+      "sha256": "e45167513d0f3b0160de9be09a9d2066e2beb9da2ee21ade4b7899b66125375e"
+    },
+    "crimson_slab": {
+      "path": "data/minecraft/recipe/crimson_slab.json",
+      "sha256": "5074c87fbee0f3e83b0d8e818a0ebbcea170433a19dab46029c102e1c1c389f9"
+    },
+    "crimson_stairs": {
+      "path": "data/minecraft/recipe/crimson_stairs.json",
+      "sha256": "498869cfc52d959ef46aaf11186f2155f0d4b6b6d46f27e9a125c9ebfb6e8bfd"
+    },
+    "dark_oak_door": {
+      "path": "data/minecraft/recipe/dark_oak_door.json",
+      "sha256": "b51de12b535008b657ab572aec620b83856e99c49d4bbbdb2a352114f207419b"
+    },
+    "dark_oak_fence": {
+      "path": "data/minecraft/recipe/dark_oak_fence.json",
+      "sha256": "889a3343fffed48c13bb258b7af8ac063c9f3a712e875b076b8a2f8fbbc30ea7"
+    },
+    "dark_oak_slab": {
+      "path": "data/minecraft/recipe/dark_oak_slab.json",
+      "sha256": "3802712552ebb542de842adf750856e7b5dd6fb024ffb7c2c94288fa9bf9925c"
+    },
+    "dark_oak_stairs": {
+      "path": "data/minecraft/recipe/dark_oak_stairs.json",
+      "sha256": "e9b3eeba6b9dc368b0cc5a111626026f5c6608a1dcc6116f5c5214187a96e709"
+    },
+    "deepslate_brick_slab": {
+      "path": "data/minecraft/recipe/deepslate_brick_slab.json",
+      "sha256": "01451a1ddbfad47ac90b7fe8d1d47ab738da7e4e5fde75e8c8af5e814c6026e1"
+    },
+    "deepslate_brick_stairs": {
+      "path": "data/minecraft/recipe/deepslate_brick_stairs.json",
+      "sha256": "0de82f0b2672c4a5243cb2542cfcc1a34d9f7d388f7b60e2dd0a837ea303c9db"
+    },
+    "deepslate_bricks": {
+      "path": "data/minecraft/recipe/deepslate_bricks.json",
+      "sha256": "e203474add9b0e10a32e9bde6bbb317e7e2f2ac40cee39ad5a8bf143f9214f4b"
+    },
+    "deepslate_tile_slab": {
+      "path": "data/minecraft/recipe/deepslate_tile_slab.json",
+      "sha256": "0c02cfd6c4177fc328d64317294b527dc1e80dc03fef5dab69168ccdb3fe75f0"
+    },
+    "deepslate_tile_stairs": {
+      "path": "data/minecraft/recipe/deepslate_tile_stairs.json",
+      "sha256": "4b87721280887ae2af69600efb1d822aad9086b60b4175934b536e0c864b51aa"
+    },
+    "deepslate_tiles": {
+      "path": "data/minecraft/recipe/deepslate_tiles.json",
+      "sha256": "466694266960fac7914db51c25deebfc4c5f72d73e63be5a17e3f685dd616949"
+    },
+    "diorite_slab": {
+      "path": "data/minecraft/recipe/diorite_slab.json",
+      "sha256": "9dbc80b15d8d9c4aa0ddbd7ade650aa2a4eb76ac0bad8da9f71bdb0bd9713dd1"
+    },
+    "diorite_stairs": {
+      "path": "data/minecraft/recipe/diorite_stairs.json",
+      "sha256": "e0082ff42180b1e9ad88379964bf46d1c5cb4d1343f4b6e6ab2f138c2ca4e11f"
+    },
+    "end_stone_brick_slab": {
+      "path": "data/minecraft/recipe/end_stone_brick_slab.json",
+      "sha256": "5233fcd8ba8519d98b62943be4dfec007ecb3e821733f6837f6d5412010b25ce"
+    },
+    "end_stone_brick_stairs": {
+      "path": "data/minecraft/recipe/end_stone_brick_stairs.json",
+      "sha256": "44e47c7bf9ca8fb420a5c2e0f5061b5edca2b4b2bc60550399e22814b0b69c32"
+    },
+    "end_stone_bricks": {
+      "path": "data/minecraft/recipe/end_stone_bricks.json",
+      "sha256": "3eeff50ec6fc03d6b4fd6cef07f6ba33967ceea3efbfa91a5ecb0d639129b348"
+    },
+    "glass_pane": {
+      "path": "data/minecraft/recipe/glass_pane.json",
+      "sha256": "3b318aadaeb9bc3582509e32b6f4aad55b6243ed3d206bfe641e2dc3e7db65ea"
+    },
+    "granite_slab": {
+      "path": "data/minecraft/recipe/granite_slab.json",
+      "sha256": "281e889c36c48faafd64dad077bd22a37ab2b5f6636424d122ae1d0619260959"
+    },
+    "granite_stairs": {
+      "path": "data/minecraft/recipe/granite_stairs.json",
+      "sha256": "5d95984717c574ceec888e44c201e773bf457dca168e8a28c4bdfc041f2405f7"
+    },
+    "iron_door": {
+      "path": "data/minecraft/recipe/iron_door.json",
+      "sha256": "a592434674ed666d7743dd05db59ecb20f4739c1603fa074c4f6981fed6c947d"
+    },
+    "jungle_door": {
+      "path": "data/minecraft/recipe/jungle_door.json",
+      "sha256": "6a60c4ed74ed925f7cb6571b4a5ba8d65065bb8ae09a8b0ff8c12fcf17236a76"
+    },
+    "jungle_fence": {
+      "path": "data/minecraft/recipe/jungle_fence.json",
+      "sha256": "6626368f805dd7623ffb1dec9af01cbf09b7aaf8e78861100a6b368cf33e3f3f"
+    },
+    "jungle_slab": {
+      "path": "data/minecraft/recipe/jungle_slab.json",
+      "sha256": "6c8e5a5f4b0b708aa953bb3043933e70c9559d79c3ece1e774a4cc5c53fb79d7"
+    },
+    "jungle_stairs": {
+      "path": "data/minecraft/recipe/jungle_stairs.json",
+      "sha256": "af6fba1c29d6498a5afda4e1d9dd1a2b89d2769d47f049f900af750e839a5528"
+    },
+    "mangrove_door": {
+      "path": "data/minecraft/recipe/mangrove_door.json",
+      "sha256": "15cfa1b924e7e3c2751a5591fd84ece310421b3ceec7a5fe59072e0cbff35dc2"
+    },
+    "mangrove_fence": {
+      "path": "data/minecraft/recipe/mangrove_fence.json",
+      "sha256": "dbf8ed1cdb13d183308a99d9ffbe25d6ea34126c50bc3215b45351fdd28138be"
+    },
+    "mangrove_slab": {
+      "path": "data/minecraft/recipe/mangrove_slab.json",
+      "sha256": "2d19d56216df4b6389a257f6b8766eed67b4b0f92dd504989046da83cd733260"
+    },
+    "mangrove_stairs": {
+      "path": "data/minecraft/recipe/mangrove_stairs.json",
+      "sha256": "49554fd241aaf6ca4b9829477388110e3fd5d67a88ffd208f54c61f454ebc779"
+    },
+    "nether_brick_fence": {
+      "path": "data/minecraft/recipe/nether_brick_fence.json",
+      "sha256": "242f02ea87b3555aa3ffde19ef6e7fec488112bbe1ded5e9d918868d9a4811af"
+    },
+    "oak_door": {
+      "path": "data/minecraft/recipe/oak_door.json",
+      "sha256": "690e573c0779775f0334f0f9931e5105f70f4c0f0dfca2268c707188538ba7e2"
+    },
+    "oak_fence": {
+      "path": "data/minecraft/recipe/oak_fence.json",
+      "sha256": "4405d2609e0f113d61edc1fcbd2e8802defb98c7f94e6180e89e386aeae1ecb4"
+    },
+    "oak_slab": {
+      "path": "data/minecraft/recipe/oak_slab.json",
+      "sha256": "3623e7b1b029d4c853ce8f75a74a0fa18c33b2f9521e0ecf23b03a423a5920e0"
+    },
+    "oak_stairs": {
+      "path": "data/minecraft/recipe/oak_stairs.json",
+      "sha256": "ea04f411208f746a0c175bc02c6930fb90bda44b60f02342d51c9c3782e3be75"
+    },
+    "polished_blackstone": {
+      "path": "data/minecraft/recipe/polished_blackstone.json",
+      "sha256": "e4808fc5384a6072701f1285195f5be4a6daa50ab78020fc3b477de2d273a527"
+    },
+    "polished_blackstone_brick_slab": {
+      "path": "data/minecraft/recipe/polished_blackstone_brick_slab.json",
+      "sha256": "21c915d65b050409bd030481b4bf501fb4c955af919c2bb63f5311ac08f38d31"
+    },
+    "polished_blackstone_brick_stairs": {
+      "path": "data/minecraft/recipe/polished_blackstone_brick_stairs.json",
+      "sha256": "3a862465189bcf65d3f3405a120e96ea61047ac758269b9f0ef62e417edb52d7"
+    },
+    "polished_blackstone_bricks": {
+      "path": "data/minecraft/recipe/polished_blackstone_bricks.json",
+      "sha256": "70d84dd8148d6ab6fa4ee345f29992a501a4006835237a80fb808860591a974c"
+    },
+    "polished_blackstone_slab": {
+      "path": "data/minecraft/recipe/polished_blackstone_slab.json",
+      "sha256": "b17224574f6c2297bb6580eb1c2eb164d92defb947c60fb7e2555632f0642d43"
+    },
+    "polished_blackstone_stairs": {
+      "path": "data/minecraft/recipe/polished_blackstone_stairs.json",
+      "sha256": "9ffc4b09eb4d52e9d76d86a4032fcace2b3986d44609e9d4eb8b0dd356c6f96b"
+    },
+    "quartz_block": {
+      "path": "data/minecraft/recipe/quartz_block.json",
+      "sha256": "7b1cbfe78591dc46931a1fc7ffbd2c14307715bb5a7e51db3f019ee81e6602b3"
+    },
+    "quartz_slab": {
+      "path": "data/minecraft/recipe/quartz_slab.json",
+      "sha256": "14bee1624414d74bb64386887fe0b128d4692dda1786339d0dd4860a0bad13fc"
+    },
+    "quartz_stairs": {
+      "path": "data/minecraft/recipe/quartz_stairs.json",
+      "sha256": "6b7e241a12533ec27f9a2a356d18baa48c76393f60e5b39f6edb28ffb4bdff00"
+    },
+    "sandstone": {
+      "path": "data/minecraft/recipe/sandstone.json",
+      "sha256": "d2ab047426347044f07fd4389e9db6d2f350add3b0c1e6cf38cb92905919a6a4"
+    },
+    "sandstone_slab": {
+      "path": "data/minecraft/recipe/sandstone_slab.json",
+      "sha256": "cdbd938b542f48aea91b2f6aa1f351a73ad478568f3f9372604d9d3c2186eeaa"
+    },
+    "sandstone_stairs": {
+      "path": "data/minecraft/recipe/sandstone_stairs.json",
+      "sha256": "2e8eb9ee2c8374825c61830b3a8f8980336b4ada73b2e46821c9345a232d1960"
+    },
+    "smoker": {
+      "path": "data/minecraft/recipe/smoker.json",
+      "sha256": "f25eebd1b8c64c1516f7ddf1e33e2ec679ef32d38dc60123e8240c7dd2d83915"
+    },
+    "smooth_quartz_slab": {
+      "path": "data/minecraft/recipe/smooth_quartz_slab.json",
+      "sha256": "176676204794c31763f40ee8fc44f6e84599ce2d2c49e08c910b3ae39f51a294"
+    },
+    "smooth_quartz_stairs": {
+      "path": "data/minecraft/recipe/smooth_quartz_stairs.json",
+      "sha256": "4cce66fe13ffae623290005fe1d2e24b13b871488b3a88d4618ca0c7df58bc6f"
+    },
+    "smooth_sandstone_slab": {
+      "path": "data/minecraft/recipe/smooth_sandstone_slab.json",
+      "sha256": "c1bf0b8d8140b4f29d4a0dd6e5f236418f8158d61ede236d93b73272241d0ce5"
+    },
+    "smooth_sandstone_stairs": {
+      "path": "data/minecraft/recipe/smooth_sandstone_stairs.json",
+      "sha256": "ad10466e9cbcd65c2f8757d54c5251df3f620348628175668c38ed2ba8a65e2f"
+    },
+    "smooth_stone_slab": {
+      "path": "data/minecraft/recipe/smooth_stone_slab.json",
+      "sha256": "cd9df73695055903b056b400d5995322859e6f76b06b6aa904d77fb499a4884e"
+    },
+    "soul_torch": {
+      "path": "data/minecraft/recipe/soul_torch.json",
+      "sha256": "9a76d342b8857fcf400098ee4e03ff422a170b996c75fff75ff4882e254bfe52"
+    },
+    "spruce_door": {
+      "path": "data/minecraft/recipe/spruce_door.json",
+      "sha256": "d974a08b639509a97fd87cce2561f37f72bf122f196b69630199c861453cdab3"
+    },
+    "spruce_fence": {
+      "path": "data/minecraft/recipe/spruce_fence.json",
+      "sha256": "c211528d01a17fd3904ccdcfc2256447ac62b4736e2fb87d3434cee150c6549d"
+    },
+    "spruce_slab": {
+      "path": "data/minecraft/recipe/spruce_slab.json",
+      "sha256": "05fdbada154b9890ede39736f7ec850955c50840146acdf3c49ce81cb98fb756"
+    },
+    "spruce_stairs": {
+      "path": "data/minecraft/recipe/spruce_stairs.json",
+      "sha256": "445478d7439e5802371bb758de5147bcc152c7eb3b9dc93ce7e75c5b619ef952"
+    },
+    "stone_brick_slab": {
+      "path": "data/minecraft/recipe/stone_brick_slab.json",
+      "sha256": "b172a94c4c90e252a489a298a1ed92b716beb257afc0b41c850c8ea24bda6570"
+    },
+    "stone_brick_stairs": {
+      "path": "data/minecraft/recipe/stone_brick_stairs.json",
+      "sha256": "3b6a9195db8b8c4720eed978325435e1aaf955a612483b4e0751fc67a97e5fc7"
+    },
+    "stone_bricks": {
+      "path": "data/minecraft/recipe/stone_bricks.json",
+      "sha256": "3fd8b29776bf965cfb56101429e4ee91d52e7ddad1fcde2b8bc75cf5ed06c8b2"
+    },
+    "stone_slab": {
+      "path": "data/minecraft/recipe/stone_slab.json",
+      "sha256": "237b876d3f800dacb0e8ac56303708b2e9fc41064feae7c2a07380b55e7f93f5"
+    },
+    "stone_stairs": {
+      "path": "data/minecraft/recipe/stone_stairs.json",
+      "sha256": "279644ad0e379cfc556f97c3803022f6b9ddb5372eb23218604478b31016abb1"
+    },
+    "warped_door": {
+      "path": "data/minecraft/recipe/warped_door.json",
+      "sha256": "c595e3347758fc8d201ca7d2bc4328f855ee915e6ca7f3c0f784d87c1247816e"
+    },
+    "warped_fence": {
+      "path": "data/minecraft/recipe/warped_fence.json",
+      "sha256": "9c500171dbe079a991e1d9d2e41359e713b772a3bb142456a7acc93d55c8076a"
+    },
+    "warped_slab": {
+      "path": "data/minecraft/recipe/warped_slab.json",
+      "sha256": "59ed8f101315c7febd2decabc469f9a9ae342bb1bf05dcbd420e3443a7bbb795"
+    },
+    "warped_stairs": {
+      "path": "data/minecraft/recipe/warped_stairs.json",
+      "sha256": "b1d2742067189f959b2335c586a1a8f8f3bcb8143298580fdb8a5f0c2f779eda"
+    },
+    "blaze_powder": {
+      "path": "data/minecraft/recipe/blaze_powder.json",
+      "sha256": "1e64570482c84b328853d05ae65e8e51d81516f6c76ca58bf5da158c99eb327a"
+    },
+    "ender_eye": {
+      "path": "data/minecraft/recipe/ender_eye.json",
+      "sha256": "6d32a8d66132e93131578605d8b0725ff69aa3245dd2437f37f4ae630b8fe9d1"
+    },
+    "bow": {
+      "path": "data/minecraft/recipe/bow.json",
+      "sha256": "8c4bc18a7cfefffdea80a1cb2f4e80de452dbced4810fefbdd1182541f642b09"
+    },
+    "arrow": {
+      "path": "data/minecraft/recipe/arrow.json",
+      "sha256": "4cb58ea04460288ac2a9ef17fadfcb213d5e76a3a1cd8de3948134820e844e33"
+    }
+  }
+}

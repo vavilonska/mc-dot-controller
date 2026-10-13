@@ -6,7 +6,9 @@
   "client": [
     "InputConstantsMixin",
     "MouseHandlerMixin",
-    "KeyboardHandlerMixin"
+    "KeyboardHandlerMixin",
+    "EntityMovementBudgetMixin",
+    "ScopedBlockMenuPacketMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -53,6 +53,15 @@ final class ActionRegistry {
         active.reason = reason;
         active = null;
     }
+    void finishAfterCleanup(String status, String reason, boolean releaseConfirmed) {
+        if (active == null) return;
+        active.result.addProperty("input_release_confirmed", releaseConfirmed);
+        if (!releaseConfirmed) {
+            active.result.addProperty("requested_terminal_status", status);
+            active.result.addProperty("requested_terminal_reason", reason);
+        }
+        finish(releaseConfirmed ? status : "failed", releaseConfirmed ? reason : "input_release_unconfirmed");
+    }
     Entry get(String id) {
         if (id == null) return active != null ? active : last;
         Entry entry = entries.get(id);

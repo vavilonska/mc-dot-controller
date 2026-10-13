@@ -212,9 +212,9 @@ def parse_inventory(state):
         raise PlanError("inventory_malformed") from None
 
 
-def state_blockers(state, terrain, targets):
+def state_blockers(state, terrain, targets, *, ambient_policy=None):
     """Offline evidence gates, never a replacement for fresh action-time reads."""
-    if not targets:
+    if not targets and ambient_policy is None:
         return []
     errors = []
     try:
@@ -236,12 +236,18 @@ def state_blockers(state, terrain, targets):
         if not 0 <= radius <= 128:
             raise PlanError("invalid_entity_scan_radius")
         total, returned = integer(nearby["total"], 0, 100000), integer(nearby["returned"], 0, 100000)
-        if (nearby.get("truncated") is not False or total != 0 or returned != 0
-                or nearby.get("entities") != []):
-            errors.append("entities_present_or_scan_incomplete")
+        if ambient_policy is None:
+            if (nearby.get("truncated") is not False or total != 0 or returned != 0
+                    or nearby.get("entities") != []):
+                errors.append("entities_present_or_scan_incomplete")
+        else:
+            from .ambient_entities import Box, classify_ambient_entities
+            report = classify_ambient_entities(state, ambient_policy,
+                additional_boxes=tuple(Box.cell(p) for p in targets))
+            errors.extend(report.blockers)
         import math
         required_radius = max(math.dist(position, (p.x + 0.5, p.y + 0.5, p.z + 0.5)) + 2
-                              for p in targets)
+                              for p in targets) if targets else 0
         if radius < required_radius:
             errors.append("entity_scan_does_not_cover_blueprint")
         px, py, pz = position

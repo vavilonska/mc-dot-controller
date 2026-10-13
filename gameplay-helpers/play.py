@@ -4,19 +4,28 @@ Importing does not create a queue client, read observations, or send actions.
 The path and inventory helpers also work directly on supplied observations.
 """
 import math,collections,json
+from navigation_binding import NativeBindingContext, no_effect_navigation_rejection, planning_context, task_handoff_required
 
 q=None
+_native_binding=NativeBindingContext()
 
 def configure(client):
  """Use the caller's existing QueueClient; this does not send a request."""
- global q
+ global q,_native_binding
+ if client is not q:_native_binding=NativeBindingContext()
  q=client
 
 def run(c,wait=30):
  if q is None:raise RuntimeError('configure_a_queue_client_before_use')
  i=q.submit(c);print('request',i,c.get('op'),c.get('action',c.get('endpoint','')),flush=True);r=q.wait(i,wait)
- if r.get('status')!='succeeded':raise RuntimeError(json.dumps({'id':i,'status':r.get('status'),'reason':r.get('reason')}))
- return r.get('result',{})
+ if c.get('op')!='observe' and task_handoff_required(r):
+  raise RuntimeError(json.dumps({'id':i,'status':r.get('status'),'reason':r.get('reason'),'requires_handoff':True}))
+ if r.get('status')!='succeeded':
+  if no_effect_navigation_rejection(r):_native_binding.seen=True
+  raise RuntimeError(json.dumps({'id':i,'status':r.get('status'),'reason':r.get('reason')}))
+ result=r.get('result',{})
+ if c.get('op')=='observe':_native_binding.observe(result.get('state',{}))
+ return result
 def obs(radius=None,vertical=4):
  c={'op':'observe'}
  if radius:c.update(terrain=True,radius=radius,vertical=vertical)
@@ -44,15 +53,16 @@ def path(o,target):
  def_unused=None
 def go(target,radius=8):
  o=obs(radius);way=path(o,target)
- if way:return run({'op':'action','action':'follow_path','waypoints':way,'timeout_ms':30000},35)
+ if way:return run(_native_binding.bind({'op':'action','action':'follow_path','waypoints':way,'timeout_ms':30000},o['state']),35)
  return {'state':o['state']}
 def inventory(o):return [(v['slot'],v['id'],v['count']) for v in o['state']['player']['inventory'] if not v['empty']]
 def look_at(x,y,z):
  p=obs()['state']['player'];dx=x-p['x'];dy=y-p['y']-1.62;dz=z-p['z'];return run({'op':'direct','endpoint':'look','body':{'yaw':math.degrees(math.atan2(-dx,dz)),'pitch':-math.degrees(math.atan2(dy,math.hypot(dx,dz))),'relative':False}})
 def travel(target):
- target=tuple(target)
+ target=tuple(target);context=None
  while True:
-  o=obs(8);p=o['state']['player'];cur=tuple(math.floor(p[k]) for k in ['x','y','z'])
+  o=obs(8);context=planning_context(o['state'],context)
+  p=o['state']['player'];cur=tuple(math.floor(p[k]) for k in ['x','y','z'])
   if cur==target:return o
   cs={(c['x'],c['y'],c['z']):c for c in o['terrain']['cells']}
   heuristic=lambda a:abs(a[0]-target[0])+abs(a[2]-target[2])+abs(a[1]-target[1])*1.5
@@ -65,6 +75,6 @@ def travel(target):
    except ValueError:continue
    if not way:continue
    print('travel_leg',cur,'to',dest,'goal',target,flush=True)
-   run({'op':'action','action':'follow_path','waypoints':way,'timeout_ms':30000},35)
+   run(_native_binding.bind({'op':'action','action':'follow_path','waypoints':way,'timeout_ms':30000},o['state']),35)
    break
   else:raise ValueError('need_new_route_no_local_progress')

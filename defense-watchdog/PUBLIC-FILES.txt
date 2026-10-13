@@ -10,8 +10,12 @@ targeting.py
 test_all_hostile_closing.py
 test_environment_recovery.py
 test_intent_client.py
+test_menu_recovery.py
+test_menu_recovery_policy.py
+test_navigation_binding.py
 test_ranged_tactics.py
 test_retaliation.py
 test_terminal_recovery.py
 test_watchdog.py
 watchdog.py
+test_capability_polling.py

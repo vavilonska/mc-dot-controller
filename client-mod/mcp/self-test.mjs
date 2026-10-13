@@ -102,11 +102,13 @@ async function runSelfTest() {
       clientInfo: { name: "mineclient-bridge-self-test", version: "1.1.5" }
     });
     assert.equal(initialized.result.serverInfo.name, "mineclient-bridge");
-    assert.equal(initialized.result.serverInfo.version, "1.1.5");
+    assert.equal(initialized.result.serverInfo.version, "1.1.7-integrated.1");
 
     const listed = await client.request("tools/list", {});
     const toolNames = listed.result.tools.map((tool) => tool.name);
     assert.deepEqual(toolNames, [
+      "mdc_catalog", "mdc_observe", "mdc_plan", "mdc_job",
+      "minecraft_client_action",
       "minecraft_client_launch",
       "minecraft_client_register",
       "minecraft_client_status",
@@ -117,6 +119,13 @@ async function runSelfTest() {
     ]);
     for (const tool of listed.result.tools) {
       assert.equal(tool.inputSchema.type, "object", `${tool.name} must declare an object input schema`);
+      // Legacy direct tools keep their flat schema; mdc_job intentionally uses
+      // conditional schemas for its submit/status/cancel operation variants.
+      if (tool.name === "mdc_job") {
+        assert.ok(Array.isArray(tool.inputSchema.allOf));
+        assert.ok(tool.inputSchema.allOf.length > 0);
+        continue;
+      }
       for (const combinator of ["oneOf", "anyOf", "allOf"]) {
         assert.equal(tool.inputSchema[combinator], undefined, `${tool.name} must not use a top-level ${combinator}`);
       }
@@ -600,7 +609,7 @@ async function runSelfTest() {
     assert.equal(await processIsAlive(fixturePid), false);
     assert.equal(clientStderrWasEmpty(), true);
     process.stdout.write(
-      `SELF_TEST_OK tools=7 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted\n`
+      `SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted\n`
     );
 
     function clientStderrWasEmpty() {

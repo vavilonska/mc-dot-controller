@@ -1,6 +1,6 @@
 # Minecraft Dot Controller
 
-真实 Minecraft 客户端与常驻 Python 执行链。当前公开源码为 `1.1.6-continuity.1`（v6 候选），用于已获准加入的兼容朋友服务器；模型决定下一步，客户端逐刻执行普通动作。构建与离线检查通过，v6 实机验收尚未完成。
+真实 Minecraft 客户端与常驻 Python 执行链。当前主线整合了 toolbox v1 / movement-observed-v2 R4 开发源码。请先阅读 [当前整合与验证边界](SOURCE-CHECKPOINT.md)。本轮用途是私有单人测试，尚未完成全部实机验收；下文早期 v6 版本及其测试数字保留为历史记录，不代表当前源码全部通过。模型决定下一步，客户端逐刻执行普通动作。
 
 ## 架构
 
@@ -47,12 +47,16 @@ python3 -m resident_controller --queue /path/to/shared/mailbox submit \
 
 共享目录必须实际由两侧共享；共享源文件不代表共享进程、回环网络或临时目录。启动、任务示例和恢复规则见[指南](resident-controller/README.md)。启用独立 watchdog 后，它应是唯一的 resident 队列写入者；普通任务须走 [IntentClient](defense-watchdog/README.md)，停止并确认输入释放后才恢复直接队列控制。
 
-## 验证状态
+## 主线与受控并行规划组合
+
+本树另含明确opt-in的受控并行一步：共享快照、只读planner、独立fresh计划和唯一owner，保留原主线环境/稳定结果/菜单合同。客户端能力、Resident、Watchdog和host接口必须配套；旧JAR不得接新受控producer。入口、限制与独立平台门见[联合接口说明](COORDINATION-INTEGRATION.md)。本组合尚未部署或实机验收。
+
+## 历史验证状态（v6 / terrain-refresh.1 截点）
 
 - Python 地形读取增量 `terrain-refresh.1`：保留 v6 全部功能，区分完整性错误与合法陈旧数据；仅后者及明确游标过期/地形限流允许一次全新扫描，失败清空旧缓存。三个 Python 运行时文件变更，不修改 Java/mod。详见[边界与离线验证](resident-controller/docs/TERRAIN_RECOVERY.md)
 - 该增量的完整公开 Python 布局：828 项运行，827 项通过，1 项历史源码对照跳过；包含 24 项新增刷新回归。编译与 CLI 检查通过。这是本地离线证据，不代表 GitHub CI 或真实故障恢复已经验收
 - 以下 Java 构建与分组 Python 数量保留为 v6 基线记录；本次未重新构建 Java
-- 当前 Java 21 / Minecraft 1.21.1 / NeoForge 21.1.255 完整构建：118 项测试通过
+- 该截点 Java 21 / Minecraft 1.21.1 / NeoForge 21.1.255 完整构建：118 项测试通过
 - 最终公开 Python 布局：防御 129 项通过、1 项历史源码对照跳过；寻路 67、制作及便携包装 37、resident 118 项通过
 - 本轮仅做源码与离线检查，没有借发布操作游戏；水中持续浮起、细雪/火焰恢复、长片段行走、稳定制作/放块尚待普通游玩中的实机验收
 - 旧版本有限实机证据包括一次 4,864 格/41 煤扫描、多段短步导航、七类制作记录，以及一次短脚本剑盾遭遇中 4 次攻击分发后目标死亡、玩家保持 20 血
@@ -69,3 +73,11 @@ python3 -m resident_controller --queue /path/to/shared/mailbox submit \
 - [`navigation-controller/`](navigation-controller/)：复用的寻路/地形算法及旧探测实验
 
 认证和回环限制保留。仓库只放源码、测试与合成/脱敏夹具，不包含令牌、私人队列、运行报告、截图、存档、安装配置或新编译的模组二进制。来源与许可证见 [NOTICE](NOTICE.md)。
+
+## Selective P2 integration
+
+The existing three-zombie retreat contract is selectively integrated on the c41 mainline with both encounter gates default-off. See [P2-INTEGRATION.md](P2-INTEGRATION.md) for exact scope, preserved root behavior, harness dependencies and outstanding live acceptance. Rebuilt P2 artifacts are not the previously game-tested c41 JAR.
+
+## Reusable capability runtime (offline development increment)
+
+[`capability-runtime/`](capability-runtime/README.md) adds opt-in guarded primitives, 33 concrete reusable skills, durable execution/scheduling, observed resource/production/build/End workflows and explicit limitations. Current source is an offline-tested development increment; prior live evidence is not transferred to the new JAR. New actions require focused private singleplayer context and never retry unknown outcomes. See its README and delivery evidence for the exact tested scope.

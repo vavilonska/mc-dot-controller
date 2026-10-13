@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {toolboxTools,executeToolbox} from './toolbox.mjs';
+const api_version='mdc.toolbox/1';
+test('four additive plain-object tools with truthful read hints',()=>{assert.equal(toolboxTools.length,4);for(const t of toolboxTools)assert.equal(t.inputSchema.type,'object');assert.equal(toolboxTools.find(t=>t.name==='mdc_job').annotations.readOnlyHint,false);});
+test('offline catalog retains49 without starting backend',async()=>{const r=await executeToolbox('mdc_catalog',{api_version,limit:128});assert.equal(r.capabilities.length,49);assert(r.capabilities.every(e=>!e.runtime_available));});
+test('strict cross-operation keys never reach backend',async()=>{let calls=0;const r=await executeToolbox('mdc_job',{api_version,operation:'status',session_ref:'s',job_id:'j',arguments:{}},{backend:{call(){calls++;}}});assert.equal(r.error.code,'invalid_request');assert.equal(calls,0);});
+test('status exact identity XOR',async()=>{const r=await executeToolbox('mdc_job',{api_version,operation:'status',session_ref:'s',job_id:'j',request_id:'r'});assert.equal(r.error.code,'invalid_request');});
+test('valid call uses supplied long-lived bridge',async()=>{let calls=0;const r=await executeToolbox('mdc_catalog',{api_version},{backend:{call(name,args){calls++;return {name,args};}}});assert.equal(r.name,'mdc_catalog');assert.equal(calls,1);});
+test('unavailable execute does not invent success',async()=>{const r=await executeToolbox('mdc_observe',{api_version,session_ref:'s',profile:'player'});assert.equal(r.error.code,'capability_unavailable');});
+test('nonfinite deeply invalid values never reach backend',async()=>{const r=await executeToolbox('mdc_catalog',{api_version,limit:NaN});assert.equal(r.error.code,'invalid_request');});

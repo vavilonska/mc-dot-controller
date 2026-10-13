@@ -85,6 +85,8 @@ def from_wire(before, state, after, terrain, captured_at):
     """
     try:
         for item in (before, state, after):
+            if isinstance(item,dict) and 'observation_clock' in item:
+                raise TerrainError('read_only_observation_navigation_forbidden')
             protocol(item)
         p, world = state['player'], WorldStamp.parse(state['world'])
         identity = (before['run_id'], integer(before['process_id'], 1), uuid(before['player']['uuid']))

@@ -21,6 +21,10 @@ Additional source includes [entity aim lock](docs/entity-aim-lock.md), current b
 environment behavior remain separately unaccepted in live play. See the current
 verification record instead of treating an older single encounter as acceptance.
 
+The optional [noncombat walking budget](docs/movement-budget.md) adds a one-shot,
+32-block cumulative ordinary-walking envelope for a narrowly controlled case.
+It is disabled by default and does not authorize or prove a live acceptance run.
+
 Read [the complete action contract](docs/client-actions.md) and [the resident controller guide](../resident-controller/README.md).
 
 ## Build and evidence

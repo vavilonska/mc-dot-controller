@@ -1,0 +1,170 @@
+{
+  "fixture_kind": "sanitized_captured_risk_fields_not_a_live_clearance",
+  "notes": "Five paused native rows. Names, item details, request/world/player identities omitted. Entity identities replaced; positions and AABBs translated together to player (0,64,0). Existing risk fields unchanged; no native_living facts added. Positive native metadata belongs only to separate synthetic fixtures.",
+  "entities": [
+    {
+      "entity_id": 100,
+      "uuid": "00000000-0000-0000-0000-000000000064",
+      "type": "minecraft:bee",
+      "class": "net.minecraft.world.entity.animal.Bee",
+      "x": -7.042985565123903,
+      "y": 66.585693359375,
+      "z": -19.005859375,
+      "velocity": {
+        "x": 0.017625,
+        "y": 0.00375,
+        "z": 0.000625
+      },
+      "distance": 20.43311396732116,
+      "alive": true,
+      "bounding_box": {
+        "min": {
+          "x": -7.392985559163439,
+          "y": 66.585693359375,
+          "z": -19.355859369039536
+        },
+        "max": {
+          "x": -6.6929855710843675,
+          "y": 67.18569338321686,
+          "z": -18.655859380960464
+        }
+      },
+      "on_ground": false,
+      "health": 10.0,
+      "max_health": 10.0,
+      "hurt_time": 0,
+      "using_item": false
+    },
+    {
+      "entity_id": 101,
+      "uuid": "00000000-0000-0000-0000-000000000065",
+      "type": "minecraft:bee",
+      "class": "net.minecraft.world.entity.animal.Bee",
+      "x": -25.249528533873903,
+      "y": 67.603271484375,
+      "z": -27.958251953125,
+      "velocity": {
+        "x": -0.013875,
+        "y": -0.00375,
+        "z": 0.024
+      },
+      "distance": 37.84423481651387,
+      "alive": true,
+      "bounding_box": {
+        "min": {
+          "x": -25.59952852791344,
+          "y": 67.603271484375,
+          "z": -28.308251947164536
+        },
+        "max": {
+          "x": -24.899528539834368,
+          "y": 68.20327150821686,
+          "z": -27.608251959085464
+        }
+      },
+      "on_ground": false,
+      "health": 10.0,
+      "max_health": 10.0,
+      "hurt_time": 0,
+      "using_item": false
+    },
+    {
+      "entity_id": 102,
+      "uuid": "00000000-0000-0000-0000-000000000066",
+      "type": "minecraft:sheep",
+      "class": "net.minecraft.world.entity.animal.Sheep",
+      "x": 43.3132156067511,
+      "y": 72.0,
+      "z": -3.70458984375,
+      "velocity": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "distance": 44.201341971792246,
+      "alive": true,
+      "bounding_box": {
+        "min": {
+          "x": 42.86321561867203,
+          "y": 72.0,
+          "z": -4.154589831829071
+        },
+        "max": {
+          "x": 43.76321559483017,
+          "y": 73.29999995231628,
+          "z": -3.254589855670929
+        }
+      },
+      "on_ground": true,
+      "health": 8.0,
+      "max_health": 8.0,
+      "hurt_time": 0,
+      "using_item": false
+    },
+    {
+      "entity_id": 103,
+      "uuid": "00000000-0000-0000-0000-000000000067",
+      "type": "minecraft:sheep",
+      "class": "net.minecraft.world.entity.animal.Sheep",
+      "x": 42.6818679505011,
+      "y": 72.0,
+      "z": -9.718505859375,
+      "velocity": {
+        "x": 0.0,
+        "y": -0.006531077902086776,
+        "z": 0.0
+      },
+      "distance": 44.49933940950943,
+      "alive": true,
+      "bounding_box": {
+        "min": {
+          "x": 42.23186796242203,
+          "y": 72.0,
+          "z": -10.168505847454071
+        },
+        "max": {
+          "x": 43.13186793858017,
+          "y": 73.29999995231628,
+          "z": -9.268505871295929
+        }
+      },
+      "on_ground": true,
+      "health": 8.0,
+      "max_health": 8.0,
+      "hurt_time": 0,
+      "using_item": false
+    },
+    {
+      "entity_id": 104,
+      "uuid": "00000000-0000-0000-0000-000000000068",
+      "type": "minecraft:boat",
+      "class": "net.minecraft.world.entity.vehicle.Boat",
+      "x": 10.483238050528822,
+      "y": 62.52326431274413,
+      "z": 43.842174247333574,
+      "velocity": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "ordinary_boat": true,
+      "passenger_count": 0,
+      "yaw_rate": 0.0,
+      "distance": 45.10227567482188,
+      "alive": true,
+      "bounding_box": {
+        "min": {
+          "x": 9.795738050528822,
+          "y": 62.52326431274413,
+          "z": 43.154674247333574
+        },
+        "max": {
+          "x": 11.170738050528822,
+          "y": 63.08576431274413,
+          "z": 44.529674247333574
+        }
+      },
+      "on_ground": false
+    }
+  ]
+}

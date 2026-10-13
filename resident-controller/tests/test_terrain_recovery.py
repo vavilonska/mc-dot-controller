@@ -25,7 +25,7 @@ class ScriptedBridge:
         assert method == 'GET' and body is None
         if self.before_read:
             self.before_read()
-        if path.startswith('/control/state?'):
+        if path.startswith(('/control/state?', '/control/capability-snapshot?')):
             self.state_reads += 1
             state = {'world': {'world_generation': WORLD_ID, 'dimension': 'minecraft:overworld',
                               'game_time': 100 + int(round((self.clock.now - 100) * 20))},
@@ -33,6 +33,10 @@ class ScriptedBridge:
                      'client_action': {'action_session': 'synthetic-session'}}
             if self.state_hook:
                 self.state_hook(self.state_reads, state)
+            if path.startswith('/control/capability-snapshot?'):
+                from capability_fixtures import native_bundle
+                from urllib.parse import parse_qs, urlsplit
+                return native_bundle(state, int(parse_qs(urlsplit(path).query)['radius'][0]))
             return state
         if path.startswith('/control/terrain?radius='):
             script = self.scripts[self.scan_count]

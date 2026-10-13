@@ -6,6 +6,7 @@ import math
 from types import MappingProxyType
 from typing import Mapping
 from uuid import UUID
+from .observation_clock import ClockStamp, CONTRACT, PROFILE
 
 
 class TerrainError(ValueError):
@@ -45,11 +46,19 @@ def uuid(value):
     return value
 
 
-def protocol(data):
+def protocol(data, *, observation_clock=None):
     if (not isinstance(data, dict) or data.get('ok') is not True
             or data.get('protocol') != 'mineclient-bridge'
             or type(data.get('schema_version')) is not int or data['schema_version'] != 2):
         raise TerrainError('unsupported_protocol')
+    clock_keys={'observation_clock','observation_clock_profile','observation_clock_seen',
+                'observation_clock_unavailable','source_clock','response_clock'}
+    if observation_clock is None:
+        if any(key in data for key in clock_keys):
+            raise TerrainError('read_only_observation_legacy_protocol_forbidden')
+    elif (observation_clock != CONTRACT or type(data.get('terrain_schema_version')) is not int
+          or data['terrain_schema_version'] != 2 or data.get('observation_clock_profile') != PROFILE):
+        raise TerrainError('invalid_selected_terrain_clock_protocol')
 
 
 @dataclass(frozen=True, order=True)
@@ -92,6 +101,16 @@ class WorldStamp:
         return cls(world['world_generation'], world['dimension'], world['game_time'])
 
 
+@dataclass(frozen=True)
+class CapabilityWorldStamp(WorldStamp):
+    """Opt-in true vanilla dimension identity; the historical parser stays Overworld-only."""
+    def __post_init__(self):
+        uuid(self.generation)
+        if self.dimension not in ('minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end'):
+            raise TerrainError('unsupported_dimension')
+        integer(self.tick, 0)
+
+
 # Match the companion combat controller's conservative vanilla floor allowlist.
 SAFE_FLOORS = frozenset('minecraft:' + item for item in (
     'stone', 'dirt', 'grass_block', 'cobblestone', 'deepslate', 'cobbled_deepslate',
@@ -107,6 +126,7 @@ class Cell:
     position: Block
     clear: bool = False
     support: bool = False
+    partial: bool = False
 
     @classmethod
     def parse(cls, data):
@@ -150,6 +170,9 @@ class TerrainGrid:
     received_at: float
     cells: Mapping[Block, Cell]
     complete: bool
+    first_source_clock: ClockStamp | None = None
+    last_source_clock: ClockStamp | None = None
+    last_response_clock: ClockStamp | None = None
 
     def __post_init__(self):
         # Copy to prevent caller mutation after a plan has been validated.
@@ -172,16 +195,26 @@ class TerrainGrid:
         return (self.support(feet.offset(y=-1)) and self.clear(feet)
                 and self.clear(feet.offset(y=1)))
 
-    def require_fresh(self, current, now, max_age_ticks=40, max_wall_age=3.0):
+    def require_fresh(self, current, now, max_age_ticks=40, max_wall_age=3.0, *, observation_clock=None):
         number(now)
         if not self.complete:
             raise TerrainError('incomplete_scan')
         if not self.world.same_world(current):
             raise TerrainError('world_generation_changed')
-        if not self.first_tick <= self.last_tick <= current.tick:
-            raise TerrainError('terrain_from_future')
-        if current.tick - self.first_tick > max_age_ticks:
-            raise StaleTerrainError('stale_terrain_ticks')
+        if self.first_source_clock is not None:
+            if observation_clock is None:
+                raise TerrainError('read_only_terrain_legacy_use_forbidden')
+            final=ClockStamp.parse(observation_clock)
+            final.after(self.last_response_clock)
+            if final.after(self.first_source_clock) > max_age_ticks:
+                raise StaleTerrainError('stale_terrain_elapsed_ticks')
+        else:
+            if observation_clock is not None:
+                raise TerrainError('mixed_terrain_clock_profile')
+            if not self.first_tick <= self.last_tick <= current.tick:
+                raise TerrainError('terrain_from_future')
+            if current.tick - self.first_tick > max_age_ticks:
+                raise StaleTerrainError('stale_terrain_ticks')
         if now < self.received_at:
             raise TerrainError('terrain_clock_reversed')
         if now - self.received_at > max_wall_age:
@@ -196,13 +229,28 @@ class TerrainAssembler:
     Pages are live observations, not an atomic snapshot. Complete only means coverage.
     """
     def __init__(self, expected_world: WorldStamp, now: float, max_pages=160,
-                 max_scan_ticks=40, max_scan_seconds=3.0):
+                 max_scan_ticks=40, max_scan_seconds=3.0, historical_survey=False,
+                 capability_page_limit=None, observation_clock=None):
+        self.initial_clock = None if observation_clock is None else ClockStamp.parse(observation_clock)
+        if self.initial_clock is not None and (historical_survey or capability_page_limit is None):
+            raise TerrainError("read_only_clock_requires_capability_no_survey")
+        self.first_source_clock = self.last_source_clock = self.last_response_clock = None
+        if self.initial_clock is not None:
+            ctx=self.initial_clock.as_domain()['context']
+            if (ctx['world_generation'],ctx['dimension']) != (expected_world.generation,expected_world.dimension):
+                raise TerrainError('terrain_clock_world_mismatch')
         self.world = expected_world
         self.started_at = number(now)
         self.max_pages = integer(max_pages, 1, 18_513)
-        self.max_scan_ticks = integer(max_scan_ticks, 0, 200)
+        # Large pages require an explicit local opt-in and a matching wire profile
+        # on every page. The historical/default parser remains capped at 128.
+        self.capability_page_limit = (None if capability_page_limit is None
+                                      else integer(capability_page_limit, 1, 1024))
+        if type(historical_survey) is not bool:
+            raise TerrainError("invalid_survey_mode")
+        self.max_scan_ticks = integer(max_scan_ticks, 0, 320 if historical_survey else 200)
         self.max_scan_seconds = number(max_scan_seconds)
-        if not 0 < self.max_scan_seconds <= 10:
+        if not 0 < self.max_scan_seconds <= (15 if historical_survey else 10):
             raise TerrainError('invalid_scan_duration')
         self.pages = 0
         self.cells = {}
@@ -224,22 +272,38 @@ class TerrainAssembler:
             raise TerrainPageError(exc) from None
 
     def _add(self, page, now):
-        protocol(page)
+        protocol(page, observation_clock=CONTRACT if self.initial_clock is not None else None)
         if self.complete:
             raise TerrainError('scan_already_completed')
         if self.pages >= self.max_pages:
             raise TerrainError('scan_page_budget')
         if now < self.started_at:
             raise TerrainError('terrain_clock_reversed')
-        if (type(page.get('terrain_schema_version')) is not int or page['terrain_schema_version'] != 1
+        if (type(page.get('terrain_schema_version')) is not int or page['terrain_schema_version'] != (2 if self.initial_clock is not None else 1)
                 or page.get('consistency') != 'live_pages' or page.get('order') != 'x_then_z_then_y'
                 or page.get('read_only') is not True or page.get('loaded_chunks_only') is not True):
             raise TerrainError('unsupported_terrain_schema')
-        stamp = WorldStamp(page['world_generation'], page['dimension'], page['game_time'])
+        if self.capability_page_limit is not None:
+            if (type(page.get('capability_page_schema_version')) is not int
+                    or page['capability_page_schema_version'] != 1
+                    or type(page.get('page_limit')) is not int
+                    or page['page_limit'] != self.capability_page_limit):
+                raise TerrainError('invalid_capability_page_profile')
+        stamp = type(self.world)(page['world_generation'], page['dimension'], page['game_time'])
         if not self.world.same_world(stamp):
             raise TerrainError('world_generation_changed')
         tick = stamp.tick
-        response_tick = integer(page['response_game_time'], tick)
+        response_tick = integer(page['response_game_time'], 0 if self.initial_clock is not None else tick)
+        source_clock=response_clock=None
+        if self.initial_clock is not None:
+            if page.get('observation_clock_profile') != PROFILE:
+                raise TerrainError('terrain_clock_profile')
+            source_clock=ClockStamp.parse(page.get('source_clock'))
+            response_clock=ClockStamp.parse(page.get('response_clock'))
+            source_clock.after(self.last_response_clock or self.initial_clock)
+            response_clock.after(source_clock)
+        elif any(k in page for k in ('observation_clock_profile','source_clock','response_clock')):
+            raise TerrainError('mixed_terrain_clock_profile')
         generation = uuid(page['generation'])
         origin = Block.parse(page['origin'])
         radius = integer(page['radius'], 0, 16)
@@ -253,7 +317,7 @@ class TerrainAssembler:
             raise TerrainError('mixed_scan')
         self.header = header
         offset = integer(page['offset'], 0, total)
-        returned = integer(page['returned'], 1, 128)
+        returned = integer(page['returned'], 1, self.capability_page_limit or 128)
         next_offset = integer(page['next_offset'], 1, total)
         if offset != len(self.cells) or next_offset != offset + returned:
             raise TerrainError('noncontiguous_page')
@@ -290,14 +354,22 @@ class TerrainAssembler:
             raise TerrainError('invalid_unknown_count')
         if self.first_tick is None:
             self.first_tick = tick
-        if self.last_tick is not None and tick < self.last_tick:
+        if self.initial_clock is None and self.last_tick is not None and tick < self.last_tick:
             raise TerrainError('terrain_page_tick_reversed')
         # Validate schema, exact coverage, world and ordering before classifying
         # expiry. A malformed page with an old timestamp is never retryable.
-        if tick < self.world.tick or response_tick - tick > self.max_scan_ticks:
-            raise StaleTerrainError('stale_terrain_page_ticks')
-        if response_tick - self.first_tick > self.max_scan_ticks:
-            raise StaleTerrainError('stale_terrain_scan_ticks')
+        if self.initial_clock is not None:
+            if response_clock.after(source_clock) > self.max_scan_ticks:
+                raise StaleTerrainError('stale_terrain_page_elapsed_ticks')
+            if response_clock.after(self.first_source_clock or source_clock) > self.max_scan_ticks:
+                raise StaleTerrainError('stale_terrain_scan_elapsed_ticks')
+            self.first_source_clock=self.first_source_clock or source_clock
+            self.last_source_clock,self.last_response_clock=source_clock,response_clock
+        else:
+            if tick < self.world.tick or response_tick - tick > self.max_scan_ticks:
+                raise StaleTerrainError('stale_terrain_page_ticks')
+            if response_tick - self.first_tick > self.max_scan_ticks:
+                raise StaleTerrainError('stale_terrain_scan_ticks')
         if now - self.started_at > self.max_scan_seconds:
             raise StaleTerrainError('stale_terrain_clock')
         self.last_tick = tick
@@ -305,11 +377,13 @@ class TerrainAssembler:
         self.complete = complete
         self.pages += 1
 
-    def finish(self, current: WorldStamp, now: float):
+    def finish(self, current: WorldStamp, now: float, *, observation_clock=None):
         if self.failed or not self.complete or self.header is None:
             raise TerrainError('incomplete_or_invalidated_scan')
         generation, origin, radius, vertical, _ = self.header
         grid = TerrainGrid(self.world, generation, origin, radius, vertical,
-                           self.first_tick, self.last_tick, self.started_at, self.cells, True)
-        grid.require_fresh(current, now, self.max_scan_ticks, self.max_scan_seconds)
+                           self.first_tick, self.last_tick, self.started_at, self.cells, True,
+                           self.first_source_clock,self.last_source_clock,self.last_response_clock)
+        grid.require_fresh(current, now, self.max_scan_ticks, self.max_scan_seconds,
+                           observation_clock=observation_clock)
         return grid

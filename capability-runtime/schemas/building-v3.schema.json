@@ -1,0 +1,688 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mdc:building-blueprint:3",
+  "title": "MDC versioned exact-state blueprint (data, never execution authority)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity",
+    "region",
+    "cells",
+    "clearance",
+    "light_checks",
+    "access_points"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blueprint_id",
+        "revision",
+        "source",
+        "content_sha256"
+      ],
+      "properties": {
+        "blueprint_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min",
+        "max"
+      ],
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/position"
+        },
+        "max": {
+          "$ref": "#/$defs/position"
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8192,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:acacia_planks",
+                  "minecraft:andesite",
+                  "minecraft:bamboo_planks",
+                  "minecraft:birch_planks",
+                  "minecraft:bricks",
+                  "minecraft:cherry_planks",
+                  "minecraft:cobbled_deepslate",
+                  "minecraft:cobblestone",
+                  "minecraft:crafting_table",
+                  "minecraft:crimson_planks",
+                  "minecraft:dark_oak_planks",
+                  "minecraft:diorite",
+                  "minecraft:glass",
+                  "minecraft:glowstone",
+                  "minecraft:granite",
+                  "minecraft:jungle_planks",
+                  "minecraft:mangrove_planks",
+                  "minecraft:oak_planks",
+                  "minecraft:obsidian",
+                  "minecraft:quartz_block",
+                  "minecraft:sandstone",
+                  "minecraft:sea_lantern",
+                  "minecraft:smooth_stone",
+                  "minecraft:spruce_planks",
+                  "minecraft:stone",
+                  "minecraft:stone_bricks",
+                  "minecraft:warped_planks"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:acacia_log",
+                  "minecraft:acacia_wood",
+                  "minecraft:birch_log",
+                  "minecraft:birch_wood",
+                  "minecraft:cherry_log",
+                  "minecraft:cherry_wood",
+                  "minecraft:dark_oak_log",
+                  "minecraft:dark_oak_wood",
+                  "minecraft:jungle_log",
+                  "minecraft:jungle_wood",
+                  "minecraft:mangrove_log",
+                  "minecraft:mangrove_wood",
+                  "minecraft:oak_log",
+                  "minecraft:oak_wood",
+                  "minecraft:spruce_log",
+                  "minecraft:spruce_wood",
+                  "minecraft:stripped_acacia_log",
+                  "minecraft:stripped_acacia_wood",
+                  "minecraft:stripped_birch_log",
+                  "minecraft:stripped_birch_wood",
+                  "minecraft:stripped_cherry_log",
+                  "minecraft:stripped_cherry_wood",
+                  "minecraft:stripped_dark_oak_log",
+                  "minecraft:stripped_dark_oak_wood",
+                  "minecraft:stripped_jungle_log",
+                  "minecraft:stripped_jungle_wood",
+                  "minecraft:stripped_mangrove_log",
+                  "minecraft:stripped_mangrove_wood",
+                  "minecraft:stripped_oak_log",
+                  "minecraft:stripped_oak_wood",
+                  "minecraft:stripped_spruce_log",
+                  "minecraft:stripped_spruce_wood"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "axis"
+                ],
+                "properties": {
+                  "axis": {
+                    "enum": [
+                      "x",
+                      "y",
+                      "z"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:acacia_stairs",
+                  "minecraft:andesite_stairs",
+                  "minecraft:bamboo_stairs",
+                  "minecraft:birch_stairs",
+                  "minecraft:blackstone_stairs",
+                  "minecraft:brick_stairs",
+                  "minecraft:cherry_stairs",
+                  "minecraft:cobbled_deepslate_stairs",
+                  "minecraft:cobblestone_stairs",
+                  "minecraft:crimson_stairs",
+                  "minecraft:dark_oak_stairs",
+                  "minecraft:deepslate_brick_stairs",
+                  "minecraft:deepslate_tile_stairs",
+                  "minecraft:diorite_stairs",
+                  "minecraft:end_stone_brick_stairs",
+                  "minecraft:granite_stairs",
+                  "minecraft:jungle_stairs",
+                  "minecraft:mangrove_stairs",
+                  "minecraft:oak_stairs",
+                  "minecraft:polished_blackstone_brick_stairs",
+                  "minecraft:polished_blackstone_stairs",
+                  "minecraft:quartz_stairs",
+                  "minecraft:sandstone_stairs",
+                  "minecraft:smooth_quartz_stairs",
+                  "minecraft:smooth_sandstone_stairs",
+                  "minecraft:spruce_stairs",
+                  "minecraft:stone_brick_stairs",
+                  "minecraft:stone_stairs",
+                  "minecraft:warped_stairs"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "facing",
+                  "half",
+                  "shape",
+                  "waterlogged"
+                ],
+                "properties": {
+                  "facing": {
+                    "enum": [
+                      "north",
+                      "east",
+                      "south",
+                      "west"
+                    ]
+                  },
+                  "half": {
+                    "enum": [
+                      "bottom",
+                      "top"
+                    ]
+                  },
+                  "shape": {
+                    "enum": [
+                      "straight",
+                      "inner_left",
+                      "inner_right",
+                      "outer_left",
+                      "outer_right"
+                    ]
+                  },
+                  "waterlogged": {
+                    "enum": [
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:acacia_slab",
+                  "minecraft:andesite_slab",
+                  "minecraft:bamboo_slab",
+                  "minecraft:birch_slab",
+                  "minecraft:blackstone_slab",
+                  "minecraft:brick_slab",
+                  "minecraft:cherry_slab",
+                  "minecraft:cobbled_deepslate_slab",
+                  "minecraft:cobblestone_slab",
+                  "minecraft:crimson_slab",
+                  "minecraft:dark_oak_slab",
+                  "minecraft:deepslate_brick_slab",
+                  "minecraft:deepslate_tile_slab",
+                  "minecraft:diorite_slab",
+                  "minecraft:end_stone_brick_slab",
+                  "minecraft:granite_slab",
+                  "minecraft:jungle_slab",
+                  "minecraft:mangrove_slab",
+                  "minecraft:oak_slab",
+                  "minecraft:polished_blackstone_brick_slab",
+                  "minecraft:polished_blackstone_slab",
+                  "minecraft:quartz_slab",
+                  "minecraft:sandstone_slab",
+                  "minecraft:smooth_quartz_slab",
+                  "minecraft:smooth_sandstone_slab",
+                  "minecraft:smooth_stone_slab",
+                  "minecraft:spruce_slab",
+                  "minecraft:stone_brick_slab",
+                  "minecraft:stone_slab",
+                  "minecraft:warped_slab"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "waterlogged"
+                ],
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "bottom",
+                      "top"
+                    ]
+                  },
+                  "waterlogged": {
+                    "enum": [
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:acacia_door",
+                  "minecraft:bamboo_door",
+                  "minecraft:birch_door",
+                  "minecraft:cherry_door",
+                  "minecraft:crimson_door",
+                  "minecraft:dark_oak_door",
+                  "minecraft:iron_door",
+                  "minecraft:jungle_door",
+                  "minecraft:mangrove_door",
+                  "minecraft:oak_door",
+                  "minecraft:spruce_door",
+                  "minecraft:warped_door"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "facing",
+                  "half",
+                  "hinge",
+                  "open",
+                  "powered"
+                ],
+                "properties": {
+                  "facing": {
+                    "enum": [
+                      "north",
+                      "east",
+                      "south",
+                      "west"
+                    ]
+                  },
+                  "half": {
+                    "enum": [
+                      "lower",
+                      "upper"
+                    ]
+                  },
+                  "hinge": {
+                    "enum": [
+                      "left",
+                      "right"
+                    ]
+                  },
+                  "open": {
+                    "enum": [
+                      "false"
+                    ]
+                  },
+                  "powered": {
+                    "enum": [
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:acacia_fence",
+                  "minecraft:bamboo_fence",
+                  "minecraft:birch_fence",
+                  "minecraft:cherry_fence",
+                  "minecraft:crimson_fence",
+                  "minecraft:dark_oak_fence",
+                  "minecraft:glass_pane",
+                  "minecraft:jungle_fence",
+                  "minecraft:mangrove_fence",
+                  "minecraft:nether_brick_fence",
+                  "minecraft:oak_fence",
+                  "minecraft:spruce_fence",
+                  "minecraft:warped_fence"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "north",
+                  "east",
+                  "south",
+                  "west",
+                  "waterlogged"
+                ],
+                "properties": {
+                  "north": {
+                    "enum": [
+                      "false",
+                      "true"
+                    ]
+                  },
+                  "east": {
+                    "enum": [
+                      "false",
+                      "true"
+                    ]
+                  },
+                  "south": {
+                    "enum": [
+                      "false",
+                      "true"
+                    ]
+                  },
+                  "west": {
+                    "enum": [
+                      "false",
+                      "true"
+                    ]
+                  },
+                  "waterlogged": {
+                    "enum": [
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:blast_furnace",
+                  "minecraft:furnace",
+                  "minecraft:smoker"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "facing",
+                  "lit"
+                ],
+                "properties": {
+                  "facing": {
+                    "enum": [
+                      "north",
+                      "east",
+                      "south",
+                      "west"
+                    ]
+                  },
+                  "lit": {
+                    "enum": [
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:soul_torch",
+                  "minecraft:torch"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "block",
+              "properties"
+            ],
+            "properties": {
+              "position": {
+                "$ref": "#/$defs/position"
+              },
+              "block": {
+                "enum": [
+                  "minecraft:soul_wall_torch",
+                  "minecraft:wall_torch"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "facing"
+                ],
+                "properties": {
+                  "facing": {
+                    "enum": [
+                      "north",
+                      "east",
+                      "south",
+                      "west"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "clearance": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 8192,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "position",
+          "purpose"
+        ],
+        "properties": {
+          "position": {
+            "$ref": "#/$defs/position"
+          },
+          "purpose": {
+            "enum": [
+              "cavity",
+              "interior",
+              "access"
+            ]
+          }
+        }
+      }
+    },
+    "light_checks": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 8192,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "position",
+          "min_block_light"
+        ],
+        "properties": {
+          "position": {
+            "$ref": "#/$defs/position"
+          },
+          "min_block_light": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15
+          }
+        }
+      }
+    },
+    "access_points": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 8192,
+      "items": {
+        "$ref": "#/$defs/position"
+      }
+    }
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": -29999984,
+          "maximum": 29999984
+        },
+        "y": {
+          "type": "integer",
+          "minimum": -64,
+          "maximum": 319
+        },
+        "z": {
+          "type": "integer",
+          "minimum": -29999984,
+          "maximum": 29999984
+        }
+      }
+    }
+  },
+  "$comment": "Runtime parser additionally verifies SHA256, coordinate containment, duplicate positions, exact paired door halves, bounded region edges and state connectivity. Schema validation alone cannot authorize construction."
+}

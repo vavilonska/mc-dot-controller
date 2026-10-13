@@ -15,6 +15,11 @@ public final class MineClientBridgeMod {
         GuardedGameMovement.install();
         ClientActions.install();
         LoadedWorldScanner.install();
+        NativeLivingObservation.install();
+        ObservationClockBridge.install();
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
+                event -> BridgeServer.terrainAcquisitionTick());
         BridgeServer.start();
         Runtime.getRuntime().addShutdownHook(new Thread(
                 BridgeServer::stop,

@@ -1,0 +1,1065 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mdc:toolbox:1",
+  "title": "MDC toolbox v1 tool invocation",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "type": "string",
+      "enum": [
+        "mdc_catalog",
+        "mdc_observe",
+        "mdc_plan",
+        "mdc_job"
+      ]
+    },
+    "arguments": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "tool",
+    "arguments"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "mdc_catalog"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/mdc_catalog"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "mdc_observe"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/mdc_observe"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "mdc_plan"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/mdc_plan"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool": {
+            "const": "mdc_job"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arguments": {
+            "$ref": "#/$defs/mdc_job"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "mdc_catalog": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "capability_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,79}$",
+            "maxLength": 80
+          },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "detail": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "contracts"
+          ]
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[0-9]{1,8}$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        }
+      },
+      "required": [
+        "api_version"
+      ],
+      "additionalProperties": false
+    },
+    "mdc_observe": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "player",
+            "inventory",
+            "menu",
+            "entities",
+            "local_terrain",
+            "survey",
+            "memory"
+          ]
+        },
+        "selectors": {
+          "type": "object",
+          "properties": {
+            "item_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "maxItems": 64
+            },
+            "entity_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "maxItems": 64
+            },
+            "slots": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "maxItems": 256
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "bounds": {
+          "type": "object",
+          "properties": {
+            "radius": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "max_cells": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "max_entities": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "acquisition_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "api_version",
+        "session_ref",
+        "profile"
+      ],
+      "additionalProperties": false
+    },
+    "mdc_plan": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "maxLength": 80
+        },
+        "capability_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "integer",
+              "const": 1
+            },
+            "execution_mode": {
+              "type": "string",
+              "enum": [
+                "noncombat",
+                "guarded"
+              ]
+            },
+            "reactions": {
+              "type": "string",
+              "enum": [
+                "stop",
+                "avoid",
+                "defend"
+              ]
+            }
+          },
+          "required": [
+            "version",
+            "execution_mode"
+          ],
+          "additionalProperties": false
+        },
+        "budgets": {
+          "type": "object",
+          "properties": {
+            "deadline_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "max_actions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "max_observations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "reflex_reserve_actions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32768
+            },
+            "cleanup_reserve_actions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32768
+            }
+          },
+          "required": [
+            "deadline_seconds",
+            "max_actions"
+          ],
+          "additionalProperties": false
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "observation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "api_version",
+        "capability",
+        "capability_version",
+        "arguments"
+      ],
+      "additionalProperties": false
+    },
+    "mdc_job": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "maxLength": 80
+        },
+        "capability_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "integer",
+              "const": 1
+            },
+            "execution_mode": {
+              "type": "string",
+              "enum": [
+                "noncombat",
+                "guarded"
+              ]
+            },
+            "reactions": {
+              "type": "string",
+              "enum": [
+                "stop",
+                "avoid",
+                "defend"
+              ]
+            }
+          },
+          "required": [
+            "version",
+            "execution_mode"
+          ],
+          "additionalProperties": false
+        },
+        "budgets": {
+          "type": "object",
+          "properties": {
+            "deadline_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "max_actions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "max_observations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "reflex_reserve_actions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32768
+            },
+            "cleanup_reserve_actions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32768
+            }
+          },
+          "required": [
+            "deadline_seconds",
+            "max_actions"
+          ],
+          "additionalProperties": false
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "submit",
+            "status",
+            "cancel",
+            "reconcile"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "expected_context_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "plan_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "event_cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "cancel_request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "api_version",
+        "operation",
+        "session_ref"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "submit"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "string",
+                "const": "mdc.toolbox/1"
+              },
+              "capability": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,79}$",
+                "maxLength": 80
+              },
+              "capability_version": {
+                "type": "integer",
+                "const": 1
+              },
+              "arguments": {
+                "type": "object"
+              },
+              "policy": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "const": 1
+                  },
+                  "execution_mode": {
+                    "type": "string",
+                    "enum": [
+                      "noncombat",
+                      "guarded"
+                    ]
+                  },
+                  "reactions": {
+                    "type": "string",
+                    "enum": [
+                      "stop",
+                      "avoid",
+                      "defend"
+                    ]
+                  }
+                },
+                "required": [
+                  "version",
+                  "execution_mode"
+                ],
+                "additionalProperties": false
+              },
+              "budgets": {
+                "type": "object",
+                "properties": {
+                  "deadline_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 86400
+                  },
+                  "max_actions": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32768
+                  },
+                  "max_observations": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32768
+                  },
+                  "reflex_reserve_actions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32768
+                  },
+                  "cleanup_reserve_actions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32768
+                  }
+                },
+                "required": [
+                  "deadline_seconds",
+                  "max_actions"
+                ],
+                "additionalProperties": false
+              },
+              "operation": {
+                "const": "submit"
+              },
+              "request_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "maxLength": 80
+              },
+              "session_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "expected_context_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "plan_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "wait_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "api_version",
+              "operation",
+              "request_id",
+              "session_ref",
+              "expected_context_ref",
+              "capability",
+              "capability_version",
+              "arguments",
+              "policy",
+              "budgets"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "status"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "string",
+                "const": "mdc.toolbox/1"
+              },
+              "operation": {
+                "const": "status"
+              },
+              "session_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "job_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "maxLength": 80
+              },
+              "request_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "maxLength": 80
+              },
+              "event_cursor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "wait_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "api_version",
+              "operation",
+              "session_ref"
+            ],
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": [
+                  "job_id"
+                ],
+                "not": {
+                  "required": [
+                    "request_id"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "request_id"
+                ],
+                "not": {
+                  "required": [
+                    "job_id"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "cancel"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "string",
+                "const": "mdc.toolbox/1"
+              },
+              "operation": {
+                "const": "cancel"
+              },
+              "session_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "job_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "maxLength": 80
+              },
+              "cancel_request_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "maxLength": 80
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "wait_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "api_version",
+              "operation",
+              "session_ref",
+              "job_id",
+              "cancel_request_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "reconcile"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "string",
+                "const": "mdc.toolbox/1"
+              },
+              "operation": {
+                "const": "reconcile"
+              },
+              "session_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "job_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "api_version",
+              "operation",
+              "session_ref",
+              "job_id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    "mdc_job_submit": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "maxLength": 80
+        },
+        "capability_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "integer",
+              "const": 1
+            },
+            "execution_mode": {
+              "type": "string",
+              "enum": [
+                "noncombat",
+                "guarded"
+              ]
+            },
+            "reactions": {
+              "type": "string",
+              "enum": [
+                "stop",
+                "avoid",
+                "defend"
+              ]
+            }
+          },
+          "required": [
+            "version",
+            "execution_mode"
+          ],
+          "additionalProperties": false
+        },
+        "budgets": {
+          "type": "object",
+          "properties": {
+            "deadline_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "max_actions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "max_observations": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "reflex_reserve_actions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32768
+            },
+            "cleanup_reserve_actions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32768
+            }
+          },
+          "required": [
+            "deadline_seconds",
+            "max_actions"
+          ],
+          "additionalProperties": false
+        },
+        "operation": {
+          "const": "submit"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "expected_context_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "plan_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "api_version",
+        "operation",
+        "request_id",
+        "session_ref",
+        "expected_context_ref",
+        "capability",
+        "capability_version",
+        "arguments",
+        "policy",
+        "budgets"
+      ],
+      "additionalProperties": false
+    },
+    "mdc_job_status": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "operation": {
+          "const": "status"
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "event_cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "api_version",
+        "operation",
+        "session_ref"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "job_id"
+          ],
+          "not": {
+            "required": [
+              "request_id"
+            ]
+          }
+        },
+        {
+          "required": [
+            "request_id"
+          ],
+          "not": {
+            "required": [
+              "job_id"
+            ]
+          }
+        }
+      ]
+    },
+    "mdc_job_cancel": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "operation": {
+          "const": "cancel"
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "cancel_request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "api_version",
+        "operation",
+        "session_ref",
+        "job_id",
+        "cancel_request_id"
+      ],
+      "additionalProperties": false
+    },
+    "mdc_job_reconcile": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string",
+          "const": "mdc.toolbox/1"
+        },
+        "operation": {
+          "const": "reconcile"
+        },
+        "session_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "api_version",
+        "operation",
+        "session_ref",
+        "job_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-api-version": "mdc.toolbox/1"
+}

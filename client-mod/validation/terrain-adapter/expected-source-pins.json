@@ -1,0 +1,12 @@
+{
+  "legacy_reader_sha256": "e2d83921a6527598c9ef5e1951b8398aa61ef3460dfc81445046d50009f0fd5d",
+  "project_sources": {
+    "TerrainReader.java": "c75fdef8a218197860421e1110f2107bdd46a612b3a749b0e7eba0fcd4c6aafe",
+    "TerrainQuery.java": "da0325950c2714f035e347f57023e348b21e63a230ec7929fa15a05927299429",
+    "TerrainScan.java": "7165d463019475d60e7e76a7cd556d29d35eb17fb7615c2036fe1469af383cf5",
+    "TerrainDispatch.java": "ab8e26ae4acd275065913905f53430c63e1167cf11670f1ba4a971f50fd76e7c",
+    "WorldGeneration.java": "22197a162a8b24c382d87b72c71b4d2516ef682aabe0a52e48271b25c3a43aeb",
+    "FlatStepCorridor.java": "786f2bcc14be909c6e587709e45d72d405fffddf13101ab6d50170c87893f70b"
+  },
+  "gson_2_11_0_sha256": "57928d6e5a6edeb2abd3770a8f95ba44dce45f3b23b7a9dc2b309c581552a78b"
+}

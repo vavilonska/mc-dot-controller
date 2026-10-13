@@ -12,9 +12,24 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class TerrainDispatch {
     private final AtomicBoolean busy = new AtomicBoolean();
 
+    /** A job owns the same admission as legacy calls until all of its work exits. */
+    final class Lease implements AutoCloseable {
+        private final AtomicBoolean released = new AtomicBoolean();
+        private Lease() { }
+        @Override public void close() {
+            if (!released.compareAndSet(false, true)) throw new IllegalStateException("terrain_lease_already_released");
+            busy.set(false);
+        }
+    }
+
+    Lease acquire() {
+        if (!busy.compareAndSet(false, true)) throw new TerrainScan.Failure(429, "terrain_busy");
+        return new Lease();
+    }
+
     <T> T call(Executor gameThread, Callable<T> operation, long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
-        if (!busy.compareAndSet(false, true)) throw new TerrainScan.Failure(429, "terrain_busy");
+        Lease lease = acquire();
         CompletableFuture<T> result = new CompletableFuture<>();
         try {
             gameThread.execute(() -> {
@@ -23,11 +38,11 @@ final class TerrainDispatch {
                 } catch (Throwable failure) {
                     result.completeExceptionally(failure);
                 } finally {
-                    busy.set(false);
+                    lease.close();
                 }
             });
         } catch (RuntimeException rejected) {
-            busy.set(false);
+            lease.close();
             throw rejected;
         }
         try {

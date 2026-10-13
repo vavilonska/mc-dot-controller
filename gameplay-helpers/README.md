@@ -42,9 +42,13 @@ result = craft_once(client, "iron_pickaxe", expected_count=1)
 Supported recipe names: `wooden_pickaxe`, `stone_pickaxe`, `iron_pickaxe`,
 `stone_axe`, `iron_axe`, `iron_sword`, `shield`, `furnace`, `iron_helmet`, `iron_chestplate`, `iron_leggings`,
 `iron_boots`, `bucket` (alias `iron_bucket`), `stone_hoe`, `iron_hoe`,
-`crafting_table`, `stick`/`sticks`, and `torch`/`torches`. A `minecraft:` prefix is
+`crafting_table`, `stick`/`sticks`, `torch`/`torches`, and `shulker_box`. A `minecraft:` prefix is
 accepted. Sticks and torches yield four; everything else yields one per call.
 Iron armor is four separate deliberately invoked recipes, consuming 24 ingots.
+`shulker_box` consumes two shulker shells and one chest in a vertical 3×3-grid
+recipe, yielding one box. It retains the same two strictly later matching-tick
+confirmation, explicit idle/pending checks, and no-replay rules. Its checks are
+offline only; see `docs/SHULKER_RECIPE.md`.
 The helper does not equip anything.
 
 The existing active vanilla InventoryMenu permits 2×2 recipes. CraftingMenu

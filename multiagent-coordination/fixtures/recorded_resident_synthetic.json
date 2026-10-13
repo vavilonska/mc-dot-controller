@@ -1,0 +1,57 @@
+{
+  "status": "succeeded",
+  "session_id": "resident-test",
+  "request_id": "recorded-observation",
+  "finished_at": 1700000000,
+  "token": "SYNTHETIC_SECRET_TOKEN",
+  "result": {
+    "status": {
+      "in_world": true
+    },
+    "action": {
+      "action_session": "33333333-3333-3333-3333-333333333333",
+      "status": "idle"
+    },
+    "state": {
+      "world": {
+        "dimension": "minecraft:overworld",
+        "world_generation": "11111111-1111-1111-1111-111111111111",
+        "game_time": 10
+      },
+      "screen_open": false,
+      "chat": [
+        "SYNTHETIC_SECRET_CHAT"
+      ],
+      "player": {
+        "uuid": "22222222-2222-2222-2222-222222222222",
+        "name": "SYNTHETIC_SECRET_PLAYER_NAME",
+        "x": 0.5,
+        "y": 64,
+        "z": 0.5,
+        "health": 20,
+        "food": 20,
+        "alive": true,
+        "on_ground": true,
+        "inventory": [
+          {
+            "slot": 0,
+            "id": "minecraft:stone_sword",
+            "count": 1,
+            "nbt": "SYNTHETIC_SECRET_NBT"
+          }
+        ],
+        "inventory_truncated": false
+      }
+    },
+    "frame": {
+      "path": "SYNTHETIC_SECRET_PRIVATE_PATH"
+    },
+    "terrain": {
+      "complete": true,
+      "hazards_exhaustive": false
+    },
+    "config": {
+      "authentication": "SYNTHETIC_SECRET_AUTH"
+    }
+  }
+}

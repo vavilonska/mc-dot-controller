@@ -29,6 +29,18 @@ repositories.configureEach {
     }
 }
 
+def realLoaderTests = providers.gradleProperty('bridge.realLoaderTests').map { it.toBoolean() }.getOrElse(false)
+
+// Direct vanilla API tests require the official FML compile/test bootstrap.
+// Their dedicated real-loader run is mandatory delivery evidence; default
+// reflection/pure-policy regression remains independent of that classpath.
+if (!realLoaderTests) {
+    sourceSets.test.java.exclude '**/PlacementVanillaSemanticsTest.java'
+    sourceSets.test.java.exclude '**/MovementBudgetLoaderTest.java'
+    sourceSets.test.java.exclude '**/NativeLivingObservationLoaderTest.java'
+    sourceSets.test.java.exclude '**/TerrainCapabilityLoaderTest.java'
+}
+
 neoForge {
     enable {
         version = project.neo_version
@@ -48,6 +60,14 @@ neoForge {
             sourceSet(sourceSets.main)
         }
     }
+
+    if (realLoaderTests) {
+        unitTest {
+            enable()
+            testedMod = mods.getByName(mod_id)
+            loadedMods = [mods.getByName(mod_id)]
+        }
+    }
 }
 
 dependencies {
@@ -56,8 +76,13 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
-    testImplementation 'com.google.code.gson:gson:2.11.0'
-    testImplementation 'org.apache.logging.log4j:log4j-api:2.24.1'
+    if (realLoaderTests) {
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+    if (!realLoaderTests) {
+        testImplementation 'com.google.code.gson:gson:2.11.0'
+        testImplementation 'org.apache.logging.log4j:log4j-api:2.24.1'
+    }
 }
 
 def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
@@ -85,6 +110,18 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.test {
+    // Resolve existing Minecraft types for in-memory BridgeServer response tests.
+    // No game entrypoint is run; keep the original test logger instead of adding
+    // the compile-only game logging backends alongside the test Log4j API.
+    if (!realLoaderTests) {
+        classpath += configurations.compileClasspath.filter { file ->
+            !file.name.startsWith('log4j-core-') && !file.name.startsWith('log4j-slf4j')
+        }
+    } else {
+        // ModDevGradle provides the genuine FML test bootstrap and runtime classpath.
+        maxParallelForks = 1
+        maxHeapSize = '768m'
+    }
     useJUnitPlatform()
     systemProperty 'mineclientBridge.projectDir', project.projectDir.absolutePath
 }
@@ -102,5 +139,13 @@ tasks.withType(Jar).configureEach {
         attributes(
                 'Implementation-Title': mod_name,
                 'Implementation-Version': mod_version)
+    }
+}
+
+// forgejunitdev is SERVER-side. Apply the identical observation-only production
+// mixin through a test-only common config so its actual injection is exercised.
+if (realLoaderTests) {
+    tasks.named('prepareNeoForgeTestFiles').configure {
+        programArguments.addAll('--mixin', 'movement-budget-loader.mixins.json')
     }
 }

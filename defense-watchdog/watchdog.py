@@ -13,6 +13,7 @@ import uuid
 
 import base_watchdog as base
 from resident_controller.native_combat import crosshair_target_in_reach
+from resident_controller.navigation_binding import NativeBindingContext
 from ranged_tactics import RangedMemory, horizontal, retreat_plan
 from environment_recovery import EnvironmentRecovery, hazards
 
@@ -22,6 +23,8 @@ cancel_waiting_intents = base.cancel_waiting_intents
 class Watchdog(base.Watchdog):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+        self.native_binding=NativeBindingContext()
+        self.native_binding_error=None
         self.ranged_memory=RangedMemory()
         self.ranged_context=None
         self.ranged_terrain=None
@@ -45,7 +48,7 @@ class Watchdog(base.Watchdog):
         data['engagement']={**data['ranged'],'scope':'all_observed_hostiles'}
         data['watchdog_revision']='v6-environment-continuity-candidate'
         data['environment']=self.environment.status()
-        if self.environment.active:data['state']='busy'
+        if self.environment.active and not (self.input_release_latched or self.handoff_latched):data['state']='busy'
         data['terminal_events_handled']=len(self.handled_terminal)
         data['combat_telemetry']={'samples':len(self.trace),'frozen_after_death':self.trace_frozen,
                                  'file':'combat-trace-'+self.session_id+'.json'}
@@ -58,6 +61,8 @@ class Watchdog(base.Watchdog):
                      if e.get('uuid')==identity and e.get('type') in base.HOSTILES and e.get('alive') is True),None)
 
     def send(self,kind,command):
+        if self.execution_policy == 'noncombat':
+            return super().send(kind,command)
         if kind=='start_combat':
             state=(self.latest or {}).get('state',{})
             target=self.target(state,command.get('target_uuid'))
@@ -132,7 +137,13 @@ class Watchdog(base.Watchdog):
         return True
 
     def observation_received(self,payload,kind):
-        state=payload.get('state',{});player=state.get('player',{});combat=payload.get('combat',{})
+        state=payload.get('state',{})
+        try:
+            self.native_binding.observe(state)
+            self.native_binding_error=None
+        except ValueError as exc:
+            self.native_binding_error=str(exc)
+        player=state.get('player',{});combat=payload.get('combat',{})
         identity=combat.get('target_uuid') or self.started_target
         target=self.target(state,identity)
         if self.trace_frozen:return
@@ -240,10 +251,13 @@ class Watchdog(base.Watchdog):
                     and lease.get('observation') is state and lease.get('progressing') is True
                     and 0 <= self.clock()-lease.get('observed_at',-math.inf) <= .5)
 
-    def submit_owner(self,intent_id,command):
+    def submit_owner(self,intent_id,command, *, queue_request_id=None):
+        if (self.execution_policy == 'noncombat' or command.get("op") in base.CONTROL_OPS
+                or self.capability_lease or "_capability_owner_id" in command):
+            return super().submit_owner(intent_id, command, queue_request_id=queue_request_id)
         if self.environment.active:return False
         if self.ranged_move:return False
-        accepted=super().submit_owner(intent_id,command)
+        accepted=super().submit_owner(intent_id,command, queue_request_id=queue_request_id)
         if accepted and self.owner and self.owner['id']==intent_id:
             self.retreat_lease=None
             if command.get('op')=='action' and command.get('action')=='follow_path':
@@ -260,6 +274,9 @@ class Watchdog(base.Watchdog):
                                     break
                             except (ValueError,KeyError):pass
         return accepted
+
+    def menu_close_ready(self):
+        return not self.environment.active and not self.ranged_move and super().menu_close_ready()
 
     def yield_navigation(self,reason):
         self.ranged_context=None;self.ranged_terrain=None;self.ranged_move=None
@@ -278,6 +295,7 @@ class Watchdog(base.Watchdog):
         if context is None or expected is None or context[0]!=expected:
             raise ValueError('ranged_context_changed')
         if (self.latest.get('action',{}).get('status')=='running'
+                or state.get('client_action',{}).get('status')=='running'
                 or self.latest.get('combat',{}).get('active') is True
                 or self.latest.get('status',{}).get('held_mappings')!=[]):
             raise ValueError('ranged_new_input_owner')
@@ -331,13 +349,28 @@ class Watchdog(base.Watchdog):
         if not plan:
             self.ranged_last={'result':'no_verified_dry_route','target_uuid':context.get('target_uuid')}
             self.yield_navigation('ranged_no_verified_route_navigation_released');return
+        try:
+            command=self.native_binding.bind({'op':'action','action':'follow_path',
+                'waypoints':plan['waypoints'],'timeout_ms':2000},state)
+        except ValueError as exc:
+            self.attention(str(exc));return
         self.ranged_last={**plan,'target_uuid':target['uuid'],'result':'retreat_dispatched'}
-        request=self.q.submit({'op':'action','action':'follow_path','waypoints':plan['waypoints'],'timeout_ms':2000})
+        request=self.q.submit(command)
         self.ranged_move={'id':request,'started':self.clock()}
         self.phase,self.reason='retreating','following_observed_dry_route'
 
     def tick(self):
+        if self.execution_policy == 'noncombat':
+            return super().tick()
+        bridge=getattr(self,'_coordination_owner',None)
+        if bridge is not None:return bridge.tick_watchdog()
         if self.stopped:return
+        if self.capability_tick():return
+        if self.input_release_latched or self.handoff_latched:return super().tick()
+        # Consume the explicit failure before environment/ranged priority paths.
+        if self.poll_unconfirmed_owner():return
+        if self.ranged_move and base.task_release_unconfirmed(self.q.result(self.ranged_move['id'])):
+            self.latch_input_release('ranged_input_release_unconfirmed');return
         if self.stop_requested:
             self.environment.abandon("operator_stop")
             return super().tick()
@@ -371,10 +404,12 @@ class Watchdog(base.Watchdog):
 def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='mode',required=True)
     start=sub.add_parser('run');start.add_argument('--queue',required=True);start.add_argument('--control',type=Path,required=True)
+    start.add_argument('--execution-policy',choices=sorted(base.EXECUTION_POLICIES),default='standard',
+                       help='noncombat: explicit guarded capability actions only; no automatic defense/recovery')
     send=sub.add_parser('submit');send.add_argument('--control',type=Path,required=True);send.add_argument('--json',required=True)
     stop=sub.add_parser('stop');stop.add_argument('--control',type=Path,required=True)
     a=p.parse_args()
-    if a.mode=='run':base.run(a.queue,a.control,watchdog_class=Watchdog)
+    if a.mode=='run':base.run(a.queue,a.control,watchdog_class=Watchdog,execution_policy=a.execution_policy)
     elif a.mode=='stop':(a.control/'STOP').write_text('operator_stop\n');print(json.dumps({'stop_requested':True}))
     else:
         body=json.loads(a.json)

@@ -21,6 +21,15 @@ encounter failed with blocked approach, zero attack dispatches and player death.
 V6 source changes do not establish that this failure is resolved in live play.
 See [verification scope](../client-mod/docs/loaded-scan-verification.md).
 
+## Opt-in coherent capability reads
+
+`capability_observation: true` requires the new native single-callback snapshot
+endpoint. State-only reads use one callback; terrain reads retain current-call A
+and final C, with all four native siblings replaced together. Original source
+ages, native action guards, legacy observation behavior and the 50-ms Resident
+loop remain unchanged. See [the coherent-read contract](docs/CAPABILITY_SNAPSHOT.md).
+Offline checks do not establish live acceptance.
+
 ## V6 result and continuity contract
 
 - `craft_planks` retrieves one output batch once, then requires the expected

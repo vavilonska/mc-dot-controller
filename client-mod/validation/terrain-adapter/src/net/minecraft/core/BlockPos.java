@@ -1,0 +1,5 @@
+package net.minecraft.core;
+public record BlockPos(int x,int y,int z) {
+ public int getX(){return x;} public int getY(){return y;} public int getZ(){return z;}
+ public String toString(){return x+","+y+","+z;}
+}

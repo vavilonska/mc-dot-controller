@@ -1,0 +1,13 @@
+# Bound encounter pause producer
+
+The resident accepts an explicit `encounter_pause` mailbox command with the current `expected_resident_session`. Its body must contain exactly `pause_schema_version: 1`, the expected native action session, world generation, player UUID, and original native action ID. The frozen v18 codec validates identities and rejects unknown fields, unsupported schemas, or a foreign active/pending/automatic owner before writing.
+
+The producer publishes its current policy and sends one `/control/pause` POST. It performs no preliminary GET, generic takeover, release-all, or original-action retry. A valid response confirms only installation of the pause screen. `gameplay_effect_confirmed` and `pause_effect_confirmed` remain false; risk and the operator handoff remain explicit. A timeout or malformed success is an uncertain pause result and is never replayed.
+
+An unresolved original task stays active or pending under its original request and native action IDs. Subsequent ticks perform only the bound action-status read, then a later state observation for a confirmed successful original action. They do not advance a multi-step recipe. Successful reconciliation retains the mainline basic-action `evidence` object (`client_observed`, `stable: false`, later state game time). Failed/cancelled native receipts remain in the original task envelope. Previously finished or uncertain envelopes are not rewritten.
+
+Input-release uncertainty has priority over pause-screen acknowledgement. A previously current release failure is preserved, and a matching acknowledgement with `input_release_confirmed: false` retains that state. Bound read reconciliation consumes the existing mainline release-failure contract: failed task, raw native receipt retained, no automatic continuation. An explicit resume refuses an unresolved paused encounter; once the original task is resolved, the existing explicit resume/cancel contract remains available. Historical receipts alone do not create a permanent global lock.
+
+The default mainline NativeCombat, environment recovery, ground-anchor/adaptive navigation, and stable-result behavior are unchanged. `/control/pause` is permitted only in the narrow transport writes set; it is not a generic direct takeover route. The producer is local source preparation, not a deployed process or proof that Minecraft/server simulation has paused.
+
+Validation artifacts separate the unchanged frozen codec and tests from added real mailbox/Resident/Watchdog tests with simulated native transport. Only the published nested-layout path in the frozen pause-flag test changes to the mainline root layout. Real gameplay pause and native input release require their own authorized platform observation.

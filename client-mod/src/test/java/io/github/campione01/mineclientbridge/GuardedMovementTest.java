@@ -254,7 +254,8 @@ class GuardedMovementTest {
         Path root = Path.of(System.getProperty("mineclientBridge.projectDir"));
         String bridge = Files.readString(root.resolve("src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java"));
         assertEquals(1, bridge.split("GuardedGameMovement\\.observedStatus\\(mc\\)", -1).length - 1);
-        int start = bridge.indexOf("private static JsonObject createControlStatus(");
+        assertTrue(bridge.contains("return createControlStatus(null)"));
+        int start = bridge.indexOf("private static JsonObject createControlStatus(JsonObject sharedAction)");
         String status = bridge.substring(start, bridge.indexOf("\n    private static ", start + 1));
         assertTrue(status.contains("GuardedGameMovement.status()")); assertFalse(status.contains("observedStatus"));
         var request = request(); core.status(); core.status();

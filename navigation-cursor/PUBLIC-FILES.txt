@@ -9,3 +9,5 @@ tests/test_drop_policy.py
 tests/test_ground_anchor.py
 tests/test_navigation_cursor.py
 tests/test_watchdog_contract.py
+navigation_binding.py
+tests/test_native_position_binding.py

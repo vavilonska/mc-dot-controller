@@ -4,13 +4,21 @@ from __future__ import annotations
 import math
 import time
 
+from .navigation_binding import NativeBindingContext, NavigationNotReady, planning_context
+from .encounter_contract import validate_encounter_request, validate_encounter_receipt
+
 WOOD = ('oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry')
 LOGS = {f'minecraft:{prefix}{wood}_{kind}': f'minecraft:{wood}_planks'
         for wood in WOOD for prefix in ('', 'stripped_') for kind in ('log', 'wood')}
 
 
-def observe():
-    return {'step': 'observe'}
+def observe(*, entity_radius=None):
+    step = {'step': 'observe'}
+    if entity_radius is not None:
+        if type(entity_radius) is not int or not 1 <= entity_radius <= 128:
+            raise ValueError('entity_radius_1_to_128')
+        step['entity_radius'] = entity_radius
+    return step
 
 
 def action(name, **body):
@@ -52,10 +60,23 @@ def click(menu, slot, button=0, click_type='pickup'):
 
 def basic(command):
     body = {key: value for key, value in command.items()
-            if key not in ('op', 'session_id', 'request_id', 'submitted_at')}
+            if key not in ('op', 'session_id', 'request_id', 'submitted_at', '_coordination',
+                           '_navigation_defense_epoch', '_capability_owner_id', '_capability_expected_dimension')}
     body.pop('action_id', None)  # The resident owns stable per-request step IDs.
+    encounter_request = validate_encounter_request(body)
+    post_observation = observe()
+    # Explicit capability callers can require a wider complete entity window
+    # in the terminal receipt itself, not only in later Runtime samples.
+    if isinstance(body.get('capability_guard'), dict) and 'entity_radius' in body:
+        radius = body['entity_radius']
+        if type(radius) is not int or not 1 <= radius <= 128:
+            raise ValueError('entity_radius_1_to_128')
+        post_observation = observe(entity_radius=radius)
     response = yield {'step': 'action', 'body': body}
-    state = yield observe()
+    validate_encounter_receipt(response, encounter_request)
+    if encounter_request is not None and response.get('status') != 'succeeded':
+        raise ValueError('encounter_task_terminal_success_required')
+    state = yield post_observation
     result = {'action': response, 'state': state, 'server_confirmed': False,
               'evidence': {'level': 'client_observed', 'stable': False,
                            'later_state_game_time': state.get('world', {}).get('game_time')}}
@@ -86,7 +107,9 @@ def walk_to(command, cache, bridge):
     waypoints = cache.route(bridge, command['target'], command.get('radius', 4), command.get('vertical', 2))
     if not waypoints:
         return {'reason': 'already_at_target', 'state': cache.state, 'server_confirmed': False}
-    result = yield action('follow_path', waypoints=waypoints, timeout_ms=command.get('timeout_ms', 15000))
+    body = cache.native_binding.bind({'action': 'follow_path', 'waypoints': waypoints,
+                                      'timeout_ms': command.get('timeout_ms', 15000)}, cache.state)
+    result = yield {'step': 'action', 'body': body}
     state = yield observe()
     return {'action': result, 'waypoints': waypoints, 'state': state, 'server_confirmed': False}
 
@@ -178,13 +201,16 @@ def craft_planks(command):
         yield {'step': 'wait', 'seconds': 0.1}
 
 
-def pillar(command):
+def pillar(command, native_binding=None):
     """Place 1..8 blocks beneath the player, checking each actual placement."""
+    native_binding = native_binding if native_binding is not None else NativeBindingContext()
     height = command.get('height', 1)
     if type(height) is not int or not 1 <= height <= 8:
         raise ValueError('pillar_height_must_be_1_to_8')
     block_id = command['block_id']
     state = yield observe()
+    native_binding.observe(state)
+    context = planning_context(state)
     p = state['player']
     base = command.get('base') or {k: math.floor(p[k]) for k in ('x', 'y', 'z')}
     if any(type(base.get(k)) is not int for k in ('x', 'y', 'z')):
@@ -204,6 +230,8 @@ def pillar(command):
             raise ValueError('invalid_hotbar_slot')
         yield click(menu, source['menu_index'], button=hotbar, click_type='swap')
         state = yield observe()
+        native_binding.observe(state)
+        context = planning_context(state, context)
         if not any(s['slot'] == hotbar and s['id'] == block_id for s in state['player']['inventory']):
             raise ValueError('material_hotbar_swap_not_observed')
     placements = []
@@ -212,21 +240,30 @@ def pillar(command):
         deadline = time.monotonic() + 3.0
         while True:
             state = yield observe()
+            native_binding.observe(state)
+            context = planning_context(state, context)
             p = state['player']
             if (abs(p['x'] - (base['x'] + 0.5)) < 0.35
                     and abs(p['z'] - (base['z'] + 0.5)) < 0.35
                     and abs(p['y'] - (base['y'] + i)) < 0.15 and p['on_ground']):
-                break
+                try:
+                    placement = native_binding.bind({'action': 'place_block',
+                        'support': {'x': base['x'], 'y': base['y'] + i - 1, 'z': base['z']},
+                        'face': 'up', 'hotbar_slot': hotbar, 'jump': True, 'timeout_ms': 5000}, state)
+                    break
+                except NavigationNotReady:
+                    pass  # Observe only within this existing bounded wait; never replay a placement.
             if time.monotonic() >= deadline:
                 raise ValueError('stand_centered_on_pillar_base_first')
             yield {'step': 'wait', 'seconds': 0.1}
         selected = next((s for s in p['inventory'] if s['slot'] == hotbar), {})
         if selected.get('id') != block_id or selected.get('count', 0) < 1:
             raise ValueError('pillar_hotbar_material_changed')
-        result = yield action('place_block', support={'x': base['x'], 'y': base['y'] + i - 1, 'z': base['z']},
-                              face='up', hotbar_slot=hotbar, jump=True, timeout_ms=5000)
+        result = yield {'step': 'action', 'body': placement}
         placements.append(result)
     state = yield observe()
+    native_binding.observe(state)
+    planning_context(state, context)
     return {'reason': 'pillar_placements_client_observed', 'placements': placements,
             'state': state, 'server_confirmed': False}
 
@@ -240,5 +277,5 @@ def make_task(command, cache, bridge):
     if operation == 'craft_planks':
         return craft_planks(command)
     if operation == 'pillar':
-        return pillar(command)
+        return pillar(command, cache.native_binding)
     raise ValueError('unknown_task')

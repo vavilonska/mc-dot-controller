@@ -6,3 +6,7 @@ play.py
 tests/test_crafting_helper.py
 tests/test_gateway_publication.py
 tests/test_portability.py
+navigation_binding.py
+tests/test_play_navigation_binding.py
+tests/test_shulker_crafting.py
+docs/SHULKER_RECIPE.md

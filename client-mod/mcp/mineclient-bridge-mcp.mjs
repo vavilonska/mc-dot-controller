@@ -11,9 +11,27 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 
+import { clientActionTool, executeClientAction } from "./client-action.mjs";
+import { toolboxTools, executeToolbox } from "./toolbox.mjs";
+import { TOOLBOX_NAMES, loadToolboxConfiguration, startConfiguredToolbox, legacyMutationRefusal } from "./toolbox-bridge.mjs";
+
 const SERVER_NAME = "mineclient-bridge";
-const SERVER_VERSION = "1.1.5";
+const SERVER_VERSION = "1.1.7-integrated.1";
 const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+// Explicit operator configuration starts only the fixed local facade service.
+// No tool argument can configure an endpoint, credential, executable or path.
+const toolboxConfigured = Boolean(process.env.MINECLIENT_TOOLBOX_CONFIG);
+let toolboxBackend = null;
+if (toolboxConfigured) {
+  try {
+    toolboxBackend = startConfiguredToolbox(loadToolboxConfiguration(
+      process.env.MINECLIENT_TOOLBOX_CONFIG, path.resolve(SERVER_DIR, "../..")));
+  } catch {
+    // Fail closed without exposing private configuration or falling back to a
+    // second writer. Catalog can still disclose source-only/unavailable entries.
+  }
+}
+const toolboxCalls = new Set();
 const DEFAULT_PREPARED_ROOT_PARENT = path.win32.join(
   fsSync.realpathSync.native(os.tmpdir()),
   "mineclient-bridge-runs"
@@ -62,6 +80,8 @@ const launchTimeoutMs = getTestNumber("MINECLIENT_BRIDGE_TEST_LAUNCH_TIMEOUT_MS"
 const pollIntervalMs = getTestNumber("MINECLIENT_BRIDGE_TEST_POLL_INTERVAL_MS", DEFAULT_POLL_INTERVAL_MS);
 
 const tools = [
+  ...toolboxTools,
+  clientActionTool,
   {
     name: "minecraft_client_launch",
     description: "Launch one isolated prepared Minecraft client root through its fixed adapter launcher and register it after authenticated readiness checks.",
@@ -287,9 +307,22 @@ function parseMessages() {
       continue;
     }
 
-    requestQueue = requestQueue.then(() => handleMessage(request)).catch(() => {
-      sendError(request?.id ?? null, -32603, "Internal MCP error");
-    });
+    if (request?.method === "tools/call" && TOOLBOX_NAMES.includes(request?.params?.name)) {
+      // The Python owner serializes effects; cancel/status must not wait behind
+      // a bounded submit/status wait in the old MCP request queue.
+      if (toolboxCalls.size >= 32) {
+        sendError(request?.id ?? null, -32000, "Toolbox request capacity exhausted before dispatch");
+      } else {
+        const active = Promise.resolve().then(() => handleMessage(request)).catch(() => {
+          sendError(request?.id ?? null, -32603, "Internal MCP error");
+        }).finally(() => toolboxCalls.delete(active));
+        toolboxCalls.add(active);
+      }
+    } else {
+      requestQueue = requestQueue.then(() => handleMessage(request)).catch(() => {
+        sendError(request?.id ?? null, -32603, "Internal MCP error");
+      });
+    }
   }
 }
 
@@ -352,6 +385,11 @@ async function callTool(params) {
     throw new Error("Tool arguments must be an object");
   }
 
+  const legacyRefusal = legacyMutationRefusal(params.name, toolboxConfigured);
+  if (legacyRefusal) return textResult(legacyRefusal);
+  if (TOOLBOX_NAMES.includes(params.name)) {
+    return textResult(await executeToolbox(params.name, args, { backend: toolboxBackend }));
+  }
   switch (params.name) {
     case "minecraft_client_launch":
       return textResult(await launchClient(args));
@@ -363,6 +401,8 @@ async function callTool(params) {
       return clientFrame(args);
     case "minecraft_client_query":
       return textResult(await clientQuery(args));
+    case "minecraft_client_action":
+      return textResult(await executeClientAction(args, { validateRunId, readDescriptor, revalidateSession, assertInputIsolation, requestJson, sanitizeForOutput }));
     case "minecraft_client_input":
       return textResult(await clientInput(args));
     case "minecraft_client_close":
@@ -1839,11 +1879,20 @@ async function shutdown(exitCode, forceExit) {
     return shutdownPromise;
   }
   shutdownPromise = (async () => {
+    // Let already parsed toolbox calls enqueue their correlated writes before
+    // EOF, including coalesced input followed immediately by disconnect.
+    await Promise.resolve();
+    // Configured mode uses only exact-owner service cleanup, never legacy
+    // release-all, which could conflict with an unresolved toolbox action.
+    const serviceClose = toolboxBackend ? toolboxBackend.close() : Promise.resolve(null);
     await requestQueue.catch(() => {});
-    await releaseRegisteredSessions();
-    process.exitCode = exitCode;
+    await Promise.allSettled([...toolboxCalls]);
+    const closed = await serviceClose;
+    if (!toolboxConfigured) await releaseRegisteredSessions();
+    const actualExit = closed && closed.exit_code !== 0 ? (exitCode || 2) : exitCode;
+    process.exitCode = actualExit;
     if (forceExit) {
-      process.stdout.end(() => process.exit(exitCode));
+      process.stdout.end(() => process.exit(actualExit));
     } else {
       process.stdout.end();
     }

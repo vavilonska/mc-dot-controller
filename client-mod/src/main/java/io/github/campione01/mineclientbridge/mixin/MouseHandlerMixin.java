@@ -1,6 +1,7 @@
 package io.github.campione01.mineclientbridge.mixin;
 
 import io.github.campione01.mineclientbridge.ClientInputIsolation;
+import io.github.campione01.mineclientbridge.MovementBudget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,7 +15,7 @@ public abstract class MouseHandlerMixin {
     @Inject(method = "onPress(JIII)V", at = @At("HEAD"), cancellable = true)
     private void mineclientBridge$filterNativeButton(
             long windowPointer, int button, int action, int modifiers, CallbackInfo callback) {
-        if (!ClientInputIsolation.acceptsInputCallback()) {
+        if (!MovementBudget.acceptsInputCallback()) {
             callback.cancel();
         }
     }
@@ -30,7 +31,7 @@ public abstract class MouseHandlerMixin {
     @Inject(method = "onScroll(JDD)V", at = @At("HEAD"), cancellable = true)
     private void mineclientBridge$filterNativeScroll(
             long windowPointer, double xOffset, double yOffset, CallbackInfo callback) {
-        if (!ClientInputIsolation.acceptsInputCallback()) {
+        if (!MovementBudget.acceptsInputCallback()) {
             callback.cancel();
         }
     }

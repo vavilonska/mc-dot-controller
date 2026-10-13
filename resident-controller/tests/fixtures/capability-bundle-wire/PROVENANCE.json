@@ -1,0 +1,20 @@
+{
+  "producer_jar_sha256": "111099ad4b0626cef4142435f0a54b41482e2efd53ed2f899d708a965ba7a3da",
+  "source": "actual BridgeJson from candidate10 built JAR; synthetic offline native fixtures",
+  "files": {
+    "encoded-bundle-both_targets.json": "213976e5799e4e6a1d00fa9878463a8b11173dd42abd921a6a7fb4adeb2cc73c",
+    "encoded-bundle-current_target.json": "d774b39ee17ffacfeb0fde1d0000de2b2f43e53bcb7f3eafce9498bab4af3aee",
+    "encoded-bundle-known_null.json": "9f3bd3929f7b0895f02ce9832d05580222ff3473c35c7aa9130e8a4afd43937a",
+    "encoded-bundle-meter_armed.json": "5924cd867a09d6e2972939cd1d7355c58e70b3a94b902d8a4521d30aac6c9fa8",
+    "encoded-bundle-meter_sealed.json": "e1e8e9a6dd7d27bd869d71076112d60588b2749f5164aa14236ffb6e4e39f69e",
+    "encoded-bundle-meter_stopping.json": "4a1833683a14a66e848721eee66875d81d98d3ff6eaad128cebd8fb5e4b7e717",
+    "encoded-bundle-missing_current_target.json": "91b03058202cb3028b13c4d6e6915dfa1e67588a6508613a58fc5feb4475e79d",
+    "encoded-bundle-missing_persistent_target.json": "01885a135605241e3ba9c3e0469d46c1416e8bda320bf763ed283f0f76043e69",
+    "encoded-bundle-multiple_rows.json": "4df57768d180142ad5a1feb03a222196a4984e95901cc60b014295ae91af81be",
+    "encoded-bundle-persistent_target.json": "3cf975a61cb6682f197dbb7a7333cfc2e51a8468409a5fc62674797b55290d87",
+    "encoded-bundle-stale_absent.json": "ca63a74db5e5887f09cd8ecb97bda1abc73a0ef8b1bc89f521e67c0ab66d95db",
+    "encoded-bundle-unknown_absent.json": "d391e0c04c32312528a3e83cff55529e8c2d521aa5a2aef65c058dde8f32750f",
+    "encoded-bundle-unrelated_nulls.json": "9f3bd3929f7b0895f02ce9832d05580222ff3473c35c7aa9130e8a4afd43937a",
+    "capability-freshness-wire.json": "ac53e44da59b402c9c383962363e2310bd03e167977d8fc1903b166288616523"
+  }
+}

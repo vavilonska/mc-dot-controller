@@ -39,6 +39,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
@@ -48,10 +49,12 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -76,12 +79,20 @@ public final class BridgeServer {
     private static final int MAX_SCREEN_CHILDREN = 128;
     private static final int MAX_CONTAINER_SLOTS = 256;
     private static final double DEFAULT_ENTITY_RADIUS = 16.0;
-    private static final double MAX_ENTITY_RADIUS = 32.0;
+    private static final double MAX_ENTITY_RADIUS = 128.0;
     private static final double MAX_GUI_COORDINATE = 1_000_000.0;
     private static final long MINECRAFT_TIMEOUT_SECONDS = 5;
     private static final long FRAME_TIMEOUT_SECONDS = 15;
     private static final GuardedDispatch GUARDED_ACTIONS = new GuardedDispatch(System::nanoTime, false);
     private static final TerrainDispatch TERRAIN_DISPATCH = new TerrainDispatch();
+    private static final TerrainAcquisition TERRAIN_ACQUISITION = new TerrainAcquisition(System::nanoTime,
+            TERRAIN_DISPATCH,
+            task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)),
+            task -> {
+                ExecutorService executor=BridgeServer.serverExecutor;
+                if(executor==null)throw new RejectedExecutionException("acquisition_executor_closed");
+                executor.execute(task);
+            }, new AcquisitionSource());
     private static final AtomicInteger WORKER_SEQUENCE = new AtomicInteger();
     private static final LinkedHashSet<InputConstants.Key> HELD_RAW_KEYS = new LinkedHashSet<>();
     private static final LinkedHashSet<Integer> HELD_WORLD_MOUSE_BUTTONS = new LinkedHashSet<>();
@@ -117,14 +128,19 @@ public final class BridgeServer {
             createdServer.createContext("/control/frame", BridgeServer::handleControlFrame);
             createdServer.createContext("/control/keymaps", BridgeServer::handleControlKeymaps);
             createdServer.createContext("/control/state", BridgeServer::handleControlState);
+            createdServer.createContext("/control/capability-snapshot", BridgeServer::handleCapabilitySnapshot);
             createdServer.createContext("/control/terrain", BridgeServer::handleControlTerrain);
+            for(String operation:new String[]{"prepare","activate","status","fetch","cancel"})
+                createdServer.createContext(TerrainAcquisitionRequest.ROOT+operation,BridgeServer::handleTerrainAcquisition);
             createdServer.createContext("/control/scan", BridgeServer::handleScanStart);
             createdServer.createContext("/control/scan/status", BridgeServer::handleScanStatus);
             createdServer.createContext("/control/scan/cancel", BridgeServer::handleScanCancel);
             createdServer.createContext("/control/screen", BridgeServer::handleControlScreen);
             createdServer.createContext("/control/action", BridgeServer::handleClientAction);
+            createdServer.createContext("/control/scoped-action", BridgeServer::handleScopedClientAction);
             createdServer.createContext("/control/action/status", BridgeServer::handleClientActionStatus);
             createdServer.createContext("/control/action/cancel", BridgeServer::handleClientActionCancel);
+            createdServer.createContext("/control/pause", BridgeServer::handleEncounterPause);
             createdServer.createContext("/control/key", BridgeServer::handleControlKey);
             createdServer.createContext("/control/raw-key", BridgeServer::handleControlRawKey);
             createdServer.createContext("/control/guarded-action", BridgeServer::handleControlGuardedAction);
@@ -142,6 +158,7 @@ public final class BridgeServer {
             createdServer.setExecutor(createdExecutor);
             server = createdServer;
             serverExecutor = createdExecutor;
+            TERRAIN_ACQUISITION.open();
             GUARDED_ACTIONS.openAdmission();
             GuardedGameMovement.LEASES.openAdmission();
             createdServer.start();
@@ -168,6 +185,7 @@ public final class BridgeServer {
     }
 
     public static synchronized void stop() {
+        TERRAIN_ACQUISITION.close();
         GUARDED_ACTIONS.closeAdmission();
         GuardedGameMovement.LEASES.closeAdmission();
         releaseAllOnMinecraftThread();
@@ -181,7 +199,7 @@ public final class BridgeServer {
         ExecutorService currentExecutor = serverExecutor;
         serverExecutor = null;
         if (currentExecutor != null) {
-            currentExecutor.shutdownNow();
+            TERRAIN_ACQUISITION.removedFromExecutor(currentExecutor.shutdownNow());
         }
     }
 
@@ -211,10 +229,25 @@ public final class BridgeServer {
 
     private static void handleControlStatus(HttpExchange exchange) throws IOException {
         if (!requireControlAccess(exchange, "/control/status", "GET")) return;
-
+        final boolean clock;
+        try {clock=ObservationClockBridge.selected(exchange.getRequestURI().getRawQuery());}
+        catch(IllegalArgumentException invalid){respondJson(exchange,400,error("invalid_observation_clock"));return;}
         try {
             JsonObject status = callOnMinecraftThread(
-                    BridgeServer::createControlStatus,
+                    () -> {
+                        if(!clock)return createControlStatus();
+                        ObservationClientClock.Stamp before=null;String unavailable=null;
+                        ObservationClockBridge.StatusContext captured=ObservationClockBridge.captureStatusContext();
+                        try {before=ObservationClockBridge.sample(captured);}catch(ObservationClientClock.Unavailable invalid){unavailable=invalid.reason;}
+                        JsonObject value=createControlStatus();
+                        value.add("observation_clock_context",captured.eligibility());
+                        if(unavailable==null)try {
+                            ObservationClockBridge.requireSame(before,ObservationClockBridge.sample());
+                            ObservationClockBridge.availableStatus(value,before);
+                        }catch(ObservationClientClock.Unavailable invalid){unavailable=invalid.reason;}
+                        if(unavailable!=null)ObservationClockBridge.unavailableStatus(value,unavailable);
+                        return value;
+                    },
                     MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, 200, status);
         } catch (Exception e) {
@@ -254,27 +287,119 @@ public final class BridgeServer {
     }
 
     private static void handleControlState(HttpExchange exchange) throws IOException {
+        BridgeReadTiming timing = new BridgeReadTiming();
         if (!requireControlAccess(exchange, "/control/state", "GET")) return;
 
         final double radius;
+        final boolean coordination;
         try {
             radius = queryDouble(exchange, "radius", DEFAULT_ENTITY_RADIUS, 0.0, MAX_ENTITY_RADIUS);
+            coordination = queryDouble(exchange, "coordination_step", 0, 0, 1) == 1;
         } catch (RequestException e) {
             respondRequestFailure(exchange, e);
             return;
         }
 
         try {
+            timing.dispatchRequested();
             EndpointResult result = callOnMinecraftThread(
-                    () -> createStateSnapshot(radius),
+                    () -> timing.call(() -> {
+                        Minecraft mc = Minecraft.getInstance();
+                        timing.clientState(mc.getFps(), mc.isWindowActive(), mc.isPaused());
+                        return createStateSnapshot(radius, timing, coordination);
+                    }),
                     MINECRAFT_TIMEOUT_SECONDS);
-            respondJson(exchange, result.status(), result.body());
+            respondJson(exchange, result.status(), result.body(), timing);
         } catch (Exception e) {
-            respondMinecraftFailure(exchange, "state_failed", e);
+            respondMinecraftFailure(exchange, "state_failed", e, timing);
         }
     }
 
+    private static void handleCapabilitySnapshot(HttpExchange exchange) throws IOException {
+        BridgeReadTiming timing=new BridgeReadTiming();
+        if(!requireControlAccess(exchange,"/control/capability-snapshot","GET"))return;
+        final double radius;
+        final boolean coordination;
+        final boolean clock;
+        try {
+            radius=queryDouble(exchange,"radius",DEFAULT_ENTITY_RADIUS,0.0,MAX_ENTITY_RADIUS);
+            coordination=queryDouble(exchange,"coordination_step",0,0,1)==1;
+            clock=ObservationClockBridge.selected(exchange.getRequestURI().getRawQuery());
+            if(clock && coordination)throw new IllegalArgumentException("clock_coordination_blocked");
+        } catch(RequestException failure) { respondRequestFailure(exchange,failure);return; }
+        catch(IllegalArgumentException invalid){respondJson(exchange,400,error("invalid_observation_clock"));return;}
+        try {
+            timing.dispatchRequested();
+            EndpointResult result=callOnMinecraftThread(() -> timing.call(() -> {
+                Minecraft mc=Minecraft.getInstance();
+                timing.clientState(mc.getFps(),mc.isWindowActive(),mc.isPaused());
+                try { return createCapabilitySnapshot(radius,timing,coordination,clock); }
+                catch(ClientActionRequest.Rejected failure) { return new EndpointResult(failure.httpStatus,failure.response()); }
+                catch(ObservationClientClock.Unavailable failure) {return new EndpointResult(409,error(failure.getMessage()));}
+            }),MINECRAFT_TIMEOUT_SECONDS);
+            respondJson(exchange,result.status(),result.body(),timing);
+        } catch(Exception failure) { respondMinecraftFailure(exchange,"capability_snapshot_failed",failure,timing); }
+    }
+
+    private static CapabilitySnapshot.Context capabilityContext(Minecraft mc) {
+        return new CapabilitySnapshot.Context(mc.level,mc.player,mc.gameMode,mc.screen,
+                mc.player==null?null:mc.player.containerMenu,WorldGeneration.current(mc.level),
+                mc.player==null?null:mc.player.getUUID().toString(),
+                mc.level==null?null:mc.level.dimension().location().toString(),ClientActions.session(),
+                mc.level==null?-1:mc.level.getGameTime());
+    }
+
+    private static EndpointResult createCapabilitySnapshot(double radius,BridgeReadTiming timing,boolean coordination) {
+        return createCapabilitySnapshot(radius,timing,coordination,false);
+    }
+    private static EndpointResult createCapabilitySnapshot(double radius,BridgeReadTiming timing,boolean coordination,boolean clock) {
+        Minecraft mc=Minecraft.getInstance();
+        if(!mc.isSameThread())throw new IllegalStateException("Capability snapshot requires client thread");
+        if(mc.player==null || mc.level==null || mc.gameMode==null)return new EndpointResult(409,error(clock?"observation_clock_unavailable":"not_in_world"));
+        CapabilitySnapshot.Context before=capabilityContext(mc);
+        ObservationClientClock.Stamp clockBefore=clock?ObservationClockBridge.sample():null;
+        // One actual registry/budget observation. Repeated ordinary status() calls would count
+        // extra budget boundaries, so all three sibling views share this original observation.
+        JsonObject action=ClientActions.status(null);
+        JsonObject status=createControlStatus(action);
+        EndpointResult state=createStateSnapshot(radius,timing,coordination,action);
+        if(state.status()!=200)return state;
+        JsonObject screen=createScreenSnapshot();
+        CapabilitySnapshot.Context after=capabilityContext(mc);
+        JsonObject bundle=CapabilitySnapshot.assemble(before,after,status,action,state.body(),screen,
+                ClientActions.statusWithoutObservation());
+        if(clock)ObservationClockBridge.snapshot(bundle,clockBefore,ObservationClockBridge.sample());
+        return new EndpointResult(200,bundle);
+    }
+
+    /** Read-only size preview for the distinct observed movement profile. Never registers or dispatches an action.
+     * Uses the same three action-bearing sibling builders and exact final HTTP serializer.
+     * Caller must repeat its original raw/owner/time fences after every preview hook returns.
+     * The reserve covers this controller's bounded terminal metadata, not arbitrary future world-state growth.
+     */
+    static void requireScopedMovementResponseBudget(JsonObject proposedAction) {
+        Minecraft mc=Minecraft.getInstance();
+        if(!mc.isSameThread())throw new ClientActionRequest.Rejected(409,"scoped_movement_preview_thread");
+        try {
+            CapabilitySnapshot.Context before=capabilityContext(mc);
+            JsonObject status=createControlStatus(proposedAction);
+            EndpointResult state=createStateSnapshot(8,new BridgeReadTiming(),false,proposedAction);
+            if(state.status()!=200)throw new ClientActionRequest.Rejected(409,"scoped_movement_preview_state_unavailable");
+            JsonObject screen=createScreenSnapshot();
+            CapabilitySnapshot.Context after=capabilityContext(mc);
+            JsonObject bundle=CapabilitySnapshot.assemble(before,after,status,proposedAction,state.body(),screen,proposedAction);
+            JsonObject standalone=clientActionResult(()->proposedAction.deepCopy(),true).body();
+            // There are exactly three copies in the coherent capability response, one in standalone status.
+            int one=BridgeJson.toJson(standalone).getBytes(StandardCharsets.UTF_8).length;
+            int three=BridgeJson.toJson(bundle).getBytes(StandardCharsets.UTF_8).length;
+            try {ScopedEntityPolicy.requireResponseSizes(one,three,MAX_JSON_BYTES);}
+            catch(IllegalArgumentException oversized){throw new ClientActionRequest.Rejected(409,oversized.getMessage());}
+        } catch(ClientActionRequest.Rejected known){throw known;}
+        catch(Exception unknown){throw new ClientActionRequest.Rejected(409,"scoped_movement_response_preview_failed");}
+    }
+
     private static void handleControlTerrain(HttpExchange exchange) throws IOException {
+        BridgeReadTiming timing = new BridgeReadTiming();
         if (!requireControlAccess(exchange, "/control/terrain", "GET")) return;
         final TerrainQuery query;
         try {
@@ -284,8 +409,11 @@ public final class BridgeServer {
             return;
         }
         try {
+            timing.dispatchRequested();
             EndpointResult result = TERRAIN_DISPATCH.call(
-                    task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)), () -> {
+                    task -> Minecraft.getInstance().execute(() -> ClientInputIsolation.syntheticDispatch(task)), () -> timing.call(() -> {
+                Minecraft mc = Minecraft.getInstance();
+                timing.clientState(mc.getFps(), mc.isWindowActive(), mc.isPaused());
                 try {
                     JsonObject body = protocolOk();
                     for (var entry : TerrainReader.read(query).entrySet()) body.add(entry.getKey(), entry.getValue());
@@ -293,14 +421,106 @@ public final class BridgeServer {
                 } catch (TerrainScan.Failure e) {
                     return new EndpointResult(e.status, error(e.getMessage()));
                 }
-            }, MINECRAFT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            }), MINECRAFT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (result.status() == 429) exchange.getResponseHeaders().set("Retry-After", "1");
-            respondJson(exchange, result.status(), result.body());
+            respondJson(exchange, result.status(), result.body(), timing);
         } catch (TerrainScan.Failure e) {
             exchange.getResponseHeaders().set("Retry-After", "1");
-            respondJson(exchange, e.status, error(e.getMessage()));
+            respondJson(exchange, e.status, error(e.getMessage()), timing);
         } catch (Exception e) {
-            respondMinecraftFailure(exchange, "terrain_failed", e);
+            respondMinecraftFailure(exchange, "terrain_failed", e, timing);
+        }
+    }
+
+    /** New versioned lifecycle only; status/fetch/cancel do not dispatch game work. */
+    private static void handleTerrainAcquisition(HttpExchange exchange) throws IOException {
+        String path=exchange.getRequestURI().getPath();
+        String operation=path.startsWith(TerrainAcquisitionRequest.ROOT)?path.substring(TerrainAcquisitionRequest.ROOT.length()):"";
+        if(!java.util.Set.of("prepare","activate","status","fetch","cancel").contains(operation)) {
+            respondJson(exchange,404,error("unknown_endpoint"));return;
+        }
+        String method=operation.equals("status")||operation.equals("fetch")?"GET":"POST";
+        if(!requireControlAccess(exchange,TerrainAcquisitionRequest.ROOT+operation,method))return;
+        TerrainAcquisitionRequest.Owner owner=null;
+        boolean startsWork=false;
+        try {
+            byte[] response;
+            String query=exchange.getRequestURI().getRawQuery();
+            if(method.equals("POST") && query!=null)throw new TerrainScan.Failure(400,"acquisition_invalid_query");
+            if(operation.equals("status")) {
+                owner=TerrainAcquisitionRequest.status(query);response=TERRAIN_ACQUISITION.status(owner);
+            } else if(operation.equals("fetch")) {
+                var request=TerrainAcquisitionRequest.fetch(query);owner=request.owner();response=TERRAIN_ACQUISITION.fetch(request);
+            } else {
+                JsonObject body;
+                try {body=TerrainAcquisitionRequest.parseBody(new String(readBody(exchange),StandardCharsets.UTF_8));}
+                catch(RequestException rejected){respondRequestFailure(exchange,rejected);return;}
+                if(operation.equals("prepare")) {
+                    var request=TerrainAcquisitionRequest.prepare(body);owner=request.owner();startsWork=true;
+                    response=TERRAIN_ACQUISITION.prepare(request);
+                } else if(operation.equals("activate")) {
+                    var request=TerrainAcquisitionRequest.activate(body);owner=request.owner();startsWork=true;
+                    response=TERRAIN_ACQUISITION.activate(request);
+                } else {
+                    var request=TerrainAcquisitionRequest.cancel(body);owner=request.owner();response=TERRAIN_ACQUISITION.cancel(request);
+                }
+            }
+            // Immutable captured bytes: no reserialization, clock headers, or native dispatch here.
+            respondBytes(exchange,200,"application/json; charset=utf-8",response);
+        } catch(TerrainScan.Failure failure) {
+            respondJson(exchange,failure.status,error(failure.getMessage()));
+        } catch(IOException transport) {
+            if(startsWork && owner!=null)TERRAIN_ACQUISITION.transportFailed(owner);
+            throw transport;
+        } catch(Exception failure) {
+            if(startsWork && owner!=null)TERRAIN_ACQUISITION.transportFailed(owner);
+            Throwable cause=failure instanceof ExecutionException?failure.getCause():failure;
+            if(cause instanceof TerrainScan.Failure rejected)respondJson(exchange,rejected.status,error(rejected.getMessage()));
+            else if(cause instanceof ClientActionRequest.Rejected rejected)respondJson(exchange,rejected.httpStatus,rejected.response());
+            else respondMinecraftFailure(exchange,"acquisition_failed",failure);
+        }
+    }
+
+    static void terrainAcquisitionTick() { TERRAIN_ACQUISITION.tick(); }
+
+    private static final class AcquisitionSource implements TerrainAcquisition.Source {
+        private Minecraft client() {
+            Minecraft mc=Minecraft.getInstance();
+            if(!mc.isSameThread())throw new IllegalStateException("minecraft_thread_required");
+            if(mc.level==null || mc.player==null || mc.gameMode==null)throw new TerrainScan.Failure(409,"not_in_world");
+            return mc;
+        }
+        @Override public TerrainAcquisition.Context context() {return context(false);}
+        @Override public TerrainAcquisition.Context context(boolean clock) {
+            Minecraft mc=client();NavigationPositionGuard.observe(mc);
+            JsonObject value=new JsonObject();
+            value.addProperty("run_id",runId());value.addProperty("process_id",ProcessHandle.current().pid());
+            value.addProperty("world_generation",WorldGeneration.current(mc.level));
+            value.addProperty("dimension",mc.level.dimension().location().toString());
+            value.addProperty("player_uuid",mc.player.getUUID().toString());value.addProperty("action_session",ClientActions.session());
+            JsonObject origin=new JsonObject();BlockPos pos=mc.player.blockPosition();
+            origin.addProperty("x",pos.getX());origin.addProperty("y",pos.getY());origin.addProperty("z",pos.getZ());value.add("origin",origin);
+            value.addProperty("navigation_epoch",NavigationPositionGuard.epoch());
+            return new TerrainAcquisition.Context(mc.level,mc.player,mc.gameMode,mc.screen,mc.player.containerMenu,
+                    config(),value,mc.level.getGameTime(),clock?ObservationClockBridge.sample():null);
+        }
+        @Override public TerrainAcquisition.Capture capture() {return capture(false);}
+        @Override public TerrainAcquisition.Capture capture(boolean clock) {
+            client();EndpointResult result=createCapabilitySnapshot(48,new BridgeReadTiming(),false,clock);
+            if(result.status()!=200) {
+                String code=result.body().has("error")?result.body().get("error").getAsString():"acquisition_snapshot_failed";
+                throw new TerrainScan.Failure(result.status(),code);
+            }
+            return new TerrainAcquisition.Capture(result.body(),context(clock));
+        }
+        @Override public boolean eligible(long now) { client();return TerrainReader.acquisitionEligible(now); }
+        @Override public TerrainAcquisition.Page read(String cursor) {return read(cursor,false);}
+        @Override public TerrainAcquisition.Page read(String cursor,boolean clock) {
+            client();TerrainQuery query=cursor==null?new TerrainQuery(4,4,1024,null,true,clock):
+                    TerrainQuery.parse("cursor="+cursor+(clock?"&observation_clock="+ObservationClientClock.CONTRACT:""));
+            JsonObject body=protocolOk();
+            for(var entry:TerrainReader.read(query).entrySet())body.add(entry.getKey(),entry.getValue());
+            return new TerrainAcquisition.Page(body,TerrainReader.lastActualStart(),System.nanoTime());
         }
     }
 
@@ -366,6 +586,14 @@ public final class BridgeServer {
         respondActionOperation(exchange, () -> ClientActions.start(request), true);
     }
 
+    private static void handleScopedClientAction(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/scoped-action", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        // Capture, parse, validate after hooks and admit inside this one callback.
+        respondActionOperation(exchange, () -> ScopedNativePreflight.start(body), true);
+    }
+
     private static void handleClientActionStatus(HttpExchange exchange) throws IOException {
         if (!requireControlAccess(exchange, "/control/action/status", "GET")) return;
         String id = null;
@@ -388,29 +616,95 @@ public final class BridgeServer {
         if (!requireControlAccess(exchange, "/control/action/cancel", "POST")) return;
         JsonObject body = readJsonObjectOrRespond(exchange, false);
         if (body == null) return;
-        final String id;
-        try { id = ClientActionRequest.string(body, "action_id"); }
+        final String id, expectedSession;
+        try {
+            id = ClientActionRequest.string(body, "action_id");
+            expectedSession = body.has("expected_action_session")
+                    ? ClientActionRequest.string(body, "expected_action_session") : null;
+        }
         catch (ClientActionRequest.Rejected failure) {
             respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
         }
-        respondActionOperation(exchange, () -> ClientActions.cancelId(id), false);
+        respondActionOperation(exchange, () -> ClientActions.cancelId(id, expectedSession), false);
+    }
+
+    private static void handleEncounterPause(HttpExchange exchange) throws IOException {
+        if (!requireControlAccess(exchange, "/control/pause", "POST")) return;
+        JsonObject body = readJsonObjectOrRespond(exchange, false);
+        if (body == null) return;
+        final EncounterPause.Request request;
+        try { request = EncounterPause.parse(body); }
+        catch (ClientActionRequest.Rejected failure) {
+            respondJson(exchange, failure.httpStatus, error(failure.getMessage())); return;
+        }
+        respondActionOperation(exchange, () -> pauseEncounterOnGameThread(request), false);
+    }
+
+    static void requireEncounterPauseAdmission() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null || mc.gameMode == null
+                || !mc.hasSingleplayerServer() || mc.getSingleplayerServer() == null
+                || mc.getSingleplayerServer().isPublished())
+            throw new ClientActionRequest.Rejected(409, "pause_requires_private_singleplayer");
+    }
+
+    static JsonObject pauseEncounterOnGameThread(EncounterPause.Request request) {
+        return pauseEncounterOnGameThread(request,false);
+    }
+
+    static JsonObject pauseEncounterTerminalOnGameThread(EncounterPause.Request request) {
+        return pauseEncounterOnGameThread(request,true);
+    }
+
+    private static JsonObject pauseEncounterOnGameThread(EncounterPause.Request request,boolean originalTerminalHookCall) {
+        return EncounterPause.apply(request, new EncounterPause.Adapter() {
+            final Minecraft mc = Minecraft.getInstance();
+            public EncounterPause.Context context(String actionId) {
+                JsonObject expected = null;
+                try { expected = ClientActions.status(actionId); }
+                catch (ClientActionRequest.Rejected failure) { if (failure.httpStatus != 404) throw failure; }
+                boolean local = mc.player != null && mc.level != null && mc.gameMode != null
+                        && mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null
+                        && !mc.getSingleplayerServer().isPublished();
+                return new EncounterPause.Context(local, ClientActions.session(),
+                        mc.level == null ? null : WorldGeneration.current(mc.level),
+                        mc.player == null ? null : mc.player.getUUID().toString(),
+                        GuardedGameMovement.LEASES.status().ownerRequestId() != null,
+                        mc.screen == null ? null : mc.screen.getClass().getName(),
+                        ClientActions.status(null), expected);
+            }
+            public void openPauseScreen() { mc.pauseGame(false); }
+            public boolean pauseScreenInstalled() { return mc.screen != null && mc.screen.getClass() == PauseScreen.class; }
+            public boolean clientPaused() { return mc.isPaused(); }
+            public void cancelEncounter() { ClientActions.cancel("encounter_paused_risk_remaining"); }
+            public JsonObject action(String actionId) { return ClientActions.status(actionId); }
+        },originalTerminalHookCall);
     }
 
     private static void respondActionOperation(HttpExchange exchange, Callable<JsonObject> operation, boolean start) throws IOException {
         try {
-            EndpointResult result = callOnMinecraftThread(() -> {
-                try {
-                    JsonObject response = operation.call();
-                    response.addProperty("protocol", PROTOCOL_NAME);
-                    response.addProperty("schema_version", PROTOCOL_SCHEMA_VERSION);
-                    boolean running = response.has("status") && response.get("status").getAsString().equals("running");
-                    return new EndpointResult(start && running ? 202 : 200, response);
-                } catch (ClientActionRequest.Rejected failure) {
-                    return new EndpointResult(failure.httpStatus, error(failure.getMessage()));
-                }
-            }, MINECRAFT_TIMEOUT_SECONDS);
+            EndpointResult result = callOnMinecraftThread(() -> clientActionResult(operation,start), MINECRAFT_TIMEOUT_SECONDS);
             respondJson(exchange, result.status(), result.body());
         } catch (Exception failure) { respondMinecraftFailure(exchange, "client_action_failed", failure); }
+    }
+
+    static EndpointResult clientActionResult(Callable<JsonObject> operation,boolean start) throws Exception {
+        return ActionResponses.result(operation,start);
+    }
+
+    /** Pure existing response wrapper; loading this nested class does not initialize the server. */
+    static final class ActionResponses {
+        static EndpointResult result(Callable<JsonObject> operation,boolean start) throws Exception {
+            try {
+                JsonObject response=operation.call();
+                response.addProperty("protocol",PROTOCOL_NAME);response.addProperty("schema_version",PROTOCOL_SCHEMA_VERSION);
+                boolean running=response.has("status") && response.get("status").getAsString().equals("running");
+                return new EndpointResult(start && running?202:200,response);
+            } catch(ClientActionRequest.Rejected failure) {
+                return new EndpointResult(failure.httpStatus,failure.response());
+            }
+        }
+        private ActionResponses() { }
     }
 
     private static void handleControlKey(HttpExchange exchange) throws IOException {
@@ -870,14 +1164,17 @@ public final class BridgeServer {
         addOperation(operations, "GET", "/control/frame", "framebuffer_png");
         addOperation(operations, "GET", "/control/keymaps", "keymap_discovery");
         addOperation(operations, "GET", "/control/state", "client_state_snapshot");
+        addOperation(operations, "GET", "/control/capability-snapshot", "coherent_capability_snapshot");
         addOperation(operations, "GET", "/control/terrain", "nearby_loaded_terrain");
         addOperation(operations, "POST", "/control/scan", "read_only_loaded_world_scan");
         addOperation(operations, "GET", "/control/scan/status", "loaded_world_scan_status");
         addOperation(operations, "POST", "/control/scan/cancel", "cancel_read_only_scan");
         addOperation(operations, "GET", "/control/screen", "screen_snapshot");
         addOperation(operations, "POST", "/control/action", "continuous_client_action");
+        addOperation(operations, "POST", "/control/scoped-action", "scoped-native-preflight/1");
         addOperation(operations, "GET", "/control/action/status", "client_action_status");
         addOperation(operations, "POST", "/control/action/cancel", "cancel_client_action");
+        addOperation(operations, "POST", "/control/pause", "ensure_bound_encounter_pause_screen");
         addOperation(operations, "POST", "/control/key", "keymap_input");
         addOperation(operations, "POST", "/control/raw-key", "internal_keyboard_input");
         addOperation(operations, "POST", "/control/guarded-action", "guarded_local_survival_action");
@@ -901,8 +1198,34 @@ public final class BridgeServer {
         JsonArray actionNames = new JsonArray();
         ClientActionRequest.ACTIONS.stream().sorted().forEach(actionNames::add);
         actions.add("actions", actionNames);
+        actions.addProperty("capability_guard_schema_version",1);
+        actions.add("combat_capabilities",CapabilityCombatSafety.capabilities());
+        actions.addProperty("movement_budget_schema_version",1);
+        actions.addProperty("movement_budget_mode",MovementBudgetLedger.MODE);
+        actions.addProperty("capability_guard_private_singleplayer_only",true);
+        JsonObject boatTransfer = new JsonObject();
+        boatTransfer.addProperty("schema_version", 1);
+        boatTransfer.addProperty("private_singleplayer_only", true);
+        boatTransfer.addProperty("max_sneak_ticks", 10);
+        boatTransfer.addProperty("min_timeout_ms", 1000);
+        boatTransfer.addProperty("max_timeout_ms", 5000);
+        actions.add("boat_transfer", boatTransfer);
         obj.add("client_actions", actions);
+        obj.add("scoped_native_preflight", ScopedNativePreflight.capabilities());
+        JsonObject pause = new JsonObject();
+        pause.addProperty("schema_version", 1);
+        pause.addProperty("private_singleplayer_only", true);
+        pause.addProperty("screen_installed_not_pause_proof", true);
+        pause.addProperty("idempotent_non_toggling", true);
+        pause.addProperty("native_terminal_opt_in", EncounterRequest.PAUSE_ON_TERMINAL);
+        obj.add("encounter_pause", pause);
         obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        obj.addProperty("combat_observation_schema_version", 1);
+        JsonObject acquisition=new JsonObject();
+        acquisition.addProperty("version",TerrainAcquisitionRequest.VERSION);acquisition.addProperty("schema_version",1);
+        acquisition.addProperty("radius",4);acquisition.addProperty("vertical",4);acquisition.addProperty("entity_radius",48);
+        acquisition.addProperty("max_pages",4);acquisition.addProperty("max_request_admissions",2);
+        obj.add("terrain_acquisition",acquisition);
         JsonObject guarded = new JsonObject();
         guarded.addProperty("schema_version", GuardedAction.SCHEMA);
         guarded.addProperty("enabled", GuardedGameActions.enabled());
@@ -996,18 +1319,29 @@ public final class BridgeServer {
         return obj;
     }
 
-    private static EndpointResult createStateSnapshot(double radius) {
+    private static EndpointResult createStateSnapshot(double radius, BridgeReadTiming timing, boolean coordination) {
+        return createStateSnapshot(radius,timing,coordination,null);
+    }
+
+    private static EndpointResult createStateSnapshot(double radius, BridgeReadTiming timing, boolean coordination, JsonObject sharedAction) {
         Minecraft mc = Minecraft.getInstance();
         WorldGeneration.current(mc.level);
+        String integratedServerInstance=IntegratedServerIdentity.current(mc.getSingleplayerServer(),
+                CapabilityGuard.privateSingleplayer(mc));
         if (mc.player == null || mc.level == null) {
             return new EndpointResult(409, error("not_in_world"));
         }
 
         JsonObject obj = protocolOk();
-        obj.add("client_action", ClientActions.status(null));
+        obj.add("client_action", sharedAction==null?ClientActions.status(null):sharedAction.deepCopy());
+        obj.add("movement_budget",sharedAction==null?MovementBudget.snapshot(mc):sharedAction.getAsJsonObject("movement_budget").deepCopy());
         obj.addProperty("aim_view_guard_schema_version", AimViewGuard.SCHEMA);
+        obj.addProperty("combat_observation_schema_version", 1);
         obj.addProperty("screen_open", mc.screen != null);
         obj.addProperty("paused", mc.isPaused());
+        obj.addProperty("focused",mc.isWindowActive());
+        obj.addProperty("private_singleplayer",CapabilityGuard.privateSingleplayer(mc));
+        obj.add("held_inputs",heldInputsSnapshot(mc));
         obj.add("menu", menuSnapshot(mc.player.containerMenu));
         JsonObject player = new JsonObject();
         player.addProperty("uuid", mc.player.getUUID().toString());
@@ -1018,6 +1352,8 @@ public final class BridgeServer {
         player.addProperty("yaw", mc.player.getYRot());
         player.addProperty("pitch", mc.player.getXRot());
         player.add("velocity", vector(mc.player.getDeltaMovement()));
+        player.add("vehicle", BoatObservation.snapshot(mc));
+        player.add("enderman_shelter",CapabilityShelter.snapshot(mc));
         player.add("eye_position", vector(mc.player.getEyePosition()));
         player.addProperty("alive", mc.player.isAlive());
         player.addProperty("health", mc.player.getHealth());
@@ -1048,11 +1384,23 @@ public final class BridgeServer {
         playerBox.add("max", vector(new Vec3(playerBounds.maxX, playerBounds.maxY, playerBounds.maxZ)));
         player.add("bounding_box", playerBox);
 
+        player.addProperty("sprinting", mc.player.isSprinting());
+        // Read the real client cooldown and item-use state. These are observed
+        // mechanics, not confirmation that a later server attack will land.
+        player.addProperty("attack_strength", mc.player.getAttackStrengthScale(0.5F));
+        player.addProperty("attack_speed", mc.player.getAttributeValue(Attributes.ATTACK_SPEED));
+        player.addProperty("entity_interaction_range", mc.player.entityInteractionRange());
+        player.addProperty("block_interaction_range", mc.player.blockInteractionRange());
+        player.addProperty("using_item", mc.player.isUsingItem());
+        player.addProperty("blocking", mc.player.isBlocking());
+        player.addProperty("use_ticks", mc.player.getTicksUsingItem());
+        player.addProperty("shield_cooldown", mc.player.getCooldowns().isOnCooldown(Items.SHIELD));
+
         Inventory inventory = mc.player.getInventory();
         player.addProperty("selected_slot", inventory.selected);
         JsonArray inventoryItems = new JsonArray();
         for (int slot = 0; slot < inventory.items.size(); slot++) {
-            JsonObject item = itemSnapshot(inventory.items.get(slot));
+            JsonObject item = capabilityItemSnapshot(inventory.items.get(slot));
             item.addProperty("slot", slot);
             inventoryItems.add(item);
         }
@@ -1066,12 +1414,13 @@ public final class BridgeServer {
                 EquipmentSlot.CHEST,
                 EquipmentSlot.LEGS,
                 EquipmentSlot.FEET}) {
-            JsonObject item = itemSnapshot(mc.player.getItemBySlot(slot));
+            JsonObject item = capabilityItemSnapshot(mc.player.getItemBySlot(slot));
             item.addProperty("slot", slot.getName());
             armor.add(item);
         }
         player.add("armor", armor);
-        player.add("offhand", itemSnapshot(mc.player.getOffhandItem()));
+        player.add("offhand", capabilityItemSnapshot(mc.player.getOffhandItem()));
+        player.add("mainhand", capabilityItemSnapshot(mc.player.getMainHandItem()));
 
         JsonArray effects = new JsonArray();
         int effectTotal = mc.player.getActiveEffects().size();
@@ -1101,8 +1450,17 @@ public final class BridgeServer {
         // A registry fact at the player's feet, not an inference from nearby trees/blocks.
         world.addProperty("biome_id", mc.level.getBiome(mc.player.blockPosition())
                 .unwrapKey().map(key -> key.location().toString()).orElse(null));
-        world.addProperty("game_time", mc.level.getGameTime());
+        long gameTime = mc.level.getGameTime();
+        long sampleNano = System.nanoTime();
+        if (timing != null) timing.stateGameTimeSample(gameTime, sampleNano);
+        world.addProperty("game_time", gameTime);
+        obj.add("capability_guard",CapabilityGuard.observation(gameTime,sampleNano));
+        obj.add("scoped_native_preflight", ScopedNativePreflight.capabilities());
+        obj.add("combat_capabilities",CapabilityCombatSafety.capabilities());
+        if (coordination) obj.add("coordination_step", CoordinationStepGuard.observation(mc, gameTime, sampleNano));
         world.addProperty("world_generation", WorldGeneration.current(mc.level));
+        world.addProperty("integrated_server_instance",integratedServerInstance);
+        world.add("navigation_guard", NavigationPositionGuard.snapshot(mc));
         world.addProperty("day_time", mc.level.getDayTime());
         world.addProperty("raining", mc.level.isRaining());
         world.addProperty("thundering", mc.level.isThundering());
@@ -1153,10 +1511,12 @@ public final class BridgeServer {
     }
 
     private static JsonObject nearbyEntitiesSnapshot(Minecraft mc, double radius) {
+        NativeLivingObservation.Frame nativeFrame = NativeLivingObservation.capture(mc);
         Comparator<EntityDistance> farthestFirst = Comparator
                 .comparingDouble(EntityDistance::distance)
                 .reversed();
-        PriorityQueue<EntityDistance> nearest = new PriorityQueue<>(MAX_NEARBY_ENTITIES, farthestFirst);
+        int limit=radius>48?128:MAX_NEARBY_ENTITIES;
+        PriorityQueue<EntityDistance> nearest = new PriorityQueue<>(limit, farthestFirst);
         int total = 0;
         double radiusSquared = radius * radius;
         for (Entity entity : mc.level.entitiesForRendering()) {
@@ -1165,7 +1525,7 @@ public final class BridgeServer {
             if (distanceSquared > radiusSquared) continue;
             total++;
             EntityDistance candidate = new EntityDistance(entity, Math.sqrt(distanceSquared));
-            if (nearest.size() < MAX_NEARBY_ENTITIES) {
+            if (nearest.size() < limit) {
                 nearest.add(candidate);
             } else if (candidate.distance() < nearest.peek().distance()) {
                 nearest.poll();
@@ -1191,8 +1551,27 @@ public final class BridgeServer {
             entityJson.addProperty("yaw", entity.getYRot());
             entityJson.addProperty("pitch", entity.getXRot());
             entityJson.add("velocity", vector(entity.getDeltaMovement()));
+            if(entity instanceof net.minecraft.world.entity.monster.Creeper creeper) {
+                JsonObject facts=new JsonObject();facts.addProperty("ignited",creeper.isIgnited());facts.addProperty("powered",creeper.isPowered());
+                facts.addProperty("swell_ticks",creeper.swell);facts.addProperty("fuse_ticks",creeper.maxSwell);
+                facts.addProperty("swell_direction",creeper.getSwellDir());facts.addProperty("explosion_radius",creeper.explosionRadius);
+                entityJson.add("creeper",facts);
+            }
+            if(entity instanceof net.minecraft.world.entity.monster.Blaze blaze) {
+                JsonObject facts=new JsonObject();facts.addProperty("charged",blaze.isCharged());entityJson.add("blaze",facts);
+            }
+            if(entity instanceof net.minecraft.world.entity.monster.EnderMan enderman) {
+                entityJson.addProperty("aggressive",enderman.isCreepy()||enderman.hasBeenStaredAt()||enderman.getTarget()==mc.player);
+            }
+            if(entity instanceof net.minecraft.world.entity.monster.Shulker shulker)entityJson.addProperty("shell_open",CapabilityTargetAction.shulkerShellOpen(shulker));
+            if(entity instanceof net.minecraft.world.entity.vehicle.Boat boat) {
+                entityJson.addProperty("ordinary_boat",boat.getClass()==net.minecraft.world.entity.vehicle.Boat.class);
+                entityJson.addProperty("passenger_count",boat.getPassengers().size());
+                entityJson.addProperty("yaw_rate",boat.deltaRotation);
+            }
             entityJson.addProperty("distance", entry.distance());
             entityJson.addProperty("alive", entity.isAlive());
+            entityJson.addProperty("line_of_sight",mc.player.hasLineOfSight(entity));
             var bounds = entity.getBoundingBox();
             JsonObject box = new JsonObject();
             box.add("min", vector(new Vec3(bounds.minX, bounds.minY, bounds.minZ)));
@@ -1202,7 +1581,30 @@ public final class BridgeServer {
             if (entity instanceof LivingEntity living) {
                 entityJson.addProperty("health", living.getHealth());
                 entityJson.addProperty("max_health", living.getMaxHealth());
+                entityJson.addProperty("hurt_time", living.hurtTime);
+                entityJson.addProperty("using_item", living.isUsingItem());
+                entityJson.addProperty("use_ticks", living.getTicksUsingItem());
+                entityJson.add("mainhand", itemSnapshot(living.getMainHandItem()));
+                CapabilityItemBinding.append(living.getMainHandItem(),entityJson.getAsJsonObject("mainhand"));
             }
+            if(entity instanceof net.minecraft.world.entity.item.ItemEntity itemEntity) {
+                entityJson.add("item",capabilityItemSnapshot(itemEntity.getItem()));
+            }
+            if(entity instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon dragon) {
+                var phase=dragon.getPhaseManager().getCurrentPhase().getPhase();
+                entityJson.addProperty("phase_id",phase.getId());
+                entityJson.addProperty("phase_name",phase.toString());
+                JsonArray parts=new JsonArray();
+                for(var part:dragon.getSubEntities()) {
+                    JsonObject row=new JsonObject();row.addProperty("entity_id",part.getId());row.addProperty("name",part.name);
+                    row.addProperty("x",part.getX());row.addProperty("y",part.getY());row.addProperty("z",part.getZ());
+                    var bb=part.getBoundingBox();JsonObject boxPart=new JsonObject();
+                    boxPart.add("min",vector(new Vec3(bb.minX,bb.minY,bb.minZ)));boxPart.add("max",vector(new Vec3(bb.maxX,bb.maxY,bb.maxZ)));
+                    row.add("bounding_box",boxPart);parts.add(row);
+                }
+                entityJson.add("dragon_parts",parts);
+            }
+            NativeLivingObservation.append(mc, entity, entityJson, nativeFrame);
             entities.add(entityJson);
         }
 
@@ -1212,13 +1614,40 @@ public final class BridgeServer {
         nearby.addProperty("returned", sorted.size());
         nearby.addProperty("truncated", total > sorted.size());
         nearby.add("entities", entities);
+        JsonArray chunks=new JsonArray();
+        int minX=(int)Math.floor((mc.player.getX()-radius)/16),maxX=(int)Math.floor((mc.player.getX()+radius)/16);
+        int minZ=(int)Math.floor((mc.player.getZ()-radius)/16),maxZ=(int)Math.floor((mc.player.getZ()+radius)/16);
+        for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++) {
+            JsonObject chunk=new JsonObject();chunk.addProperty("x",x);chunk.addProperty("z",z);
+            chunk.addProperty("loaded",mc.level.hasChunkAt(new BlockPos(x*16,mc.player.blockPosition().getY(),z*16)));
+            chunks.add(chunk);
+        }
+        nearby.add("loaded_chunks",chunks);
+        JsonArray gateways=new JsonArray();int inspected=0;boolean gatewayTruncated=false;
+        gatewayScan: for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++) {
+            var chunk=mc.level.getChunkSource().getChunk(x,z,net.minecraft.world.level.chunk.status.ChunkStatus.FULL,false);
+            if(!(chunk instanceof net.minecraft.world.level.chunk.LevelChunk loaded))continue;
+            for(var blockEntity:loaded.getBlockEntities().values()) {
+                if(++inspected>4096){gatewayTruncated=true;break gatewayScan;}
+                if(!(blockEntity instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity gateway))continue;
+                BlockPos pos=blockEntity.getBlockPos();
+                if(Vec3.atCenterOf(pos).distanceToSqr(mc.player.position())>radiusSquared)continue;
+                JsonObject row=new JsonObject();row.addProperty("x",pos.getX());row.addProperty("y",pos.getY());row.addProperty("z",pos.getZ());
+                row.addProperty("loaded",true);row.addProperty("id","minecraft:end_gateway");row.add("properties",new JsonObject());row.addProperty("cooling_down",gateway.isCoolingDown());
+                gateways.add(row);
+            }
+        }
+        nearby.add("end_gateways",gateways);nearby.addProperty("end_gateways_truncated",gatewayTruncated);
         return nearby;
     }
 
     private static JsonObject createScreenSnapshot() {
+        BoundedContainerSnapshot.beginSnapshot();
         Minecraft mc = Minecraft.getInstance();
         JsonObject obj = protocolOk();
         Screen screen = mc.screen;
+        obj.add("world_selection", WorldSelectionObservation.capture(mc, screen,
+                () -> new WorldSelectionSnapshot.Identity(ProcessHandle.current().pid(), runId(), ClientActions.session())));
         if (mc.player != null) obj.add("menu", menuSnapshot(mc.player.containerMenu));
         obj.addProperty("open", screen != null);
         if (screen == null) {
@@ -1279,7 +1708,7 @@ public final class BridgeServer {
                 slotJson.addProperty("x", slot.x);
                 slotJson.addProperty("y", slot.y);
                 slotJson.addProperty("active", slot.isActive());
-                slotJson.add("item", itemSnapshot(slot.getItem()));
+                slotJson.add("item", capabilityItemSnapshot(slot.getItem()));
                 slots.add(slotJson);
             }
             obj.addProperty("slots_total", totalSlots);
@@ -1291,12 +1720,18 @@ public final class BridgeServer {
     }
 
     static JsonObject menuSnapshot(AbstractContainerMenu menu) {
+        BoundedContainerSnapshot.beginSnapshot();
         Minecraft mc = Minecraft.getInstance();
         JsonObject obj = new JsonObject();
         obj.addProperty("menu_class", menu.getClass().getName());
         obj.addProperty("container_id", menu.containerId);
         obj.addProperty("state_id", menu.getStateId());
-        obj.add("carried", itemSnapshot(menu.getCarried()));
+        obj.add("carried", capabilityItemSnapshot(menu.getCarried()));
+        if(menu instanceof net.minecraft.world.inventory.AbstractFurnaceMenu furnace) {
+            JsonObject f=new JsonObject();f.addProperty("is_lit",furnace.isLit());
+            f.addProperty("burn_progress",furnace.getBurnProgress());f.addProperty("lit_progress",furnace.getLitProgress());
+            obj.add("furnace",f);
+        }
         JsonArray slots = new JsonArray();
         int limit = Math.min(menu.slots.size(), MAX_CONTAINER_SLOTS);
         for (int i = 0; i < limit; i++) {
@@ -1309,7 +1744,7 @@ public final class BridgeServer {
             entry.addProperty("player_inventory", inventory);
             if (inventory) entry.addProperty("inventory_index", slot.getContainerSlot());
             entry.addProperty("active", slot.isActive());
-            entry.add("item", itemSnapshot(slot.getItem()));
+            entry.add("item", capabilityItemSnapshot(slot.getItem()));
             slots.add(entry);
         }
         obj.add("slots", slots);
@@ -1332,6 +1767,24 @@ public final class BridgeServer {
         }
     }
 
+    static JsonObject capabilityItemSnapshot(ItemStack stack) {
+        JsonObject out=itemSnapshot(stack);
+        CapabilityItemBinding.append(stack,out);
+        if(stack!=null && !stack.isEmpty()) {
+            var contents=stack.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
+            if(contents!=null) {
+                JsonArray effects=new JsonArray();int total=0;
+                for(var effect:contents.getAllEffects()) {
+                    total++;if(total>32)continue;
+                    JsonObject row=new JsonObject();row.addProperty("id",BuiltInRegistries.MOB_EFFECT.getKey(effect.getEffect().value()).toString());
+                    row.addProperty("amplifier",effect.getAmplifier());row.addProperty("duration_ticks",effect.getDuration());effects.add(row);
+                }
+                out.add("potion_effects",effects);out.addProperty("potion_effects_truncated",total>32);
+            }
+        }
+        return out;
+    }
+
     private static JsonObject itemSnapshot(ItemStack stack) {
         JsonObject item = new JsonObject();
         boolean empty = stack == null || stack.isEmpty();
@@ -1347,6 +1800,7 @@ public final class BridgeServer {
         item.addProperty("count", stack.getCount());
         item.addProperty("damage", stack.getDamageValue());
         item.addProperty("max_damage", stack.getMaxDamage());
+        BoundedContainerSnapshot.append(stack, item);
         return item;
     }
 
@@ -1366,6 +1820,10 @@ public final class BridgeServer {
     }
 
     private static JsonObject createControlStatus() {
+        return createControlStatus(null);
+    }
+
+    private static JsonObject createControlStatus(JsonObject sharedAction) {
         Minecraft mc = Minecraft.getInstance();
         WorldGeneration.current(mc.level);
         JsonObject obj = ok();
@@ -1382,7 +1840,8 @@ public final class BridgeServer {
         obj.addProperty("evidence_root", identityValue(
                 "mineclientBridge.evidenceRoot",
                 "MINECLIENT_BRIDGE_EVIDENCE_ROOT"));
-        obj.add("client_action", ClientActions.status(null));
+        obj.add("client_action", sharedAction==null?ClientActions.status(null):sharedAction.deepCopy());
+        obj.addProperty("coordination_step_protocol", 1);
         obj.addProperty("bridge_running", isRunning());
         obj.addProperty("in_world", mc.level != null && mc.player != null);
 
@@ -2155,29 +2614,39 @@ public final class BridgeServer {
 
     private static void respondMinecraftFailure(HttpExchange exchange, String operationCode, Exception e)
             throws IOException {
+        respondMinecraftFailure(exchange,operationCode,e,null);
+    }
+
+    private static void respondMinecraftFailure(HttpExchange exchange, String operationCode, Exception e,
+                                                BridgeReadTiming timing) throws IOException {
         if (e instanceof TimeoutException) {
             respondJson(exchange, 504, error("minecraft_thread_timeout",
-                    "Minecraft did not complete the operation within the configured timeout"));
+                    "Minecraft did not complete the operation within the configured timeout"), timing);
             return;
         }
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
-            respondJson(exchange, 503, error("request_interrupted"));
+            respondJson(exchange, 503, error("request_interrupted"), timing);
             return;
         }
 
         Throwable cause = e instanceof ExecutionException && e.getCause() != null ? e.getCause() : e;
         if (cause instanceof FrameTooLargeException frameTooLarge) {
-            respondJson(exchange, 500, error("frame_too_large", frameTooLarge.getMessage()));
+            respondJson(exchange, 500, error("frame_too_large", frameTooLarge.getMessage()), timing);
             return;
         }
 
         JsonObject obj = error(operationCode);
         obj.addProperty("detail", exceptionDetail(cause));
-        respondJson(exchange, 500, obj);
+        respondJson(exchange, 500, obj, timing);
     }
 
     private static void respondJson(HttpExchange exchange, int status, JsonObject body) throws IOException {
+        respondJson(exchange,status,body,null);
+    }
+
+    private static void respondJson(HttpExchange exchange, int status, JsonObject body, BridgeReadTiming timing) throws IOException {
+        if(timing!=null) timing.encodingStarted();
         byte[] bytes = BridgeJson.toJson(body).getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_JSON_BYTES) {
             status = 500;
@@ -2185,6 +2654,7 @@ public final class BridgeServer {
                     "JSON response exceeds " + MAX_JSON_BYTES + " bytes"))
                     .getBytes(StandardCharsets.UTF_8);
         }
+        if(timing!=null) { timing.encodingFinished();timing.addHeaders(exchange.getResponseHeaders()); }
         respondBytes(exchange, status, "application/json; charset=utf-8", bytes);
     }
 
@@ -2360,7 +2830,7 @@ public final class BridgeServer {
         return command;
     }
 
-    private static String runId() {
+    static String runId() {
         String value = identityValue(
                 "mineclientBridge.runId",
                 "MINECLIENT_BRIDGE_RUN_ID");
@@ -2414,6 +2884,14 @@ public final class BridgeServer {
         }
     }
 
+    static JsonObject heldInputsSnapshot(Minecraft mc) {
+        JsonObject out=new JsonObject();JsonArray keys=new JsonArray();
+        for(KeyMapping mapping:mc.options.keyMappings)if(mapping.isDown())keys.add(mapping.getName());
+        out.add("keys",keys);out.addProperty("raw_keys",HELD_RAW_KEYS.size());
+        out.addProperty("world_mouse_buttons",HELD_WORLD_MOUSE_BUTTONS.size());
+        out.addProperty("neutral",keys.isEmpty() && !hasHeldInputs() && !mc.player.isUsingItem());
+        return out;
+    }
     static boolean hasHeldInputs() { return !HELD_RAW_KEYS.isEmpty() || !HELD_WORLD_MOUSE_BUTTONS.isEmpty(); }
 
     static int releaseAllInputs() {
@@ -2462,7 +2940,7 @@ public final class BridgeServer {
     private record EntityDistance(Entity entity, double distance) {
     }
 
-    private record EndpointResult(int status, JsonObject body) {
+    record EndpointResult(int status, JsonObject body) {
     }
 
     private static final class RequestException extends Exception {

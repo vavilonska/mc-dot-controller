@@ -22,12 +22,17 @@ The inclusive cuboid is `(2*radius+1)^2 * (2*vertical+1)` cells, including air.
 - `radius`: integer 0–16 (X/Z)
 - `vertical`: integer 0–8 (Y)
 - `limit`: integer 1–128 cells per page
+- `capability=1`: explicit initial-query opt-in permitting `limit` 1–1024;
+  the default remains 64. Other capability values are rejected. This profile
+  changes only bounded observation batching, never action permission.
 - Maximum scan volume: 18,513 cells
 - Unknown parameters, duplicate parameters, malformed encoding, fractions, negative
   values, and oversized query strings are rejected with HTTP 400
 
 Continue using `GET /control/terrain?cursor=<next_cursor>`. Do not combine a cursor
-with other parameters. Only one scan is retained; a new initial query replaces it.
+with other parameters, including `capability`. The initial profile and requested
+page limit are retained on every continuation and replay. Only one scan is retained;
+a new initial query replaces it.
 The anchor and bounds stay fixed while the player moves. Cursors expire after 30
 seconds and are invalidated when the ClientLevel changes (dimension/reconnect).
 Expired, superseded, out-of-order, or wrong-world cursors return 409.
@@ -60,6 +65,13 @@ The normal `ok`, `protocol`, and `schema_version` fields remain. Terrain adds:
 - `read_only: true`, `loaded_chunks_only: true`
 - `budget_exhausted`, `read_elapsed_micros`, `unknown_cells`, `cells`
 
+Opted-in capability pages additionally report `capability_page_schema_version: 1`,
+`page_limit` (the requested upper bound), and `payload_budget_exhausted`.
+Legacy responses omit all three fields. Cell keys and meaning are unchanged.
+A page may be smaller than its requested limit because either the time budget or
+the byte budget ended it. Consumers must verify the profile on every page and
+continue using its cursor rather than assume a fixed number of pages.
+
 Each cell has `x,y,z`, `status` (`loaded`, `unloaded`, `out_of_world`, or `read_failed`), and `known`.
 An unloaded/out-of-world/failed-read cell has `known:false`, and **no fabricated air, collision,
 support, or block ID data**. Loaded cells additionally include:
@@ -91,11 +103,26 @@ unknown collision, without partial support/shape claims. This is not a sandbox f
 arbitrary mod code: collision context still refers to the real player, as required
 for entity-dependent shapes. The extension itself performs no world writes.
 
-Each page has a hard 128-cell limit and a **cooperative** 2 ms sampling budget checked
+Legacy pages have a hard 128-cell limit; explicitly opted-in capability pages have
+a hard 1024-cell limit and at most 224 KiB of serialized cells, including array
+separators. An allocation-light byte-size visitor conservatively bounds the HTTP
+encoder's UTF-8/JSON output. It counts null members even if the encoder omits them,
+and overcounts unmatched UTF-16 surrogates. No per-cell JSON string or UTF-8 byte
+array is created for sizing. Sizing runs inside the unchanged **cooperative** 2 ms sampling budget checked
 between cells. A single modded callback cannot be interrupted safely, so 2 ms is not
 a hard frame-time guarantee. JSON assembly and dispatch overhead are additional.
-The HTTP gate, 50 ms spacing, and small page cap bound normal request pressure.
+The byte bound reserves 32 KiB for envelope metadata under the unchanged 256 KiB
+HTTP response guard. A cell that would cross the remaining payload budget is
+discarded without advancing the cursor; the next page reads that coordinate afresh.
+No cell from an earlier tick is carried into the next page. An individually
+oversized cell or encoding failure invalidates the scan and fails closed.
+The HTTP gate, 50 ms spacing, and page caps bound normal request pressure.
 Cursors keep only one page of data and use weak world references.
+
+The capability profile is an offline-verified batching change, not evidence of
+live latency acceptance. Synthetic real-loader measurements retain cold/first
+measured and warm scans separately; the 2 ms budget can still require more pages
+than the byte cap alone would permit. Whole scans remain `live_pages`, never atomic.
 
 Consumers must reject stale or mismatched `world_generation`, dimension, sampling
 age, partial evidence, and unknown terrain where those matter for the proposed action.

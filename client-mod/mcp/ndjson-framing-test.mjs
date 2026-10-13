@@ -13,6 +13,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_FILE = path.join(HERE, "mineclient-bridge-mcp.mjs");
 const MAX_LINE_BYTES = 1024 * 1024;
 const TOOL_NAMES = [
+  "mdc_catalog", "mdc_observe", "mdc_plan", "mdc_job",
+  "minecraft_client_action",
   "minecraft_client_launch",
   "minecraft_client_register",
   "minecraft_client_status",
@@ -102,7 +104,7 @@ async function runServer({ input = "", script, expectedExit = 0 }) {
   }
 }
 
-test("stdio initialize and coalesced tools/list expose the seven standard tools", async () => {
+test("stdio initialize and coalesced tools/list retain seven standard tools and add finite client action", async () => {
   const messages = await runServer({
     input: line(request(1, "initialize", {
       protocolVersion: "2024-11-05",
@@ -113,8 +115,21 @@ test("stdio initialize and coalesced tools/list expose the seven standard tools"
   });
   assert.equal(messages.length, 2, "Notifications must not produce a response");
   assert.deepEqual(messages.map((message) => message.id), [1, 2]);
-  assert.deepEqual(messages[0].result.serverInfo, { name: "mineclient-bridge", version: "1.1.5" });
+  assert.deepEqual(messages[0].result.serverInfo, { name: "mineclient-bridge", version: "1.1.7-integrated.1" });
   assert.deepEqual(messages[1].result.tools.map((tool) => tool.name), TOOL_NAMES);
+});
+
+test("real stdio action route rejects root-only recovery before descriptor access", async () => {
+  const session = "11111111-1111-4111-8111-111111111111";
+  const args = {run_id:"unregistered-action-fixture",operation:"submit",expected_action_session:session,
+    body:{action_id:"root-recovery-zero",action:"recover_environment",timeout_ms:0,
+      expected_world_generation:session,expected_player_uuid:session,expected_action_session:session,waypoints:[]}};
+  const messages = await runServer({input:line(request(21,"tools/call",{name:"minecraft_client_action",arguments:args}))});
+  assert.equal(messages.length,1);
+  assert.equal(messages[0].id,21);
+  assert.equal(messages[0].result.isError,true);
+  assert.match(messages[0].result.content[0].text,/action_unsupported/);
+  assert.doesNotMatch(messages[0].result.content[0].text,/Unknown tool|descriptor|ENOENT/);
 });
 
 test("fragmented UTF-8 survives byte splits and adjacent CRLF/blank lines", async () => {

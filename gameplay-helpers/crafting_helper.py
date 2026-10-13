@@ -35,6 +35,7 @@ RECIPES = {
     "stone_axe": Recipe(("MM", "MS", " S"), {"M": STONE, "S": STICK}),
     "iron_pickaxe": Recipe(("MMM", " S ", " S "), {"M": IRON, "S": STICK}),
     "iron_axe": Recipe(("MM", "MS", " S"), {"M": IRON, "S": STICK}),
+    "shulker_box": Recipe(("S", "C", "S"), {"S": ("minecraft:shulker_shell",), "C": ("minecraft:chest",)}),
     "iron_sword": Recipe(("M", "M", "S"), {"M": IRON, "S": STICK}),
     "shield": Recipe(("PIP", "PPP", " P "), {"P": PLANKS, "I": IRON}),
     "furnace": Recipe(("MMM", "M M", "MMM"), {"M": STONE}),
