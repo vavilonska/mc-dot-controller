@@ -1,77 +1,52 @@
 {
-  "schema": "mdc-mainline-source-integration-v8",
-  "repository_parent_commit": "9aed63f4cb193030eab2bb779a306e5ec33f8d92",
-  "repository_parent_tree": "da41a679c9ceb9808122469b9911df80d9e23ec1",
-  "source_stage": "Reviewed bounded placement settlement correction",
-  "scope": "Strict dispatch revision; one monotonic post-return menu successor only with exact consumption/context; separate physical neutrality and semantic cleanup diagnostics.",
+  "schema": "mdc-mainline-source-integration-v9",
+  "repository_parent_commit": "c9f5247c91d321d6df09f9d210f6f936a3a488a2",
+  "repository_parent_tree": "dd813ae4ba1c00aa9e00d14a3c66c9fca9fa23c6",
+  "source_stage": "T23 bounded placement acceptance documentation",
+  "scope": "Three documentation updates only; production and tests unchanged.",
   "verification": {
-    "independent_settlement": {
-      "production_policy_callback_checks": 787,
-      "vanilla_and_source_exact_menu_checks": 22,
-      "cleanup_assertions": 1248,
-      "cleanup_synthetic_cases": 96
+    "scope": "Documentation only; all production and test source bytes match the verified parent publication. No tests rerun for unchanged code.",
+    "prior_source_verification": {
+      "capability_tests": 759,
+      "all_passed": true,
+      "current_placement_java_wire_consumers": 11,
+      "legacy_java_wire_consumers": 8
     },
-    "full_native_source_compile": {
-      "java_sources": 137,
-      "project_classes": 331
+    "T23": {
+      "original_complete_live_verifier": "PASS",
+      "independent_live_and_saved_review": "PASS",
+      "native_action_ticks": 6,
+      "native_stable_ticks": 5,
+      "effect_count": 1,
+      "packet_count": 1,
+      "selected_count_before": 5,
+      "selected_count_after": 4,
+      "menu_revision_before": 1,
+      "menu_revision_after": 2,
+      "physical_neutral": true,
+      "release_binding_confirmed": true,
+      "semantic_context_confirmed": true,
+      "other_compared_cells_unchanged": 74,
+      "typed_inventory_representations": 4,
+      "health": 20,
+      "position_conserved": true,
+      "automated_closure_seconds": 63.215,
+      "mcp_exit_code": 0,
+      "java_numeric_exit": null,
+      "handoff_sha256": "ba136f519660a94dd9003dd5b577064bfab1084c9034e5aec64dc854324b0664",
+      "tested_artifact_sha256": "925f179a03dc6ede3b9e6a0aa014f9d9f73c201203e5ce5bbf0e8ebb7b3abc11"
     },
-    "legacy_native_combined": {
-      "children": 7,
-      "all_exit_zero": true
-    },
-    "current_placement_java_wire": {
-      "synthetic_facts": true,
-      "exact_extracted_terminal_method": true,
-      "real_serializers": true,
-      "python_consumer_tests": 11
-    },
-    "python_focused": [
-      {
-        "name": "placement-python",
-        "exit_code": 0,
-        "summary": [
-          "Ran 18 tests in 0.169s",
-          "OK"
-        ]
-      },
-      {
-        "name": "t21-compatibility",
-        "exit_code": 0,
-        "summary": [
-          "Ran 6 tests in 0.001s",
-          "OK"
-        ]
-      },
-      {
-        "name": "legacy-wire-python",
-        "exit_code": 0,
-        "summary": [
-          "Ran 8 tests in 0.103s",
-          "OK"
-        ]
-      }
-    ],
-    "capability_full": {
-      "name": "capability-full",
-      "exit_code": 0,
-      "summary": [
-        "Ran 759 tests in 272.498s",
-        "OK"
-      ]
-    },
-    "prior_owner_harness_attempt": "756/759 passed; three CLI import failures from incomplete PYTHONPATH. Corrected CLI module 5/5 passed; original and intermediate failed logs retained. Clean full integrated run supersedes the harness invocation only.",
-    "scope": "Offline compile, genuine vanilla revision methods, production pure policy/fence, exact extracted guards/cleanup with synthetic readers, actual emitted codec bytes. No live correction acceptance.",
-    "remaining": [
-      "fresh artifact assembly and independent package checks",
-      "bounded live validation of this correction",
-      "full Gradle/NeoForge build"
-    ],
-    "original_T22": "Unknown after one effect/packet and selected count 5 to 4. Original specific exception unavailable; not reclassified or replayed."
+    "limits": [
+      "One stationary cobblestone placement only",
+      "No whole-world unchanged claim",
+      "No multi-cell building workflow claim",
+      "No additional server acknowledgement or future-dynamics claim",
+      "T22 original unknown outcome preserved; no retry or reclassification"
+    ]
   },
-  "reviews": "Independent frozen source/compile/policy/vanilla/extracted cleanup review passed; source owner verified all twelve owned paths and three integration docs.",
   "excluded": [
-    "Raw live receipts, worlds, GUI, accounts, credentials and installed state",
-    "Compiled artifacts and external binaries",
+    "Private live receipts, runtime identities, worlds, GUI and accounts",
+    "Credentials, compiled artifacts, installed state and external dependencies",
     "Generated synthetic fixtures and caches"
   ],
   "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt",
@@ -98,8 +73,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9860,
-      "sha256": "e10c9da018e33c07f6b4d6041a27f62009d8bb6dd8ce23b348b1ddd854396ba2"
+      "bytes": 9818,
+      "sha256": "9ffacb93235e93029c494204f8f86c9daf5e8464777740f91634cbfc0097689d"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
@@ -313,8 +288,8 @@
     },
     {
       "path": "capability-runtime/docs/SCOPED-PLACEMENT.md",
-      "bytes": 4162,
-      "sha256": "253f50a748bed6e58f73766bff073c050d6381aba2199612ef4e740734075d70"
+      "bytes": 4362,
+      "sha256": "5df6019f5d1ee2ce36c527254f68d3fb868eb0ca664ea8047db3be57555033f4"
     },
     {
       "path": "capability-runtime/docs/SHELTERED-ENDERMAN-LOS.md",
@@ -1128,8 +1103,8 @@
     },
     {
       "path": "client-mod/docs/scoped-placement.md",
-      "bytes": 6645,
-      "sha256": "63e0241856bd7527328b58a0639b9d51cf64e3c6733911af2732a3413d2c0cd3"
+      "bytes": 8575,
+      "sha256": "f59279c69e020f055ebb57a9c86b4bc31453d9fa5ab83afdff2ac4be58a5d0a6"
     },
     {
       "path": "client-mod/docs/serialization-verification.md",

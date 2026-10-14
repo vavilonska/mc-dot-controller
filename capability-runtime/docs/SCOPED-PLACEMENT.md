@@ -21,9 +21,11 @@ Run the ordinary capability and Resident unit-test discovery with the repository
 
 ## Settlement status
 
-The first live microtrial retained an unknown outcome after one effect and one
-packet; no successful live placement acceptance is claimed. The reviewed native
-settlement correction permits one expected menu-revision increment only after
-confirmed use return and exact consumption, retaining all identity and inventory
-fences. Physical neutrality is distinct from semantic cleanup, and unknown still
-forbids replay. See [native details](../../client-mod/docs/scoped-placement.md).
+T22 retained an unknown outcome after one effect and one packet. The separate
+T23 trial subsequently passed the original live verifier and independent saved
+inspection for one stationary cobblestone placement: one effect/packet, count
+5→4, revision 1→2, and confirmed physical neutrality, release binding and semantic
+cleanup. The target plus 74 other compared cells and four inventory representations
+were checked; no whole-world equivalence is claimed. The correction retains all
+identity and inventory fences, and unknown still forbids replay. This does not
+establish multi-cell building. See [native details and closure limits](../../client-mod/docs/scoped-placement.md).
