@@ -1,6 +1,7 @@
 """Finite resource goals; inventory acquisition and block removal stay distinct."""
 from copy import deepcopy
 from mdc_skills import resources as skills, supply, planning, production
+from mdc_skills import scoped_mining, scoped_collect
 from .production import (_object, _integer, _number, _enum, _ITEM, _COORD,
                          _definition, _invoke, _validate, _inventory_counts)
 
@@ -31,6 +32,9 @@ _SCHEMAS = {
 _DISPATCH = {'find_resources': skills.find, 'mine': skills.mine, 'collect': skills.collect,
              'mine_and_collect': skills.mine_and_collect, 'acquire_nearby': planning.acquire_nearby,
              'ensure_items': supply.ensure_items, 'place_workstation': supply.place_workstation}
+_COLLECT_SCHEMA = _object({'target_uuid': {'type':'string', 'pattern':'^' + scoped_collect._UUID + '$'},
+    'item_id':_enum(scoped_collect.ITEMS), 'minimum':_integer(1,64), 'min_health':_number(8,20)},
+    ('target_uuid','item_id'))
 _MOB_SOURCES = ('minecraft:ender_pearl', 'minecraft:blaze_rod', 'minecraft:gunpowder', 'minecraft:string')
 
 
@@ -73,10 +77,51 @@ def definitions():
                     'requirement_items': 32, 'nested_limits': 'Original shared P2 job budget applies at every runtime boundary.'}))
     for row in rows:
         row['planner_available'] = row['capability'] in ('ensure_items', 'acquire_nearby')
+    local = _definition('mine_local','resources','local_controller',
+        _object({'target':_COORD,'expected_block_id':_enum(scoped_mining.BLOCKS),
+                 'expected_block_properties':_object({}), 'require_correct_tool':{'type':'boolean'}},
+                ('target','expected_block_id','expected_block_properties')),
+        (scoped_mining,), prerequisites=('Negotiated mining-local-observed-v2 with exact native callback fences.',
+            'Private Overworld survival; stationary supported player and selected ordinary tool.'),
+        limits=('Observed-profile v2: at most 8 seconds / 160 native action ticks; longer native requests refused.',
+            'Distant supported passives use observed projection; ordinary items allowed; no future-dynamics guarantee.',
+            'Exactly one explicit static full-cube target; no movement, hotbar switch, search or pickup.',
+            'Full original catalog is preserved. Legacy mine keeps its separate terrain-limited contract.',
+            'Block absence proves removal only; no causal attribution of drops or inventory acquisition.'),
+        features=('scoped-native-preflight/1','profile:mining-local-observed-v2','action:break_block'),
+        bounds={'target_blocks':1,'timeout_ms':8000,'native_footprint_cells':512})
+    local.update(observation_profile='player',adapter_status='implemented',
+                 cancel_granularity='exact_native_action',
+                 validation={'offline':'not_run','live':'not_run'})
+    local['known_limits'] = local['known_limits'][:-1]
+    rows.append(local)
+    collect = _definition('collect_local','resources','local_controller',_COLLECT_SCHEMA,(scoped_collect,),
+        prerequisites=('Negotiated collect-local-observed-v1 and same original runtime owner/context.',
+            'One explicit observed plain item UUID in an adjacent cardinal cell; entire stack inventory capacity.'),
+        limits=('Exactly one flat one-block movement; no search, replan, retry, jump or sprint.',
+            'Only seven ordinary item IDs with exact default components; native target identity and stack rechecked.',
+            'All other corridor entities remain excluded; unsupported entities and projectiles refuse.',
+            'Only known target-absence cancellation may proceed to independent inventory verification.',
+            'Stable typed inventory gain proves observed acquisition, never causal loot attribution.',
+            'Input release and ownership cleanup remain required; no general physical-distance budget.'),
+        features=('scoped-native-preflight/1','profile:collect-local-observed-v1','action:follow_path'),
+        bounds={'target_entities':1,'route_steps':1,'native_timeout_ms':8000,'maximum_action_ticks':160,
+                'pickup_observations':16,'maximum_stack_count':64})
+    collect.update(adapter_status='implemented',observation_profile='entities',cancel_granularity='exact_native_action',
+        validation={'offline':'not_run','live':'not_run'})
+    collect['known_limits'] = collect['known_limits'][:-1]
+    rows.append(collect)
     return rows
 
 
 def invoke(capability, runtime, arguments, control):
+    if capability == 'collect_local':
+        return _invoke(capability,runtime,arguments,control,{'collect_local':_COLLECT_SCHEMA},
+            {'collect_local':scoped_collect.collect_local},skill_kwargs={'control':control})
+    if capability == 'mine_local':
+        schema = next(row['input_schema'] for row in definitions() if row['capability'] == capability)
+        return _invoke(capability, runtime, arguments, control, {capability:schema},
+                       {capability:scoped_mining.mine_local})
     return _invoke(capability, runtime, arguments, control, _SCHEMAS, _DISPATCH)
 
 

@@ -7,13 +7,13 @@ import os
 import re
 import subprocess
 import sys
+import zipfile
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 PACKAGE = REPO / 'client-mod/src/main/java/io/github/campione01/mineclientbridge'
-NATIVE = ['BridgeServer', 'CapabilitySnapshot', 'ClientActionRequest', 'ClientActions',
-          'ScopedFlatMovement', 'ScopedMovementEntities', 'ScopedMovementWire',
-          'ActionRegistry', 'BridgeJson', 'ScopedNativePreflight', 'ScopedEntityPolicy', 'ScopedFlatPolicy']
+NATIVE = [str(path.relative_to(PACKAGE).with_suffix('')).replace(os.sep, '.')
+          for path in sorted(PACKAGE.rglob('*.java'))]
 SYNTHETIC = ['ScopedFlatMovement', 'ScopedMovementEntities', 'ScopedFlatPolicy',
              'ScopedEntityPolicy', 'ActionRegistry', 'ClientActionRequest', 'BridgeJson']
 VM = ['-Xms32m', '-Xmx384m', '-XX:ActiveProcessorCount=1', '-XX:+UseSerialGC', '-XX:-UsePerfData']
@@ -39,6 +39,10 @@ def verify_inputs():
     for row in json.loads((HERE / 'expected-production.json').read_text())['sources']:
         if sha(REPO / row['path']) != row['sha256']:
             raise ValueError('Production source pin changed: ' + row['path'])
+    pinned = {row['path'] for row in json.loads((HERE / 'expected-production.json').read_text())['sources']}
+    actual = {str(path.relative_to(REPO)) for path in PACKAGE.rglob('*.java')}
+    if pinned != actual:
+        raise ValueError('Production source inventory changed; review and pin it explicitly')
     pins = json.loads((HERE / 'expected-prerequisites.json').read_text())
     for kind in ['javac', 'java']:
         if sha(JDK / 'bin' / kind) != pins[kind + '_sha256']:
@@ -48,6 +52,9 @@ def verify_inputs():
     for path, row in zip(CP, pins['classpath']):
         if path.name != row['basename'] or sha(path) != row['sha256']:
             raise ValueError('Classpath pin changed: ' + row['basename'])
+        with zipfile.ZipFile(path) as jar:
+            if any(name.startswith('io/github/campione01/mineclientbridge/') and name.endswith('.class') for name in jar.namelist()):
+                raise ValueError('Stale project class forbidden in external classpath: ' + row['basename'])
     gson = next(row for row in pins['classpath'] if row['basename'].startswith('gson-'))
     if sha(GSON) != gson['sha256']:
         raise ValueError('Gson pin changed')
@@ -115,11 +122,11 @@ final class ClientActions {
     (OUT / 'synthetic-src/io/github/campione01/mineclientbridge/ClientActions.java').write_text(body)
     run('source-wiring', [sys.executable, '-I', '-B', HERE / 'check_source_relation.py', OUT / 'synthetic-src', OUT / 'source-relation-results.json'])
     compile_java('native-production-compile', OUT / 'native-classes', os.pathsep.join(map(str, CP)),
-                 [PACKAGE / (n + '.java') for n in NATIVE])
+                 [PACKAGE / (n.replace('.', '/') + '.java') for n in NATIVE])
     compile_java('wire-test-compile', OUT / 'wire-classes', os.pathsep.join(map(str, [OUT / 'native-classes', *CP])),
                  [HERE / n for n in ['WireV1Facts.java', 'WireV1Fixture.java', 'WireV1ProducerCases.java', 'LegacyBridgeJsonReference.java', 'ActionTickWitnessTest.java', 'NativeClassOrigins.java']])
     runtime_cp = os.pathsep.join(map(str, [OUT / 'wire-classes', OUT / 'native-classes', *CP]))
-    java('production-class-origins', 'NativeClassOrigins', runtime_cp, [OUT / 'native-classes'])
+    java('production-class-origins', 'NativeClassOrigins', runtime_cp, [OUT / 'native-classes'], log=True)
     java('native-wire-producer', 'WireV1ProducerCases', runtime_cp, [OUT / 'wire-fixtures'], log=True)
     print('WIRE_FIXTURES_READY=' + str(OUT / 'wire-fixtures'), flush=True)
     compile_java('synthetic-policy-compile', OUT / 'engine-classes', str(GSON),
@@ -144,7 +151,7 @@ final class ClientActions {
 finally:
     write(OUT / 'RESULT.json', {
         'schema': 'mdc.movement-t13-offline-result/1', 'status': status, 'children': receipts,
-        'production_sources_compiled': NATIVE, 'native_classes': len(list((OUT / 'native-classes').rglob('*.class'))),
+        'production_sources_compiled': NATIVE, 'baseline_mod_artifact_used': False, 'native_classes': len(list((OUT / 'native-classes').rglob('*.class'))),
         'scope': 'Focused source wiring, native compilation, real codec with synthetic captured facts, and actual policy logic with synthetic engine readers; no live Minecraft lifecycle or successful movement proof.',
         'wire_fixtures': 'wire-fixtures', 'action_fixtures': 'action-fixtures',
         'game_started': False, 'deployment': False, 'network': False})

@@ -83,3 +83,9 @@ tests/movement_t13/run_offline.py
 tests/movement_t13/test_full_reply_boundary.py
 tests/movement_t13/test_movement_wire_contract.py
 tests/movement_t13/test_node_reply_boundary.mjs
+resident_controller/combat_snapshot.py
+resident_controller/collect_snapshot.py
+resident_controller/mining_entities.py
+resident_controller/mining_snapshot.py
+tests/combat_witness_fixture.py
+tests/test_combat_scoped_witness.py

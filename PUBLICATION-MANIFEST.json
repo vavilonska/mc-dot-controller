@@ -1,136 +1,148 @@
 {
-  "schema": "mdc-mainline-source-integration-v2",
-  "repository_parent_commit": "27f3539a7ecd5adffe31d8b68611c7c054a1aa50",
-  "repository_parent_tree": "079ccd067cef8b4525f91f7490243cbb2c4712bb",
-  "source_stage": "T13 single-authority wire and native action ticks",
-  "source_manifest_sha256": "091ea46c4dfcddff3949f006f97ed655862b03ce8c77904f07d8a5cbd4ecd6ba",
-  "frozen_source_files": 748,
-  "production_delta_files": 15,
-  "production_changed_after_tests": false,
-  "production_files": [
+  "schema": "mdc-mainline-source-integration-v3",
+  "repository_parent_commit": "9bfd430ee5b7667ae6a036e42df03b1c5d503bac",
+  "repository_parent_tree": "d29ff413100f08946f8178f22c74e382ffcc01ef",
+  "source_stage": "scoped mining-preview plus collect and offline combat integration",
+  "source_freezes": {
+    "mining_preview": "983e40170b33dd4fd74adbc92d85d2adc297f4302891925ac8d8f15b690b6728",
+    "collect": "c8630710c97f11f09809d5d6e79869af4fc8a731bb76adf1df58d957d8593fe0",
+    "combat_delta": "9aba7055079fec2537698aa6360099b90e759bcea1b0523740afc225dcca9498"
+  },
+  "merge_strategy": "Exact cumulative mining+collect source plus reviewed additive combat shared-file merges. Retained published-main fixes.",
+  "integration_corrections": [
     {
-      "path": "capability-runtime/mdc_skills/core.py",
-      "sha256": "0aeec400fe8cf99d1b1882849557e07c75fbd5ff0c3ecfedc7ce571bf252b2f5",
-      "base_git_blob": "6ff5e9ecd54c22eecc917c206b5dda8677e54a39"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
+      "reason": "Confirmed standalone collect wire lost required explicit nullable mob_target_uuid; include collect in existing witness null-preservation selector only.",
+      "before_sha256": "2a25c428a60b9a831a80069df7700596e879c73c39d0e251e536acee8f448f36",
+      "after_sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
     },
     {
-      "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "sha256": "6df0d0a575d7a29f72f56615d4673eb2792359b7059d9a3fc695ef7215f08cd4",
-      "base_git_blob": "8b6f7ed83e0d4f588e82fc02e9a8d9ece4ed4eef"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
-      "sha256": "972550072b05b2bc4a7cc07667061a787697c808dcae027c8891c692f1013304",
-      "base_git_blob": "3126112005ee5fdfc4e3ef3da013b5227998072c"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySnapshot.java",
-      "sha256": "931f26efc3fb48b6bcbd359183f1ba5a0630704fdd6d53185923f39bee4a492a",
-      "base_git_blob": "5fb2e7de018ecdfb97e592fefac9d9c07c543ba7"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
-      "sha256": "6ed383e7f698acaf0c09b56f01b21de23633f9bac702107db705777f0cdbc912",
-      "base_git_blob": "e9387ca945dc5ee38e15236a14e1b5d67a49fdc3"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "sha256": "66faa4773c9115ad50c6830dd649a1dfe927b010b8ae9d71344ce9b382cd51c9",
-      "base_git_blob": "87a20d71fc8ff13f25f8da21b3c4b5a604d18c57"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
-      "sha256": "ad54359f27396dc8084b1f25a2c416656152ff1cbbce6767e3fd15bb674d0017",
-      "base_git_blob": "a1a9b764b44c3eb3bd8cf5ea6d907d9500c6ae69"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
-      "sha256": "0d64fa1d8a3e37f42823d64a1023db1a86ebdbe50639061881d745c18f189fc0",
-      "base_git_blob": "9bb5c7d44152022109fa0d7799a2cf955e610bc5"
-    },
-    {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "sha256": "78fab2e888f70ca5c5513237a6e4bcbf4baedfa8b0aca7d48c6d0adf8945e735",
-      "base_git_blob": null
-    },
-    {
-      "path": "resident-controller/resident_controller/capability_snapshot.py",
-      "sha256": "a7c0dce11c810b66af2f3bf14e1d609a2b4128ca308473b5e53f46e5aa19caf7",
-      "base_git_blob": "d31867040fbd13556ced090185b7df85da6b4d52"
-    },
-    {
-      "path": "resident-controller/resident_controller/controller.py",
-      "sha256": "c714c7ab273ca3a7fcd97f68376ea8c0dab0e0573edb2a4618f530509d5fd39a",
-      "base_git_blob": "1f271a009fc7f9698adfdfd00219294129758235"
-    },
-    {
-      "path": "resident-controller/resident_controller/movement_wire.py",
-      "sha256": "9cf2d0010ecf481eb1c06180a5810a346f1cfd65127220094badd86aa12f53d8",
-      "base_git_blob": null
-    },
-    {
-      "path": "resident-controller/resident_controller/terrain_acquisition.py",
-      "sha256": "489d9faefc13cb3297673075ac555705889be3cfc59721a2e78f3fc0082903e2",
-      "base_git_blob": "e53054570b557ac9a37ca8f0f39cfa53b8c3b052"
-    },
-    {
-      "path": "resident-controller/resident_controller/transport.py",
-      "sha256": "284d4f6ba94eaff18bd8caa2d866d59053bd9987455f2be2b0f83204be8563c3",
-      "base_git_blob": "3580272c96d91b2957691640f4e4b5fd083fbe73"
-    },
-    {
-      "path": "resident-controller/resident_controller/world.py",
-      "sha256": "7ef816f9114d57fadc8fc5c5862c572a6b0071a686cdac33201d9e1c501bb915",
-      "base_git_blob": "ed3d374fee7619c5f7212a3b619f335be79e390c"
+      "path": "capability-runtime/tests/test_scoped_combat_chain.py",
+      "reason": "Preserve standard main test discovery without unqualified cross-package fixture import; fixture and all assertions unchanged.",
+      "before_sha256": "7527cbc349613edc974017edfe56fedb2a2e51db78358407ac1c39d1e80e0c21",
+      "after_sha256": "09e46d436742f715f70513e563547de94006bbc5bf9acf16e8a09e3e32f21dbf"
     }
   ],
-  "preserved_main_fixes": "Three adapter read-only observation guards, portable test hashes/discovery, toolbox descriptor and synthetic platform fixes.",
-  "verification": {
-    "resident_python": 410,
-    "cursor_python": 83,
-    "gameplay_python": 64,
-    "toolbox_python": 57,
-    "capability_python": 651,
-    "node_portable": 122,
-    "node_framing": 9,
-    "synthetic_platform": "passed; Windows/PowerShell not validated",
-    "native_source_checks": 37,
-    "native_source_families": 12,
-    "native_java21_classes": 37,
-    "synthetic_policy_assertions": 168,
-    "synthetic_policy_scenarios": 15,
-    "generated_consumer_checks": 52,
-    "wire_python_codec": 8,
-    "wire_python_full_reply_tests": 6,
-    "wire_python_full_reply_cases": 22,
-    "wire_node_cases": 38,
-    "full_gradle_build": "not performed",
-    "current_commit_github_ci": "not yet run",
-    "initial_capability_attempt": "Known 180-second timeout with owned child killed/reaped; original output retained. Distinct 450-second attempt passed.",
-    "python_wire_attempts": "Both passed; final attempt02 follows network-guard strengthening."
+  "source_reviews": {
+    "collect": "passed actual combined source",
+    "combat": "passed actual combined source",
+    "scope": "offline source only"
   },
-  "live_scope": {
-    "result": "one cardinal flat-block public/native movement and independent saved-world acceptance",
-    "action_ticks": 13,
-    "continuation_checks": 34,
-    "goal_error_blocks": 0.0743125,
-    "normal_closure_seconds": 51.382848,
-    "health_inventory_equipment_conserved": true,
-    "original_world_preserved": true,
-    "closed_success_seal_sha256": "074b6ba0d345757ca7687b85d6cded35c3062995a1b95750776403b44c050d71",
-    "not_claimed": [
-      "general pathfinding",
-      "all 49 toolbox cases",
-      "future entity dynamics",
-      "server-confirmed multiplayer result"
+  "verification": {
+    "broad": [
+      {
+        "name": "resident-controller",
+        "exit": 0,
+        "summary": [
+          "Ran 419 tests in 2.818s",
+          "OK"
+        ]
+      },
+      {
+        "name": "navigation-cursor",
+        "exit": 0,
+        "summary": [
+          "Ran 83 tests in 0.118s",
+          "OK"
+        ]
+      },
+      {
+        "name": "gameplay-helpers",
+        "exit": 0,
+        "summary": [
+          "Ran 64 tests in 4.422s",
+          "OK"
+        ]
+      },
+      {
+        "name": "capability-runtime",
+        "exit": 0,
+        "summary": [
+          "Ran 718 tests in 260.669s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "name": "toolbox",
+        "exit": 0,
+        "summary": [
+          "Ran 57 tests in 0.082s",
+          "OK"
+        ]
+      },
+      {
+        "name": "node-portable",
+        "exit": 0,
+        "summary": [
+          "\u2139 tests 122",
+          "\u2139 pass 122",
+          "\u2139 fail 0",
+          "\u2139 skipped 0"
+        ]
+      },
+      {
+        "name": "node-framing",
+        "exit": 0,
+        "summary": [
+          "\u2139 tests 9",
+          "\u2139 pass 9",
+          "\u2139 fail 0",
+          "\u2139 skipped 0"
+        ]
+      },
+      {
+        "name": "node-platform",
+        "exit": 0,
+        "summary": [
+          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
+          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
+        ]
+      }
+    ],
+    "capability_discovery_skip": "One actual-Java-wire fixture-dependent class skipped in default discovery; its8 cases passed separately.",
+    "focused_python": {
+      "mining": 32,
+      "collect": 22,
+      "collect_actual_owner_chain_synthetic_native": 7,
+      "combat_recheck": 32,
+      "actual_java_wire_consumers": 8
+    },
+    "native": {
+      "production_sources": 128,
+      "fresh_class_origins": 321,
+      "baseline_mod_jar_used": false,
+      "t13_scenarios": 15,
+      "t13_policy_assertions": 168,
+      "mining_policy_codec": 10,
+      "collect_policy": 338,
+      "combat_fence": 14,
+      "combat_intent": 16,
+      "combined_codec": 15
+    },
+    "existing_t13_wire": {
+      "codec_tests": 8,
+      "python_full_reply_tests": 6,
+      "python_reported_cases": 22,
+      "node_cases": 38
+    },
+    "not_run": [
+      "full Gradle/NeoForge build",
+      "Windows/PowerShell validation",
+      "transformed mixin application",
+      "native combat functional attack/shield/cancel",
+      "live collect",
+      "live combat"
     ]
   },
+  "live_evidence": "See docs/MINING-COLLECT-COMBAT.md for T15/T16 mining/saved readback and failed automatic marker distinction; collect/combat remain offline only.",
+  "reactions": "cross-action stop; no automatic resume",
   "excluded": [
-    "Generated compressed fixtures; regenerate from checked-in generator",
-    "Compiled binaries, dependencies, private live receipts, GUI, world/account/profile/config/credential data",
-    "Stale candidate README/test regressions and historical nonportable scripts"
+    "Generated compressed synthetic fixture; regenerate from checked-in generator",
+    "Raw live receipts, worlds, GUI, account/profile/config/credential data",
+    "Compiled artifacts, dependency binaries, consumed operational packets",
+    "Stale candidate docs/tests and case-only build stamp"
   ],
-  "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt, to avoid hash cycles",
+  "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt to avoid hash cycles",
   "files": [
     {
       "path": ".gitignore",
@@ -154,13 +166,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 9228,
-      "sha256": "81ed464f1a45fa7733c084a783cad6685d14dbdec31e0f62f96fbc13e4c26958"
+      "bytes": 9344,
+      "sha256": "f43ce4ee5d727b149194bca9338e6300a97d25b52273123349052c1b0ad44bd9"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
-      "bytes": 7880,
-      "sha256": "a4e6db27c13567d3aadc97261fc5b37b9652679f6298af2873da1003de67596e"
+      "bytes": 9849,
+      "sha256": "ca71a41dff76013d4fdc5e1a550a0544b2f32f81c36be649bf608f92596b2d1d"
     },
     {
       "path": "building-controller/.gitignore",
@@ -319,8 +331,8 @@
     },
     {
       "path": "capability-runtime/PUBLIC-FILES.txt",
-      "bytes": 2244,
-      "sha256": "571f22aed6a021c00ed68add493a324fd858a21f358e608f98dfdc2c099758a4"
+      "bytes": 3286,
+      "sha256": "380cafd6f8bddd1320364afe64e650ffb6b2d1f1ec27782891681cbd6481c9c5"
     },
     {
       "path": "capability-runtime/README.md",
@@ -498,6 +510,16 @@
       "sha256": "3e44d4c9f0da3acd9216328b40f6beaa269388f97a855d41af7a1e8a3d23347e"
     },
     {
+      "path": "capability-runtime/mdc_skills/scoped_collect.py",
+      "bytes": 8378,
+      "sha256": "55c295b22a11c8914cb3b62b0c667adb0cecd4417fc677aad22191533a146138"
+    },
+    {
+      "path": "capability-runtime/mdc_skills/scoped_mining.py",
+      "bytes": 2584,
+      "sha256": "fa28cb00aa866369d04643d3e75a497cb0215b4c0835bf3f502101e938071cc9"
+    },
+    {
       "path": "capability-runtime/mdc_skills/scoped_mobility.py",
       "bytes": 3342,
       "sha256": "5e11f67c41360b2e24f3c8b5b70ac8ae2841366124bedb862f10cab2df714cc2"
@@ -569,13 +591,13 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/resources.py",
-      "bytes": 7872,
-      "sha256": "80e807cf3c5030de8556369b3c47a066ad248004fe79c9ce292ff3bb29a6fc84"
+      "bytes": 11751,
+      "sha256": "39a26689239e5e7837cf285c96c30de0fbd1e84b6e08e4e2c297588c26540b15"
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/tactical.py",
-      "bytes": 10185,
-      "sha256": "9abdf58006489cded50164202795dfaddbb023ec2b457297ffa81dca0cea88ec"
+      "bytes": 11353,
+      "sha256": "82156c093911a17d71aec7bdb256b1e35f811f78e543e99d2c61ac3b3adc3107"
     },
     {
       "path": "capability-runtime/mdc_toolbox/budgets.py",
@@ -604,8 +626,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "bytes": 20368,
-      "sha256": "6df0d0a575d7a29f72f56615d4673eb2792359b7059d9a3fc695ef7215f08cd4"
+      "bytes": 21176,
+      "sha256": "f0ce7871890f277a1c972762fef3b974c79d0e3c7c7467aea86edce5b76f750f"
     },
     {
       "path": "capability-runtime/mdc_toolbox/serialization.py",
@@ -651,6 +673,111 @@
       "path": "capability-runtime/tests/fixtures/native-capability-terrain-pages.json",
       "bytes": 556007,
       "sha256": "2ce01c5303eb0c9c8ba4e142b906b15fec3130fd0845a4b1360e1e14b1366586"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/PROVENANCE.sha256",
+      "bytes": 1320,
+      "sha256": "f22b9b77e7428cb3cc3e464f7a8c4747ee75e43fe97dbd9f9a3ea536bd6385b2"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/README.md",
+      "bytes": 4865,
+      "sha256": "09a93a2be7e5d2d74e6379387f5207dbb68ea83914337195265c997705e04526"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/__init__.py",
+      "bytes": 150,
+      "sha256": "56578a3df7738f2a346eda769371574c7e7c68289a7f6eb56600dda12ab9d2e3"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/bootstrap.py",
+      "bytes": 1958,
+      "sha256": "65c489e2e461f7131c1236aa6b9b21360be976b4852079815d5d3d5d47092197"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/collect/__init__.py",
+      "bytes": 72,
+      "sha256": "cd74ce602a63fff0f2f87c76ef8bb827bbaa03f3978d88d9bb65abc72aeee350"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/collect/collect_fixture.py",
+      "bytes": 2742,
+      "sha256": "062236fe7269bc1efa39ae476fb07cfda80576d61809cbe3efa190c054bda3e8"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/collect/menu_fixture.py",
+      "bytes": 6525,
+      "sha256": "3a0dd768e0eda13de7afa5242ecb8ccbf2097e32acea4afd28d05008d7160729"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/collect/movement_fixture.py",
+      "bytes": 3024,
+      "sha256": "77a1c96f9d81612120ec79bd9ecc9043334612c973ff81193dbc8216735c817e"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/collect/test_collect_chain.py",
+      "bytes": 8969,
+      "sha256": "a84f6ee0e8e6259fff5cd5bec9bbd193f2539f939f5de93b2235c67c359c0360"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/collect/test_collect_route.py",
+      "bytes": 11329,
+      "sha256": "9392fc55b14790c8d6fc15a71013e6001b9f85e6441a70c8f375a6155f1360cc"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/mining/__init__.py",
+      "bytes": 73,
+      "sha256": "9bfd56e24092926cc91f99f527bff1c13e7e2092f1a524fc053a33ec887110ed"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/mining/mining_fixture.py",
+      "bytes": 6306,
+      "sha256": "2c58a92a6f1ff6916901ef79e80f8cf5214e52c6921f4d8c3d3612542f56eb3d"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/mining/mining_menu_fixture.py",
+      "bytes": 3692,
+      "sha256": "55756fe25a3996b5c99778c1b6a24ea1233764e277e07d8aae727081969d4564"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/mining/test_mining_chain.py",
+      "bytes": 8431,
+      "sha256": "83c23d4ba8f8c94604557022cd30866dcf4c0809031b6b2ac716f089c17d2247"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/mining/test_preview_diagnostics.py",
+      "bytes": 3307,
+      "sha256": "179937b8e36fe8bc1269435c4f2182ab8c2b16d5d39da920cc40b6a9d5467e93"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/mining/test_scoped_mining.py",
+      "bytes": 11619,
+      "sha256": "d20a52a77b8d99b6cc7f1e4b3435b35a195f28abcddb3112e80c36232b1a6821"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/references/__init__.py",
+      "bytes": 81,
+      "sha256": "cdd5e83316742a5a12c76aaf13dc22fcf37184d7f1202ac0699b0fc82f427b19"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/references/accepted_movement_sha256.json",
+      "bytes": 298,
+      "sha256": "da828d7d83182f8d7b760854e211d359efcc003f5b1d1139732361e847ab966e"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/references/original_resources.py",
+      "bytes": 7892,
+      "sha256": "bec362b368926c855fc2d497eb07f3581d6b12d24ce1d3d20fbe239c8361e626"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/run_offline.py",
+      "bytes": 8785,
+      "sha256": "35f20b0ba4481cb5b60c7e8cb3834c4d18b5424e8905ed390f9359058bc9579b"
+    },
+    {
+      "path": "capability-runtime/tests/mining_collect/test_native_wire.py",
+      "bytes": 7952,
+      "sha256": "30502b4d7cc183bbe41c6a89dc83d23a2ba6596f6fc7d13b9bc5317cf10eee02"
     },
     {
       "path": "capability-runtime/tests/support_core.py",
@@ -818,6 +945,11 @@
       "sha256": "97cf6b25acc2c097337b6fa6e3e577c4600aa566c050894887fcb0251dda2c46"
     },
     {
+      "path": "capability-runtime/tests/test_scoped_combat_chain.py",
+      "bytes": 8631,
+      "sha256": "09e46d436742f715f70513e563547de94006bbc5bf9acf16e8a09e3e32f21dbf"
+    },
+    {
       "path": "capability-runtime/tests/test_sheltered_enderman_los.py",
       "bytes": 28200,
       "sha256": "36fa014a4401c787811640dfae144ce08bdd4b28e4857841a0374017a23cd618"
@@ -849,8 +981,8 @@
     },
     {
       "path": "capability-runtime/tests/toolbox/test_p5_tactical_dimensions.py",
-      "bytes": 22981,
-      "sha256": "20a8381ced258e3c44d3f9b5dcf000d56da8becd1649d0e58071116fa951824f"
+      "bytes": 23035,
+      "sha256": "558533dc2001b4c2d0b78d0ebe2fd5080d79af75c00b971783c220974b68ef44"
     },
     {
       "path": "client-mod/.gitignore",
@@ -1274,8 +1406,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombat.java",
-      "bytes": 54357,
-      "sha256": "1c5496d29a09b3db29fe93a032a68658a31c900ef6195588902acca638fcea4e"
+      "bytes": 58993,
+      "sha256": "bbe08a92fdcaab0e41f680899ed1a81ef9891b5634d9d4fc4854c5e357f1e9d3"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombatRequest.java",
@@ -1304,8 +1436,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "bytes": 8439,
-      "sha256": "8b44f8190f5f7e903b227520605de9106b43cd6240d83247a699fe10bd414fe5"
+      "bytes": 8666,
+      "sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeLog.java",
@@ -1324,8 +1456,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
-      "bytes": 154494,
-      "sha256": "972550072b05b2bc4a7cc07667061a787697c808dcae027c8891c692f1013304"
+      "bytes": 154809,
+      "sha256": "ae49e2030c5c1d84cd7e062a849351cee1b401916a63a127f91cbd4917f66bed"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityCombatSafety.java",
@@ -1354,8 +1486,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityItemBinding.java",
-      "bytes": 1793,
-      "sha256": "4a61c13962f660974b233df7ad6c7f550ce6cce30f690d9df45da32d6db34cd7"
+      "bytes": 2145,
+      "sha256": "82cbfad34f2ccf46bd7a268b1556022fb25694fdcb24ac0aa4b4c66a428cfa7f"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityPath.java",
@@ -1404,13 +1536,18 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 68193,
-      "sha256": "66faa4773c9115ad50c6830dd649a1dfe927b010b8ae9d71344ce9b382cd51c9"
+      "bytes": 75677,
+      "sha256": "235baed8b68e63430206f8ce670feb6bfc6d4c1f99676b6f6333eeaa952a725f"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
       "bytes": 6573,
       "sha256": "8656d19dc27e120fc4ad1eca945227c06169d8b4318d63de8b4a2838c8e9a422"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatCallbackFence.java",
+      "bytes": 1343,
+      "sha256": "79d6dc41f441424f3e6a475e0d1eea1364af720272a9759bb0226730ed907d42"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatCellCache.java",
@@ -1658,14 +1795,29 @@
       "sha256": "48adec5e813764505a5700f2f51a0b1d241446b037dafe306c887434a28aae72"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedCollectTarget.java",
+      "bytes": 8111,
+      "sha256": "a4ab30f244b88c9ec98f0493ad1cf8699525534520a5973a5bdbef3ea3007b27"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedCombat.java",
+      "bytes": 9678,
+      "sha256": "40e678586d948c63295776db088ee13085ebacaf5761aef72cb3442ebf61c347"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedCombatDispatch.java",
+      "bytes": 7067,
+      "sha256": "c8687c4d008a74d9c38f421bba87e92595b8d629ac360a1d29ec774ca7864cd2"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedEntityPolicy.java",
-      "bytes": 9922,
-      "sha256": "1f9c733ed60734c7f8216db7b1b35f6b6021d604d53f5875ab5a11bc0af1aa9c"
+      "bytes": 11480,
+      "sha256": "e6061d020ba54fd4ae178afffb43d68cfe1fbf11e413e8612ab5fa83533c4e4b"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
-      "bytes": 19178,
-      "sha256": "ad54359f27396dc8084b1f25a2c416656152ff1cbbce6767e3fd15bb674d0017"
+      "bytes": 19798,
+      "sha256": "3579dab60fd78cb34c0cf64b44a087e42873456cec3293ab78a45e61c5f7421d"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatPolicy.java",
@@ -1673,19 +1825,39 @@
       "sha256": "4f03c0604b0250ef81e5e0bfeeec83dacde12e10e19e97ae5b12cf11f77a9774"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMining.java",
+      "bytes": 30901,
+      "sha256": "6bed6d84f2d607bb53c7e9f6668c7f219879f6fe1a5b33500f6d76aa4075d808"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMiningDispatch.java",
+      "bytes": 3903,
+      "sha256": "784d1f494c3d4b4760bbfb9db1443f34e87a3fd5114bcb716764722474eda8a4"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMiningEntities.java",
+      "bytes": 9169,
+      "sha256": "9de4cbf952db7d1847e1f40606bea538a18883763eea1e7510cff2d1de0c1c96"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMiningEntityPolicy.java",
+      "bytes": 10014,
+      "sha256": "acf3809123d34875dc2c37d02402ab30ea6094e546ae6cd30dafbe82d4dcc94f"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
-      "bytes": 9071,
-      "sha256": "0d64fa1d8a3e37f42823d64a1023db1a86ebdbe50639061881d745c18f189fc0"
+      "bytes": 9483,
+      "sha256": "f54e82c59bbaa9da0746de260e331ef94f699b7c623bf00bea2e11c1766b2c17"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "bytes": 4079,
-      "sha256": "78fab2e888f70ca5c5513237a6e4bcbf4baedfa8b0aca7d48c6d0adf8945e735"
+      "bytes": 4451,
+      "sha256": "8b67d5049b09dcf3cc280ae59e197e5f4f6b5f69e549893f5483668e5974c01d"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "bytes": 25344,
-      "sha256": "89f33305b451620ce1ead3e46054ed4bafd79458eef6deb48ac54d904c315e85"
+      "bytes": 27169,
+      "sha256": "108cf950dd6328ec89a7ea780425f46231c212b7065d0f8a684e84399d1aea28"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/SprintKeyState.java",
@@ -1768,14 +1940,39 @@
       "sha256": "3ec49d0ae336638b06de2b9fde2bc804ab1df3443d1aefca3578ea9f032e5472"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedCombatAttackMixin.java",
+      "bytes": 1241,
+      "sha256": "58ac9e67ec888db5eced69604c023ac3c5fcba88bffc3001a551c2804c045eee"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedCombatInteractAccessor.java",
+      "bytes": 363,
+      "sha256": "c72bae9a1a5535d6ad04a49b63ec45a2087f0d86c9122c2be15fdf6330d2c3f8"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedCombatPacketMixin.java",
+      "bytes": 968,
+      "sha256": "95ccddce1b016f3fc8b92f218e841562574853e4a7a8417d44d9902c5006f952"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedMiningClientMixin.java",
+      "bytes": 2405,
+      "sha256": "0f9dfcb64d239db57b900c8c12a7910c49de5e9f28033b1cb5aa69fff9d4176b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedMiningGameModeMixin.java",
+      "bytes": 3751,
+      "sha256": "874cda3f72bc80af4779216c6c6ae9b0d9c99b0843e545eb56882caf2ac1e265"
+    },
+    {
       "path": "client-mod/src/main/resources/META-INF/accesstransformer.cfg",
       "bytes": 2669,
       "sha256": "ffd3960447c486a61abda97b2e20f4d28ac1b5ddcc04729dae4ba8259ae4c803"
     },
     {
       "path": "client-mod/src/main/resources/mineclient_bridge.mixins.json",
-      "bytes": 352,
-      "sha256": "84bcba60e0efcb955c3ee661b6126736e8407ebaedbe8199c255f495a1a819a9"
+      "bytes": 514,
+      "sha256": "7c231484932e1c5a1a842dd5dac125358c9d8ae98848a9e3e4e7431f00436b1b"
     },
     {
       "path": "client-mod/src/main/resources/mineclient_bridge.png",
@@ -2213,6 +2410,11 @@
       "sha256": "55eb0884f4a4dcf1bbcaa556c042d236dbf37c2ce3585ed32e52f38062694199"
     },
     {
+      "path": "client-mod/src/test/java/io/github/campione01/mineclientbridge/ScopedCollectPolicyFiniteTest.java",
+      "bytes": 5021,
+      "sha256": "ab0feb7439dbe59a146487f3acd58397532e6e029ef5f3b9e0ae05d4c953abe3"
+    },
+    {
       "path": "client-mod/src/test/java/io/github/campione01/mineclientbridge/SprintKeyStateTest.java",
       "bytes": 2550,
       "sha256": "cadfe335aadde65fccd76d0c00cc73e52d59b156dee7f7e51c37e5bf2499d1a5"
@@ -2368,6 +2570,36 @@
       "sha256": "7f4b156817499f3e3fc91b2370d23809aa61ff27cf72d1c07884cd5fb2cbd3ae"
     },
     {
+      "path": "client-mod/validation/mining-collect-combat/.gitignore",
+      "bytes": 21,
+      "sha256": "c00ec18342c6f7aa0c20002c1febc8283d5d3817b118dbae566bfaa9527a6288"
+    },
+    {
+      "path": "client-mod/validation/mining-collect-combat/CombinedWireChecks.java",
+      "bytes": 8687,
+      "sha256": "c1fef253dbcae9a18296f17e18bdca360d69f18468f1bddda1e4a3255278f8c8"
+    },
+    {
+      "path": "client-mod/validation/mining-collect-combat/MiningObservedPolicyTest.java",
+      "bytes": 2472,
+      "sha256": "2a28a4db3f7ad56b342f0dbe480cd2011645024a0314a4878e3771c2fc8995d7"
+    },
+    {
+      "path": "client-mod/validation/mining-collect-combat/PORT-PROVENANCE.json",
+      "bytes": 1081,
+      "sha256": "c6694204ba05cce3b4e0e53591b5e225c15b826782a586445714d1b499c4fdb9"
+    },
+    {
+      "path": "client-mod/validation/mining-collect-combat/README.md",
+      "bytes": 4507,
+      "sha256": "2db43568bd4a0bb6ffc2c5a31f7329231387762a1604495659e85d0d09f9f1b8"
+    },
+    {
+      "path": "client-mod/validation/mining-collect-combat/run.py",
+      "bytes": 6337,
+      "sha256": "fa32888940a878e848fed6e6fc4d6751d262ee1f27b271d5892dce08ac096ada"
+    },
+    {
       "path": "client-mod/validation/movement-t13/.gitignore",
       "bytes": 27,
       "sha256": "cdd9665972268cfdd8229f8d745e2cdcae3ba0b38aafa34216503f6bc5d3d44e"
@@ -2389,18 +2621,18 @@
     },
     {
       "path": "client-mod/validation/movement-t13/NativeClassOrigins.java",
-      "bytes": 955,
-      "sha256": "9f523b47089ae1ddca0a044a6d553c4383a3aec52deb62d0f1fc51b82ac86e31"
+      "bytes": 1059,
+      "sha256": "7e8605693df0e19ca9f4588e224abee785931977029b3dec423b8b0f1ce680ac"
     },
     {
       "path": "client-mod/validation/movement-t13/PORT-PROVENANCE.json",
-      "bytes": 4457,
-      "sha256": "aa29b9f9524cde807028972da8235e4205db0c6171b55584d81a84407b6d6694"
+      "bytes": 5575,
+      "sha256": "6b8740a77e5ca6cb217df0f40b7d67b47d1d5c2cdb39e53715a1658f28fc3e51"
     },
     {
       "path": "client-mod/validation/movement-t13/README.md",
-      "bytes": 5096,
-      "sha256": "3f51a2c122890b65a9c65a21596ca0cdba814cfe1644a401c9096310440bffa5"
+      "bytes": 6684,
+      "sha256": "ff525d7aefcb4760e7804ae5404834486aa2c907f1b1e06118f840f30c5d03b4"
     },
     {
       "path": "client-mod/validation/movement-t13/WireV1Facts.java",
@@ -2424,21 +2656,31 @@
     },
     {
       "path": "client-mod/validation/movement-t13/check_source_relation.py",
-      "bytes": 4967,
-      "sha256": "f4a86027512fd0dc378432a39d67270afc3b8eea9e2dd46ccaf1c3473384ccad"
+      "bytes": 5869,
+      "sha256": "e65da5d009c0edbec7c5ee0dc48f4d5d0dcaf4463d64e7f10288ea09a69fc392"
     },
     {
       "path": "client-mod/validation/movement-t13/expected-lifecycle-methods.json",
       "bytes": 511,
-      "sha256": "dc2531ae513aff849d68052973bd9966742108aff425d9046c150ad488391828"
+      "sha256": "f688b551256ddb94f0e7941e121c723cb72deedd61921ab0181171541cce9424"
     },
     {
       "path": "client-mod/validation/movement-t13/expected-prerequisites.json",
-      "bytes": 3505,
-      "sha256": "81843365b5b3fda3a81ed8c9f46cf22eb92360055d480efde715d9c849d5c11c"
+      "bytes": 3317,
+      "sha256": "a92ae872b6342ea0fd64f27c968bd61c25483e805f3bc8f82ec8a247b9a67a4a"
     },
     {
       "path": "client-mod/validation/movement-t13/expected-production.json",
+      "bytes": 25869,
+      "sha256": "5e542d6f0b4c6a002256afc32edea1f8e857feecd01ed5a51ee6cded82c504f0"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/historical-t13-lifecycle-methods.json",
+      "bytes": 511,
+      "sha256": "dc2531ae513aff849d68052973bd9966742108aff425d9046c150ad488391828"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/historical-t13-production.json",
       "bytes": 2450,
       "sha256": "f3f7b04f85b5701dfb903bbcee2b1f2dce8fe9e5db3a06f531f1c74e28fdd11d"
     },
@@ -2449,13 +2691,13 @@
     },
     {
       "path": "client-mod/validation/movement-t13/prepare_engine_fixtures.py",
-      "bytes": 11911,
-      "sha256": "b2ecf086876bb484d7590c23df623127656cb2d56a84516f081eda45f74c5c4c"
+      "bytes": 12684,
+      "sha256": "ffb58f37b692790957e1d56cf5207a72cae37a3f2f36b11dfb8a3e553f61c5cc"
     },
     {
       "path": "client-mod/validation/movement-t13/run.py",
-      "bytes": 9671,
-      "sha256": "fb8354895a8ddad92466ea06bded83b8ce6aa90b6eb923d5b71a3a165c3ff7da"
+      "bytes": 10199,
+      "sha256": "bc9dfb3a6db3526eac41aa6c90f5112e6ef6387811808f83e31286a5fd261ce1"
     },
     {
       "path": "client-mod/validation/native-coordination/LegacyCoordinationParserProbe.java",
@@ -2481,6 +2723,16 @@
       "path": "client-mod/validation/native-living-wire/run.sh",
       "bytes": 2585,
       "sha256": "0bcd20d43b6e57e7e47df50307f4119d1a511b1b9c152e4bfb28d86850a753bd"
+    },
+    {
+      "path": "client-mod/validation/scoped-combat/CombatCallbackFenceChecks.java",
+      "bytes": 1833,
+      "sha256": "eeaeac53bea00ccf98e8380a9f66ce3ec3241fdbe8ea1e5b49a563094f43cc2f"
+    },
+    {
+      "path": "client-mod/validation/scoped-combat/ScopedCombatIntentChecks.java",
+      "bytes": 2170,
+      "sha256": "17ff2d67550980b93cae13e26b29c42d2689f11bca88530352e4323f109fa137"
     },
     {
       "path": "client-mod/validation/terrain-adapter/.gitignore",
@@ -2736,6 +2988,11 @@
       "path": "defense-watchdog/watchdog.py",
       "bytes": 23974,
       "sha256": "0bc940ec2939e06f9c7e6123a886415756ad646e2a5c76431918c2444828987e"
+    },
+    {
+      "path": "docs/MINING-COLLECT-COMBAT.md",
+      "bytes": 6946,
+      "sha256": "654c336d0d07d18b382b96711f791016e82deb436a9d5decabbfb3f62e8c24cd"
     },
     {
       "path": "docs/MOVEMENT-T13.md",
@@ -3374,8 +3631,8 @@
     },
     {
       "path": "resident-controller/PUBLIC-FILES.txt",
-      "bytes": 3443,
-      "sha256": "28746999a56e5e419e20215575b4aecef4c6febbd0c4413541fd54f62a95d342"
+      "bytes": 3668,
+      "sha256": "bde5c8b115225cd2ef1a3694ee10ab4756887d1b0f58d0dcbd13bd31364a443b"
     },
     {
       "path": "resident-controller/README.md",
@@ -3454,13 +3711,23 @@
     },
     {
       "path": "resident-controller/resident_controller/capability_snapshot.py",
-      "bytes": 30533,
-      "sha256": "a7c0dce11c810b66af2f3bf14e1d609a2b4128ca308473b5e53f46e5aa19caf7"
+      "bytes": 32282,
+      "sha256": "e0a17a36ee6f9426bb4575bc3798ee16988e600d98b8672541bffa75b6ecceb8"
+    },
+    {
+      "path": "resident-controller/resident_controller/collect_snapshot.py",
+      "bytes": 3121,
+      "sha256": "c5b24578240623a81de75919351fb4fa5a2155397546ffd34874e18bcf674427"
+    },
+    {
+      "path": "resident-controller/resident_controller/combat_snapshot.py",
+      "bytes": 4487,
+      "sha256": "417fead2fdca30222cc734ccd2db5e37b5f4ac829db645630ca5f86395a175b4"
     },
     {
       "path": "resident-controller/resident_controller/controller.py",
-      "bytes": 82448,
-      "sha256": "c714c7ab273ca3a7fcd97f68376ea8c0dab0e0573edb2a4618f530509d5fd39a"
+      "bytes": 83641,
+      "sha256": "5a3b4325198b3e022d6273a6b1f3e8255a97cb29f9cd7267c8e92751b6f0ba3a"
     },
     {
       "path": "resident-controller/resident_controller/coordination_contract.py",
@@ -3483,9 +3750,19 @@
       "sha256": "2a63c74260e169192accba829769285e67d7e0f0c887bcb31192db66e0d0f22a"
     },
     {
+      "path": "resident-controller/resident_controller/mining_entities.py",
+      "bytes": 7054,
+      "sha256": "039b3e522f34033fe838b9f5968297978de7073e41b83a50041651a5bf852a9e"
+    },
+    {
+      "path": "resident-controller/resident_controller/mining_snapshot.py",
+      "bytes": 9554,
+      "sha256": "908deeb7f12c554fcb552134159f3f95469281ae6bf1d386d9a1849447902500"
+    },
+    {
       "path": "resident-controller/resident_controller/movement_wire.py",
-      "bytes": 9004,
-      "sha256": "9cf2d0010ecf481eb1c06180a5810a346f1cfd65127220094badd86aa12f53d8"
+      "bytes": 9308,
+      "sha256": "d51b03569a6ef99ab2a04a4ba203414a53b1d4d044755b888f50be9700c70bfd"
     },
     {
       "path": "resident-controller/resident_controller/native_combat.py",
@@ -3536,6 +3813,11 @@
       "path": "resident-controller/tests/capability_fixtures.py",
       "bytes": 2993,
       "sha256": "99f2f2415b0be466ff11f11ce0edf79b3e758904e7d7b936ea8ed597dfacdf54"
+    },
+    {
+      "path": "resident-controller/tests/combat_witness_fixture.py",
+      "bytes": 5223,
+      "sha256": "9acbcb2ebb48381a2a0fed1aeae56b3f3c2d428e21aeef9d339a3155c2805d99"
     },
     {
       "path": "resident-controller/tests/fixtures/capability-bundle-wire/PROVENANCE.json",
@@ -3686,6 +3968,11 @@
       "path": "resident-controller/tests/test_capability_terrain.py",
       "bytes": 6233,
       "sha256": "a9c654c3b143014dd16737060ffff5d9e6df845e409e083049931ace735c3bf9"
+    },
+    {
+      "path": "resident-controller/tests/test_combat_scoped_witness.py",
+      "bytes": 5681,
+      "sha256": "d53c5ad32c2f62956ee9822cfd082922f27f126046f241ed17a8a005b1dc6b9d"
     },
     {
       "path": "resident-controller/tests/test_controller.py",

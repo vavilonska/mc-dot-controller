@@ -1,0 +1,53 @@
+{
+  "schema": "mdc.movement-t13-production/1",
+  "sources": [
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
+      "sha256": "972550072b05b2bc4a7cc07667061a787697c808dcae027c8891c692f1013304"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySnapshot.java",
+      "sha256": "931f26efc3fb48b6bcbd359183f1ba5a0630704fdd6d53185923f39bee4a492a"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
+      "sha256": "6ed383e7f698acaf0c09b56f01b21de23633f9bac702107db705777f0cdbc912"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
+      "sha256": "66faa4773c9115ad50c6830dd649a1dfe927b010b8ae9d71344ce9b382cd51c9"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
+      "sha256": "ad54359f27396dc8084b1f25a2c416656152ff1cbbce6767e3fd15bb674d0017"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
+      "sha256": "0d64fa1d8a3e37f42823d64a1023db1a86ebdbe50639061881d745c18f189fc0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
+      "sha256": "78fab2e888f70ca5c5513237a6e4bcbf4baedfa8b0aca7d48c6d0adf8945e735"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ActionRegistry.java",
+      "sha256": "def0e49e2c57923c352d447a09e0b25ef01dd7699f5111fcd84434a48d77b6f3"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
+      "sha256": "8b44f8190f5f7e903b227520605de9106b43cd6240d83247a699fe10bd414fe5"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
+      "sha256": "89f33305b451620ce1ead3e46054ed4bafd79458eef6deb48ac54d904c315e85"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedEntityPolicy.java",
+      "sha256": "1f9c733ed60734c7f8216db7b1b35f6b6021d604d53f5875ab5a11bc0af1aa9c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatPolicy.java",
+      "sha256": "4f03c0604b0250ef81e5e0bfeeec83dacde12e10e19e97ae5b12cf11f77a9774"
+    }
+  ]
+}

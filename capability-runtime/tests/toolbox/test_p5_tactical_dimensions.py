@@ -71,7 +71,7 @@ class BindingTests(unittest.TestCase):
         self.assertNotIn('gateway_pearl', [row['capability'] for row in rows])
         catalog = CapabilityCatalog([tactical, dimensions])
         for row in rows:
-            self.assertEqual(row['adapter_status'], 'legacy_limited')
+            self.assertEqual(row['adapter_status'], 'scoped_native' if row['capability'] == 'engage' else 'legacy_limited')
             self.assertEqual(row['validation']['live'], 'not_run')
             self.assertFalse(row['resume_supported'])
             self.assertFalse(catalog.entry(row['capability'], {'available': True,

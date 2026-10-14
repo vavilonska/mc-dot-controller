@@ -1,0 +1,27 @@
+{
+  "schema": "mdc.mining-collect-combat-validation-port/1",
+  "sources": [
+    {
+      "destination": "MiningObservedPolicyTest.java",
+      "origin": "scoped-mining-preview-r1/tests/native/MiningObservedPolicyTest.java",
+      "byte_identical": true,
+      "sha256": "2a28a4db3f7ad56b342f0dbe480cd2011645024a0314a4878e3771c2fc8995d7"
+    }
+  ],
+  "existing_tests": [
+    "client-mod/src/test/java/io/github/campione01/mineclientbridge/ScopedCollectPolicyFiniteTest.java",
+    "client-mod/validation/scoped-combat/CombatCallbackFenceChecks.java",
+    "client-mod/validation/scoped-combat/ScopedCombatIntentChecks.java"
+  ],
+  "new_tests": [
+    "CombinedWireChecks.java",
+    "run.py"
+  ],
+  "production_changes": "None by this validation port. Combined source includes the separately reviewed additive collect profile nullable-witness codec correction.",
+  "required_limitations": [
+    "Mixin transformed application NOT_RUN",
+    "Real combat functional/live NOT_RUN",
+    "All captured wire facts synthetic",
+    "Native policy checks are not engine lifecycle evidence"
+  ]
+}

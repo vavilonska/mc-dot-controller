@@ -28,8 +28,11 @@ def _public_context(context):
 
 class OwnerRuntimeBackend:
     INITIAL_CAPABILITIES = frozenset({'select_hotbar','ensure_hotbar','equip','consume','close_menu',
-        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local'})
+        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','mine_local','collect_local','engage'})
     REQUIRED_ACTIONS = {
+        'mine_local': {'break_block'},
+        'collect_local': {'follow_path'},
+        'engage': {'combat_entity'},
         'navigate_local': {'follow_path'},
         'select_hotbar': {'select_hotbar'}, 'ensure_hotbar': {'select_hotbar','click_slot'},
         'equip': {'select_hotbar','click_slot'}, 'consume': {'select_hotbar','click_slot','use_item'},
@@ -70,7 +73,9 @@ class OwnerRuntimeBackend:
             features.extend('action:' + name for name in scoped.get('guarded_actions', []))
         negotiated_actions = set(self._profile_actions({'scoped_profiles': scoped.get('profiles', {}) if isinstance(scoped, dict) else {}}))
         supported = sorted(name for name in self._plugins() if name in self.INITIAL_CAPABILITIES
-                           and self.REQUIRED_ACTIONS[name] <= negotiated_actions and 'scoped-native-preflight/1' in features)
+                           and ((name == 'collect_local' and isinstance(scoped,dict) and scoped.get('profiles',{}).get('collect-local-observed-v1') == ['follow_path'])
+                                or (name != 'collect_local' and self.REQUIRED_ACTIONS[name] <= negotiated_actions))
+                           and 'scoped-native-preflight/1' in features)
         known = isinstance(session.get('capability_context'), dict) and all(
             isinstance(session['capability_context'].get(k), str) for k in ('world_generation','dimension','player_uuid','action_session'))
         available = (not self._quarantined and session.get('state') in ('ready', 'busy') and known
@@ -97,6 +102,10 @@ class OwnerRuntimeBackend:
                                   'state-use-v1': {'use_item'}, 'block-menu-v1': {'interact_block'},
                                   'movement-flat-observed-v2': {'follow_path'}}[profile]:
                         output[action] = profile
+        if profiles.get('mining-local-observed-v2') == ['break_block']:
+            output['break_block'] = 'mining-local-observed-v2'
+        if profiles.get('combat-local-observed-v1') == ['combat_entity']:
+            output['combat_entity'] = 'combat-local-observed-v1'
         return output
 
     def _effect(self):
@@ -128,7 +137,10 @@ class OwnerRuntimeBackend:
             control = JobControl(context)
             self.runtime.required_execution_policy = expected_policy
             self._active = {'context': _public_context(context), 'control': control}
-            self.runtime.begin_job(control, scoped_profiles=self._profile_actions(description))
+            profiles = self._profile_actions(description)
+            if capability == 'collect_local':
+                profiles['follow_path'] = 'collect-local-observed-v1'
+            self.runtime.begin_job(control, scoped_profiles=profiles)
             begun = True
             self._active['owner_context'] = self.runtime.owner_context()
             supervisor = LocalSupervisor(control, policy)

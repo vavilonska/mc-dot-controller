@@ -1,4 +1,37 @@
-# Mainline integration: T13 observed movement
+# Mainline integration: scoped mining, collect and combat source
+
+This integration starts from published commit
+`9bfd430ee5b7667ae6a036e42df03b1c5d503bac`, preserving its earlier fixes.
+See [current evidence and capability boundaries](docs/MINING-COLLECT-COMBAT.md).
+
+- Mining source: accepted preview freeze
+  `983e40170b33dd4fd74adbc92d85d2adc297f4302891925ac8d8f15b690b6728`.
+- Collect source: accepted offline freeze
+  `c8630710c97f11f09809d5d6e79869af4fc8a731bb76adf1df58d957d8593fe0`.
+- Combat source: reviewed offline delta freeze
+  `9aba7055079fec2537698aa6360099b90e759bcea1b0523740afc225dcca9498`.
+- Shared merges were reviewed by both source owners. A confirmed standalone
+  collect null-serialization omission was fixed narrowly and covered with actual
+  Java-emitted bytes validated by the real Python consumers. Response limits are
+  unchanged. Main's adapter-copy and test portability fixes are preserved.
+- All 128 production Java sources compiled into 321 freshly verified classes
+  against pinned external dependencies, without a prior project JAR. Focused
+  native policy/codec, cross-language, broad Python and existing Node checks
+  passed; exact counts and the separately covered discovery skip are documented.
+- This is not a complete Gradle/NeoForge build or transformed-mixin validation.
+  Collect and combat remain offline-only; native combat functional and live
+  tests are NOT_RUN. Cross-action reactions remain stop-only.
+- T15/T16 mining functional/saved evidence is distinct from automation closure:
+  T15 missed its bound; T16's automatic marker path retained HOLD, with manual
+  completion in 145.707 seconds. Consult current evidence before interpreting
+  any mining result as full automation acceptance.
+- No artifact was deployed by this publication. Original worlds, paused tasks,
+  credentials and configuration are unchanged. No raw private runtime evidence,
+  worlds, binaries or dependencies are included.
+
+## Previous T13 checkpoint (historical)
+
+### T13 observed movement
 
 This source-only integration starts from main commit
 `27f3539a7ecd5adffe31d8b68611c7c054a1aa50` and preserves its prior adapter

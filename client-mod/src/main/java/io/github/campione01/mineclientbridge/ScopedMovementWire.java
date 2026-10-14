@@ -23,7 +23,9 @@ final class ScopedMovementWire {
                 ?null:result.getAsJsonObject(WITNESS);
         if(witness==null || !witness.has("profile") || !witness.get("profile").isJsonPrimitive()
                 || !witness.getAsJsonPrimitive("profile").isString()
-                || !witness.get("profile").getAsString().equals(ScopedFlatMovement.PROFILE))
+                || !(witness.get("profile").getAsString().equals(ScopedFlatMovement.PROFILE)
+                    || witness.get("profile").getAsString().equals(ScopedMining.PROFILE)
+                    || witness.get("profile").getAsString().equals(ScopedCollectTarget.PROFILE)))
             return coherent;
         require(!coherent.has(MARKER) && !result.has(REFERENCE));
         JsonObject ref=new JsonObject();ref.addProperty("schema_version",1);ref.addProperty("path",TARGET);
@@ -43,16 +45,18 @@ final class ScopedMovementWire {
 
     static JsonObject sizeDiagnostic(JsonObject action,int standalone,int capability,int limit) {
         JsonObject witness=action.getAsJsonObject("result").getAsJsonObject(WITNESS);
-        JsonObject movement=witness.getAsJsonObject("facts").getAsJsonObject("movement");
-        JsonObject entities=movement.getAsJsonObject("entity_guard");
-        JsonObject out=new JsonObject();out.addProperty("schema_version",1);
+        boolean mining=witness.get("profile").getAsString().equals(ScopedMining.PROFILE);
+        JsonObject footprint=witness.getAsJsonObject("facts").getAsJsonObject(mining?"mining":"movement");
+        JsonObject entities=footprint.getAsJsonObject("entity_guard");
+        JsonObject out=new JsonObject();out.addProperty("schema_version",mining?2:1);
+        if(mining)out.addProperty("profile",ScopedMining.PROFILE);
         out.addProperty("standalone_bytes",standalone);out.addProperty("capability_bytes",capability);
         out.addProperty("response_limit",limit);
         out.addProperty("standalone_reserve_bytes",ScopedEntityPolicy.TERMINAL_GROWTH_BYTES);
         out.addProperty("capability_reserve_bytes",3*ScopedEntityPolicy.TERMINAL_GROWTH_BYTES);
         out.addProperty("witness_bytes",fullBytes(witness));out.addProperty("entity_frame_bytes",fullBytes(entities));
         out.addProperty("enumerated_count",entities.get("enumerated_count").getAsInt());
-        out.addProperty("cell_count",movement.getAsJsonArray("cells").size());
+        out.addProperty("cell_count",footprint.getAsJsonArray("cells").size());
         return out;
     }
     private static void require(boolean condition){if(!condition)throw new ClientActionRequest.Rejected(409,"scoped_movement_wire_incoherent");}

@@ -28,6 +28,15 @@ final class ScopedEntityPolicy {
         "minecraft:boat","net.minecraft.world.entity.vehicle.Boat",
         "minecraft:chest_minecart","net.minecraft.world.entity.vehicle.MinecartChest",
         "minecraft:item","net.minecraft.world.entity.item.ItemEntity");
+    static final String PICKUP_RESTING_ENVELOPE="vanilla-grounded-item-v1";
+    static final double PICKUP_HORIZONTAL_SPEED=.003, PICKUP_MIN_VERTICAL=-.120000001, PICKUP_ANCHOR_DRIFT=.03;
+    /** Vanilla grounded item skips three moves while gravity accumulates; ordinary floor collision resets Y. */
+    static boolean restingPickupMotion(V v){return Math.hypot(v.x,v.z)<=PICKUP_HORIZONTAL_SPEED
+            && v.y>=PICKUP_MIN_VERTICAL && v.y<=0;}
+    static boolean restingPickupAnchor(V anchor,V now){return Math.abs(anchor.x-now.x)<=PICKUP_ANCHOR_DRIFT
+            && Math.abs(anchor.y-now.y)<=PICKUP_ANCHOR_DRIFT && Math.abs(anchor.z-now.z)<=PICKUP_ANCHOR_DRIFT
+            && Math.floor(anchor.x)==Math.floor(now.x) && Math.floor(anchor.y)==Math.floor(now.y)
+            && Math.floor(anchor.z)==Math.floor(now.z);}
     record V(double x,double y,double z) {
         V { require(finite(x,y,z),"scoped_movement_entity_nonfinite"); }
         JsonArray json(){return array(x,y,z);}
@@ -77,11 +86,15 @@ final class ScopedEntityPolicy {
             return j;
         }
     }
-    record Frame(long tick,long nano,int horizon,int selfCount,Box prism,List<Row> rows) {
+    record Frame(long tick,long nano,int horizon,int selfCount,Box prism,List<Row> rows,String pickupUuid) {
+        Frame(long tick,long nano,int horizon,int selfCount,Box prism,List<Row> rows){this(tick,nano,horizon,selfCount,prism,rows,null);}
         Frame {
             require(horizon>=0 && horizon<=MAX_TICKS && selfCount==1 && rows!=null && rows.size()+selfCount<=LIMIT,
                     "scoped_movement_entity_coverage_invalid");
             rows=List.copyOf(rows);
+            if(pickupUuid!=null)require(rows.stream().filter(r->pickupUuid.equals(r.uuid) && !r.removed
+                    && r.type.equals("minecraft:item") && restingPickupMotion(r.velocity)
+                    && r.position.equals(r.target)).count()==1,"scoped_collect_target_row_invalid");
             var ids=new HashSet<Integer>();var uuids=new HashSet<String>();Row previous=null;
             for(Row row:rows){
                 require(ids.add(row.id) && uuids.add(row.uuid),"scoped_movement_entity_duplicate_identity");
@@ -89,7 +102,8 @@ final class ScopedEntityPolicy {
                 if(!row.removed){
                     require(project(row.box,row.position,row.velocity,row.target,horizon).equals(row.projected),
                             "scoped_movement_entity_projection_changed");
-                    require(row.projected.separate(prism),"scoped_movement_entity_projected_corridor_conflict");
+                    require(row.uuid.equals(pickupUuid) && row.type.equals("minecraft:item")
+                            || row.projected.separate(prism),"scoped_movement_entity_projected_corridor_conflict");
                 }
                 previous=row;
             }
@@ -106,7 +120,9 @@ final class ScopedEntityPolicy {
             j.addProperty("live_other_count",rows.size()-removed);j.addProperty("removed_count",removed);j.addProperty("unsupported_count",0);
             j.addProperty("source_tick",tick);j.addProperty("source_nano",Long.toString(nano));
             j.addProperty("maximum_action_ticks",MAX_TICKS);j.addProperty("remaining_projection_ticks",horizon);
-            j.add("prism",prism.json());JsonArray a=new JsonArray();for(Row row:rows)a.add(row.json());j.add("rows",a);
+            j.add("prism",prism.json());JsonArray a=new JsonArray();for(Row row:rows){
+                JsonObject r=row.json();if(row.uuid.equals(pickupUuid))r.addProperty("verdict","pickup_target");a.add(r);
+            }j.add("rows",a);if(pickupUuid!=null)j.addProperty("permitted_pickup_uuid",pickupUuid);
             require(WIRE.toJson(j).getBytes(StandardCharsets.UTF_8).length<=MAX_FRAME_BYTES,
                     "scoped_movement_entity_evidence_too_large");
             return j;

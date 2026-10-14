@@ -80,6 +80,15 @@ final class IntegratedServerIdentity {static String value="server";static String
 final class WorldGeneration {static String value="world";static String current(Object l){return value;}}
 final class NavigationPositionGuard {static long value;static long epoch(){return value;}}
 final class BridgeServer {static boolean held;static boolean hasHeldInputs(){return held;}}
+// Deliberately unavailable branches: T13 dynamics cover ordinary movement only.
+// Actual collect/mining sources are separately compiled and checked natively.
+final class ScopedCollectTarget {
+ static final String PROFILE="collect-local-observed-v1";final String uuid=null;
+ ScopedCollectTarget(Minecraft mc,ClientActionRequest request){throw new AssertionError("Collect engine branch is outside synthetic T13 coverage");}
+ void assertCurrent(net.minecraft.client.multiplayer.ClientLevel level){throw new AssertionError("Collect engine branch is outside synthetic T13 coverage");}
+ JsonObject facts(){throw new AssertionError("Collect engine branch is outside synthetic T13 coverage");}
+}
+final class ScopedMining {static final String PROFILE="mining-local-observed-v2";}
 final class ScopedNativePreflight {static final long MAX_NANOS=250_000_000L;}
 final class EncounterRequest {static final String PAUSE_ON_TERMINAL="encounter_pause_on_terminal";}
 final class MovementBudget {static boolean budgetAction(String s){return false;}static void validate(ClientActionRequest r){}}

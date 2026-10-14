@@ -38,6 +38,13 @@ final class ScopedNativePreflight {
             (profile.equals("state-menu-v1") ? MENU : profile.equals("state-use-v1") ? USE : profile.equals(BlockMenuPreflight.PROFILE) ? Set.of("interact_block") : Set.of("follow_path")).stream().sorted().forEach(actions::add);
             profiles.add(profile, actions);
         }
+        if (ScopedMovementEntities.ready()) {
+            JsonArray collect=new JsonArray();collect.add("follow_path");profiles.add(ScopedCollectTarget.PROFILE,collect);
+        }
+        if (ScopedMiningDispatch.ready()) {
+            JsonArray mining=new JsonArray();mining.add("break_block");profiles.add(ScopedMining.PROFILE,mining);
+        }
+        if(ScopedCombatDispatch.ready()){JsonArray combat=new JsonArray();combat.add("combat_entity");profiles.add(ScopedCombat.PROFILE,combat);}
         out.add("profiles", profiles);
         JsonArray supported = new JsonArray();
         ClientActionRequest.ACTIONS.stream().sorted().forEach(supported::add);
@@ -58,7 +65,9 @@ final class ScopedNativePreflight {
         require((profile.equals("state-menu-v1") && MENU.contains(action))
                 || (profile.equals("state-use-v1") && USE.contains(action))
                 || (profile.equals(BlockMenuPreflight.PROFILE) && action.equals("interact_block"))
-                || (profile.equals(ScopedFlatMovement.PROFILE) && action.equals("follow_path")), "scoped_profile_unavailable_for_action");
+                || ((profile.equals(ScopedFlatMovement.PROFILE) || profile.equals(ScopedCollectTarget.PROFILE)) && action.equals("follow_path"))
+                || (profile.equals(ScopedCombat.PROFILE) && action.equals("combat_entity") && ScopedCombatDispatch.ready())
+                || (profile.equals(ScopedMining.PROFILE) && action.equals("break_block") && ScopedMiningDispatch.ready()), "scoped_profile_unavailable_for_action");
         require(ClientActionRequest.string(scope, "owner_id").matches("[0-9a-f]{32}"), "invalid_scoped_owner");
         require(ClientActionRequest.integer(scope, "owner_generation", -1) > 0, "invalid_scoped_owner_generation");
         require(ClientActionRequest.integer(scope, "defense_epoch", -1) >= 0, "invalid_scoped_defense_epoch");
@@ -66,6 +75,7 @@ final class ScopedNativePreflight {
         require(intent.has("capability_guard") && intent.get("capability_guard").isJsonObject(), "scoped_expected_guard_required");
         require(!intent.has("observation_clock") && !intent.has("observation_clock_profile"), "scoped_diagnostic_clock_forbidden");
         require(mc.player != null && mc.level != null && mc.gameMode != null && CapabilityGuard.privateSingleplayer(mc), "scoped_private_singleplayer_required");
+        if(profile.equals(ScopedCombat.PROFILE))ScopedCombat.validateIntent(intent);
         if (profile.equals(BlockMenuPreflight.PROFILE)) {
             require(ScopedBlockMenuDispatch.ready(), "block_menu_post_hook_fence_unavailable");
             BlockMenuPreflight.validateIntent(intent);
@@ -75,8 +85,12 @@ final class ScopedNativePreflight {
         intent.add("capability_guard", CapabilityGuard.observation(capture.tick, capture.nano));
         ClientActionRequest parsed = ClientActionRequest.parse(intent);
         capture.commandDigest = digest(parsed.original());
+        if(profile.equals(ScopedMining.PROFILE)) {
+            capture.mining=new ScopedMining(mc,parsed,capture.nano,capture.tick);
+            capture.facts.add("mining",capture.mining.facts());
+        }
         capture.recheck(mc);
-        if(capture.movement!=null) {
+        if(capture.movement!=null || capture.mining!=null) {
             capture.requireMovementResponseBudget(parsed);
             capture.recheck(mc); // All preview/state/slot hooks precede the unchanged final admission fences.
         }
@@ -96,6 +110,8 @@ final class ScopedNativePreflight {
         final Object blockMenuEntity;
         final BlockMenuRawState blockMenuRawState;
         final ScopedFlatMovement movement;
+        ScopedMining mining;
+        final ScopedCombat combat;
 
         Capture(Minecraft mc, JsonObject scope, JsonObject intent) {
             player = mc.player; level = mc.level; menu = player.containerMenu;
@@ -106,8 +122,11 @@ final class ScopedNativePreflight {
             this.scope = scope.deepCopy(); this.planningGuard = intent.getAsJsonObject("capability_guard").deepCopy();
             originalIntent = intent.deepCopy();
             submittedDigest = digest(intent);
-            movement = ScopedFlatMovement.PROFILE.equals(ClientActionRequest.string(scope, "profile"))
-                ? new ScopedFlatMovement(mc, ClientActionRequest.parse(intent), nano, tick) : null;
+            String profile=ClientActionRequest.string(scope,"profile");
+            movement = (ScopedFlatMovement.PROFILE.equals(profile) || ScopedCollectTarget.PROFILE.equals(profile))
+                ? new ScopedFlatMovement(mc, ClientActionRequest.parse(intent), nano, tick,ScopedCollectTarget.PROFILE.equals(profile)) : null;
+            combat=ScopedCombat.PROFILE.equals(ClientActionRequest.string(scope,"profile"))
+                ? new ScopedCombat(mc,ClientActionRequest.parse(intent),nano) : null;
             facts = captureFacts(mc);
             blockMenuEntity = blockMenu() ? mc.level.getBlockEntity(BlockMenuPreflight.target(originalIntent)) : null;
             blockMenuRawState = blockMenu() ? new BlockMenuRawState(mc, facts) : null;
@@ -121,7 +140,9 @@ final class ScopedNativePreflight {
             JsonObject block = blockMenu() ? BlockMenuPreflight.capture(mc, originalIntent) : null;
             JsonObject out = facts(mc);
             if (block != null) out.add("block_menu", block);
+            if(combat!=null)out.add("combat",combat.facts());
             if (movement != null) out.add("movement", movement.facts());
+            if (mining != null) out.add("mining", mining.facts());
             return out;
         }
 
@@ -148,7 +169,11 @@ final class ScopedNativePreflight {
                 require(actionId == null, "scoped_movement_admission_only");
                 movement.admissionRecheck(mc);
             }
+            if(combat!=null)combat.admission(mc);
+            if(mining!=null)mining.admissionBeforeFacts(mc);
             require(facts.equals(captureFacts(mc)), "scoped_profile_facts_changed");
+            if(mining!=null)mining.admissionAfterFacts(mc);
+            if(combat!=null)combat.admission(mc);
             // After generic permission hooks, only raw corridor/entity/pose/owner reads remain.
             if (movement != null) movement.admissionRawFence(mc);
             // Fact/slot/shape hooks are not assumed pure. Fence the original owner after them.

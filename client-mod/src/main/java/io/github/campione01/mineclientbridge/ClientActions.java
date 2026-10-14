@@ -52,6 +52,8 @@ final class ClientActions {
         boolean scopedPacketPending;
         BlockHitResult scopedPacketHit;
         ScopedFlatMovement scopedMovement;
+        ScopedMining scopedMining;
+        ScopedCombat scopedCombat;
         boolean useHeld;
         boolean left, right;
         Input input;
@@ -214,6 +216,10 @@ final class ClientActions {
             active.entry.result.add("scoped_native_preflight", scoped.witness(request.id()));
             active.scopedMovement = scoped.movement;
             if (active.scopedMovement != null) active.scopedMovement.activate(active.entry);
+            active.scopedCombat=scoped.combat;
+            if(active.scopedCombat!=null){active.scopedCombat.activate(active.entry);active.combat.bindScoped(active.scopedCombat);}
+            active.scopedMining=scoped.mining;
+            if(active.scopedMining!=null)active.scopedMining.activate(active.entry);
         }
         if (scoped != null && scoped.blockMenu()) {
             active.scopedBlockMenu = scoped; active.entry.result.addProperty("dispatched", false);
@@ -314,6 +320,14 @@ final class ClientActions {
     }
 
     private static boolean context(Minecraft mc,String phase) {
+        RuntimeAction a=active;
+        try{return contextChecked(mc,phase);}
+        catch(RuntimeException failure){
+            if(a!=null && a.scopedMining!=null){scopedMiningUnknown(a.scopedMining,"mining_context_hook_failed");return false;}
+            throw failure;
+        }
+    }
+    private static boolean contextChecked(Minecraft mc,String phase) {
         if (active == null) return false;
         RuntimeAction enteredOwner = active;
         String budgetProblem=MovementBudget.problem(mc);
@@ -332,7 +346,7 @@ final class ClientActions {
         if(enteredOwner.capabilityGuard!=null) {
             String denied=enteredOwner.capabilityGuard.check(mc,enteredOwner.dispatched);
             if(active!=enteredOwner)return false;
-            if(denied!=null){finish("cancelled",denied);return false;}
+            if(denied!=null && !(enteredOwner.scopedCombat!=null && denied.equals("capability_health_guard"))){finish("cancelled",denied);return false;}
         }
         NavigationPositionGuard.observe(mc);
         if (active != enteredOwner) return false;
@@ -384,6 +398,7 @@ final class ClientActions {
         MovementBudget.preTick(mc);
         NavigationPositionGuard.tick(mc);
         if (!context(mc,"pre_tick")) return;
+        RuntimeAction entered=active;
         try {
             RuntimeAction a = active;
             a.entry.ticks++;
@@ -424,6 +439,7 @@ final class ClientActions {
                 }
                 case "combat_entity" -> {
                     BoundedCombat.Step step = a.combat.tick(mc, a.entry.ticks);
+                    if(active!=a)return; // A native hook may cancel or replace this exact owner.
                     a.entry.result.addProperty("phase", step.reason());
                     JsonObject phases = a.entry.result.getAsJsonObject("phase_ticks");
                     phases.addProperty(step.reason(), phases.has(step.reason()) ? phases.get(step.reason()).getAsInt()+1 : 1);
@@ -432,7 +448,7 @@ final class ClientActions {
                 }
             }
         } catch (RuntimeException failure) {
-            failException(failure);
+            if(active==entered)failException(failure);
         }
     }
 
@@ -449,6 +465,13 @@ final class ClientActions {
             } catch (RuntimeException failure) { if (active == a) failException(failure); return; }
         }
         Input input = event.getInput();
+        if(a.scopedCombat!=null){
+            try {ScopedCombat.require(ScopedFlatMovement.neutral(input),"scoped_combat_external_movement_input");
+                a.scopedCombat.check(Minecraft.getInstance(),false);a.combat.beforeScopedMovement(Minecraft.getInstance(),a.forward);
+                if(active!=a)return; a.scopedCombat.check(Minecraft.getInstance(),false);
+                if(input!=a.player.input || event.getInput()!=input || !ScopedFlatMovement.neutral(input))throw new ClientActionRequest.Rejected(409,"scoped_combat_input_identity_changed");
+            } catch(RuntimeException failed){if(active==a)finish("cancelled","scoped_combat_movement_revalidation_failed");return;}
+        }
         if(a.scopedMovement!=null) {
             try {
                 if(input!=a.player.input || !ScopedFlatMovement.neutral(input))
@@ -459,6 +482,15 @@ final class ClientActions {
                     throw new ClientActionRequest.Rejected(409,"scoped_movement_input_changed_after_hooks");
                 a.dispatched=true; a.scopedMovement.markAttempted();
             } catch(RuntimeException failed) { if(active==a)finish("cancelled",ScopedFlatMovement.rejection(failed));return; }
+        }
+        if(a.scopedMining!=null) {
+            ScopedMining guard=a.scopedMining;
+            try {
+                if(input!=a.player.input || !ScopedMining.neutral(input))throw new ScopedMining.Refused("mining_input_identity_or_neutrality_changed");
+                guard.check(Minecraft.getInstance(),true,!guard.targetAir());
+                if(active!=a || event.getInput()!=input || input!=a.player.input || !ScopedMining.neutral(input))
+                    throw new ScopedMining.Refused("mining_input_changed_after_hooks");
+            } catch(RuntimeException failure){scopedMiningUnknown(guard,"mining_input_context_unconfirmed");return;}
         }
         a.input = input;
         input.forwardImpulse = a.forward;
@@ -624,7 +656,48 @@ final class ClientActions {
         a.entry.result.addProperty("environment_waiting_for_route", a.recoveryStalled || a.waypoint >= points.size());
     }
 
+    static boolean ownsScopedCombat(ScopedCombat guard,ActionRegistry.Entry entry){return active!=null && active.scopedCombat==guard
+        && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
+    static ScopedCombat scopedCombat(BoundedCombat combat){return active!=null && active.combat==combat?active.scopedCombat:null;}
+    static boolean ownsCombat(BoundedCombat combat){return active!=null && active.combat==combat;}
+    static ScopedMining scopedMining(){return active==null?null:active.scopedMining;}
+    static boolean ownsScopedMining(ScopedMining g,ActionRegistry.Entry entry){return active!=null && active.scopedMining==g && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
+    static boolean ownsScopedMining(ScopedMining g){return active!=null && active.scopedMining==g;}
+    static void scopedMiningUnknown(ScopedMining g,String reason){
+        g.markUnknown();
+        if(ownsScopedMining(g)){active.entry.result.addProperty("unknown_outcome",true);finish("failed",reason);}
+    }
+    static void scopedMiningRemoved(ScopedMining g){
+        if(!ownsScopedMining(g))return;
+        if(!g.removalAdmissible()){scopedMiningUnknown(g,"mining_target_absent_before_attempt");return;}
+        try {g.check(Minecraft.getInstance(),true,false);}
+        catch(RuntimeException failure){scopedMiningUnknown(g,"mining_removal_context_unconfirmed");return;}
+        active.entry.result.addProperty("observed_block","minecraft:air");finish("succeeded","block_broken_observed");
+    }
+    private static void mineScoped(Minecraft mc,RuntimeAction a) {
+        ScopedMining g=a.scopedMining;
+        try {
+            if(g.targetAir()){scopedMiningRemoved(g);return;}
+            g.check(mc,false,false);
+            // Aim and renderer/mod callbacks may act; certainty is latched before the first one.
+            g.markAttempted();a.entry.result.addProperty("effect_attempted",true);
+            BlockHitResult hit=aimMiningTarget(mc,g.target,g);
+            if(hit==null)throw new ScopedMining.Refused("mining_target_not_visible_or_reachable");
+            if(active!=a)throw new ScopedMining.Refused("mining_owner_changed_after_aim");
+            if(!capabilityDispatchCheck(mc,a))return;
+            if(!mc.mouseHandler.isMouseGrabbed())mc.mouseHandler.grabMouse();
+            g.check(mc,false,true);
+            boolean first=!a.dispatched;a.dispatched=true;a.entry.result.addProperty("dispatched",true);
+            a.attackHeld=true;mc.options.keyAttack.setDown(true);
+            if(first)ScopedMiningDispatch.attack(g,mc::startAttack);
+            if(active!=a)return;
+            g.check(mc,true,!g.targetAir());
+            if(g.targetAir()){scopedMiningRemoved(g);return;}
+            a.entry.result.addProperty("destroy_stage",mc.gameMode.getDestroyStage());
+        } catch(RuntimeException failure){scopedMiningUnknown(g,failure instanceof ScopedMining.Refused?failure.getMessage():"mining_check_failed");}
+    }
     private static void mine(Minecraft mc, RuntimeAction a) {
+        if(a.scopedMining!=null){mineScoped(mc,a);return;}
         BlockPos pos = pos(a.entry.request.target());
         if (!mc.level.hasChunkAt(pos)) { finish("failed", "chunk_not_loaded"); return; }
         if (mc.level.getBlockState(pos).isAir()) { finish("succeeded", "block_absent"); return; }
@@ -652,27 +725,44 @@ final class ClientActions {
         a.entry.result.addProperty("destroy_stage", mc.gameMode.getDestroyStage());
     }
 
-    private static BlockHitResult aimMiningTarget(Minecraft mc, BlockPos pos) {
+    private static BlockHitResult aimMiningTarget(Minecraft mc, BlockPos pos) {return aimMiningTarget(mc,pos,null);}
+    private static BlockHitResult aimMiningTarget(Minecraft mc, BlockPos pos,ScopedMining guard) {
         Vec3 center = Vec3.atCenterOf(pos);
-        aim(mc, center);
+        aimMiningPoint(mc, center,guard);
         BlockHitResult hit = pick(mc, pos, null);
         if (hit != null) return hit; // Preserve the existing fast path.
         Vec3 eye = mc.player.getEyePosition();
         for (MiningAimPoints.Point point : MiningAimPoints.facingFaces(
                 pos.getX(), pos.getY(), pos.getZ(), eye.x, eye.y, eye.z)) {
-            aim(mc, new Vec3(point.x(), point.y(), point.z()));
+            aimMiningPoint(mc, new Vec3(point.x(), point.y(), point.z()),guard);
             // Candidate coordinates never authorize mining: real picking must hit the
             // same block within ordinary reach, with intervening blocks/entities intact.
             hit = pick(mc, pos, null);
             if (hit != null) return hit;
         }
         // All candidates were occluded/out of range. Keep the old failed-action view.
-        aim(mc, center);
+        aimMiningPoint(mc, center,guard);
         pick(mc, pos, null);
         return null;
     }
 
+    private static void aimMiningPoint(Minecraft mc,Vec3 point,ScopedMining guard) {
+        if(guard==null){aim(mc,point);return;}
+        Vec3 d=point.subtract(mc.player.getEyePosition());
+        float yaw=(float)Math.toDegrees(Math.atan2(-d.x,d.z));
+        float pitch=(float)-Math.toDegrees(Math.atan2(d.y,Math.hypot(d.x,d.z)));
+        guard.check(mc,false,false);mc.player.setYRot(yaw);
+        guard.check(mc,false,false);mc.player.setXRot(Math.max(-90,Math.min(90,pitch)));
+        guard.check(mc,false,false);mc.player.setYHeadRot(yaw);
+        guard.check(mc,false,false);
+    }
     private static void observeBreak(Minecraft mc, RuntimeAction a) {
+        if(a.scopedMining!=null){
+            try {a.scopedMining.check(mc,true,!a.scopedMining.targetAir());
+                if(a.scopedMining.targetAir())scopedMiningRemoved(a.scopedMining);
+            } catch(RuntimeException failure){scopedMiningUnknown(a.scopedMining,"mining_post_tick_unconfirmed");}
+            return;
+        }
         BlockPos pos = pos(a.entry.request.target());
         if (mc.level.getBlockState(pos).isAir()) {
             a.entry.result.addProperty("observed_block", "minecraft:air");
@@ -1011,6 +1101,9 @@ final class ClientActions {
     private static void finish(String status, String reason) {
         RuntimeAction a = active;
         if (a == null) return;
+        if(a.scopedMining!=null && !status.equals("succeeded") && !reason.equals("cancel_requested")) {
+            a.scopedMining.markUnknown();a.entry.result.addProperty("unknown_outcome",true);
+        }
         active = null;
         boolean pathAction = a.entry.request.action().equals("follow_path");
         boolean discontinuityCleanup = reason.equals("position_discontinuity_rebind_required");
@@ -1031,7 +1124,10 @@ final class ClientActions {
             Minecraft mc = Minecraft.getInstance();
             if (discontinuityCleanup || a.capabilityGuard!=null) {
                 attackReleased = releaseDiscontinuousAttack(() -> mc.options.keyAttack.setDown(false),
-                        () -> { if (mc.gameMode != null) mc.gameMode.stopDestroyBlock(); });
+                        () -> { if (mc.gameMode != null) {
+                            if(a.scopedMining!=null)ScopedMiningDispatch.cleanup(a.scopedMining,mc.gameMode::stopDestroyBlock);
+                            else mc.gameMode.stopDestroyBlock();
+                        } });
             } else {
                 // Existing non-discontinuity ordering/errors remain unchanged.
                 mc.options.keyAttack.setDown(false);
@@ -1068,6 +1164,13 @@ final class ClientActions {
                 catch(RuntimeException rejected){MovementBudget.interrupt("movement_budget_seal_failed");status="failed";reason="movement_budget_seal_failed";}
             }
             a.entry.result.add("movement_budget",MovementBudget.snapshot());
+            if(a.scopedMining!=null) {
+                Minecraft mc=Minecraft.getInstance();
+                released &= ScopedMining.neutral(a.input) && ScopedMining.neutral(a.player.input)
+                    && !mc.options.keyAttack.isDown() && !ScopedMining.otherKeys(mc) && !BridgeServer.hasHeldInputs();
+                a.entry.result.add("mining",a.scopedMining.terminal(released,status.equals("succeeded")
+                    && a.entry.result.has("observed_block") && a.entry.result.get("observed_block").getAsString().equals("minecraft:air")));
+            }
             ACTIONS.finishAfterCleanup(status, reason, released);
             if (a.combat != null)
                 EncounterTerminalPause.afterTerminal(a.entry, ACTIONS.session, BridgeServer::pauseEncounterTerminalOnGameThread);

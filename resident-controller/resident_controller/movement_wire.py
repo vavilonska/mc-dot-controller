@@ -64,7 +64,7 @@ def decode(bundle):
     result = action['result']
     authority = result.get(WITNESS)
     require(REFERENCE not in result and type(authority) is dict, 'authority_missing_or_chained')
-    require(authority.get('profile') == 'movement-flat-observed-v2'
+    require(authority.get('profile') in ('movement-flat-observed-v2','mining-local-observed-v2','collect-local-observed-v1')
             and authority.get('version') == 'scoped-native-preflight/1'
             and type(authority.get('schema_version')) is int and authority['schema_version'] == 1
             and authority.get('coverage_complete') is True and authority.get('admitted') is True
@@ -154,13 +154,17 @@ def valid_size_diagnostic(value):
     keys = {'schema_version', 'standalone_bytes', 'capability_bytes', 'response_limit',
             'standalone_reserve_bytes', 'capability_reserve_bytes', 'witness_bytes',
             'entity_frame_bytes', 'enumerated_count', 'cell_count'}
-    if type(value) is not dict or set(value) != keys:
+    if type(value) is not dict:
         return False
-    if not all(type(v) is int and 0 <= v <= 2147483647 for v in value.values()):
+    mining = value.get('schema_version') == 2 and value.get('profile') == 'mining-local-observed-v2'
+    if set(value) != (keys | {'profile'} if mining else keys):
         return False
-    return (value['schema_version'] == 1 and value['response_limit'] == WIRE_LIMIT
+    if not all(type(value[k]) is int and 0 <= value[k] <= 2147483647 for k in keys):
+        return False
+    return (value['schema_version'] == (2 if mining else 1) and value['response_limit'] == WIRE_LIMIT
             and value['standalone_reserve_bytes'] == 8192 and value['capability_reserve_bytes'] == 24576
-            and value['cell_count'] == 150 and 1 <= value['enumerated_count'] <= 1024
+            and (1 <= value['cell_count'] <= 512 if mining else value['cell_count'] == 150)
+            and 1 <= value['enumerated_count'] <= 1024
             and value['entity_frame_bytes'] <= 192 * 1024
             and value['entity_frame_bytes'] <= value['witness_bytes'] <= value['standalone_bytes']
             and (value['standalone_bytes'] > WIRE_LIMIT - 8192

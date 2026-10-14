@@ -30,6 +30,11 @@ final class CapabilityItemBinding {
         ItemStack captured=ITEMS.get(ClientActionRequest.string(expected,"item_fingerprint"));
         return captured!=null && same(captured,actual);
     }
+    static boolean matchesComponents(JsonObject expected,ItemStack actual) {
+        if(expected==null || !expected.has("component_fingerprint")) return false;
+        ItemStack captured=ITEMS.get(ClientActionRequest.string(expected,"component_fingerprint"));
+        return captured!=null && ItemStack.isSameItemSameComponents(captured,actual);
+    }
     static boolean same(ItemStack a,ItemStack b) {
         return a.getCount()==b.getCount() && ItemStack.isSameItemSameComponents(a,b);
     }

@@ -394,8 +394,13 @@ public final class BridgeServer {
             int one=BridgeJson.toJson(standalone).getBytes(StandardCharsets.UTF_8).length;
             int three=BridgeJson.toJson(bundle).getBytes(StandardCharsets.UTF_8).length;
             try {ScopedEntityPolicy.requireResponseSizes(one,three,MAX_JSON_BYTES);}
-            catch(IllegalArgumentException oversized){throw new ClientActionRequest.Rejected(409,oversized.getMessage(),null,
-                    ScopedMovementWire.sizeDiagnostic(proposedAction,one,three,MAX_JSON_BYTES));}
+            catch(IllegalArgumentException oversized){
+                // Diagnostic rendering must never erase an already known size refusal.
+                JsonObject diagnostic=null;
+                try {diagnostic=ScopedMovementWire.sizeDiagnostic(proposedAction,one,three,MAX_JSON_BYTES);}
+                catch(RuntimeException unavailable) { /* Preserve the original refusal even if diagnostics are unavailable. */ }
+                throw new ClientActionRequest.Rejected(409,oversized.getMessage(),null,diagnostic);
+            }
         } catch(ClientActionRequest.Rejected known){throw known;}
         catch(Exception unknown){throw new ClientActionRequest.Rejected(409,"scoped_movement_response_preview_failed");}
     }

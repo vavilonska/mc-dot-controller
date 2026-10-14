@@ -34,6 +34,8 @@ final class ScopedFlatMovement {
     final long sourceNano, sourceTick, deadline;
     final JsonObject footprint;
     private final ClientActionRequest request;
+    private final ScopedCollectTarget pickup;
+    private final String profile;
     private final float initialHealth;
     private final Pose admissionPose;
     private final ScopedMovementEntities admissionEntities;
@@ -47,7 +49,13 @@ final class ScopedFlatMovement {
     private int checks;
 
     ScopedFlatMovement(Minecraft mc, ClientActionRequest request, long sourceNano, long sourceTick) {
+        this(mc,request,sourceNano,sourceTick,false);
+    }
+    ScopedFlatMovement(Minecraft mc, ClientActionRequest request, long sourceNano, long sourceTick,boolean collecting) {
         this.request=request;this.sourceNano=sourceNano;this.sourceTick=sourceTick;
+        profile=collecting?ScopedCollectTarget.PROFILE:PROFILE;
+        require(collecting==request.original().has("pickup_target"),"scoped_collect_profile_required");
+        pickup=collecting?new ScopedCollectTarget(mc,request):null;
         player=mc.player;level=mc.level;server=mc.getSingleplayerServer();session=ClientActions.session();
         serverIdentity=IntegratedServerIdentity.current(server,CapabilityGuard.privateSingleplayer(mc));
         worldGeneration=WorldGeneration.current(level);playerUuid=player.getUUID().toString();navigationEpoch=NavigationPositionGuard.epoch();
@@ -69,7 +77,7 @@ final class ScopedFlatMovement {
         initialHealth=player.getHealth();deadline=sourceNano+request.timeoutMs()*1_000_000L;
         sampleX=player.getX();sampleZ=player.getZ();
         // Admission has no Entry yet; its action age is explicitly zero.
-        admissionEntities=ScopedMovementEntities.capture(level,player,bounds,0);
+        admissionEntities=ScopedMovementEntities.capture(level,player,bounds,0,pickup);
         lastEntityTick=admissionEntities.frame.tick();lastEntityNano=admissionEntities.frame.nano();
         maximumCheckedPopulation=admissionEntities.frame.population();
         Pose pose=environment(mc,true);
@@ -98,7 +106,7 @@ final class ScopedFlatMovement {
         return ticks;
     }
     JsonObject facts(){
-        try {JsonObject out=footprint.deepCopy();out.add("entity_guard",admissionEntities.frame.json());return out;}
+        try {JsonObject out=footprint.deepCopy();out.add("entity_guard",admissionEntities.frame.json());if(pickup!=null)out.add("pickup_target",pickup.facts());return out;}
         catch(IllegalArgumentException invalid){throw new ClientActionRequest.Rejected(409,invalid.getMessage());}
     }
     void admissionRecheck(Minecraft mc) {
@@ -119,7 +127,7 @@ final class ScopedFlatMovement {
     void beforeEffect(Minecraft mc) {
         long began=System.nanoTime();
         int actionTicks=actionTicks();
-        ScopedMovementEntities entities=ScopedMovementEntities.capture(level,player,bounds,actionTicks);
+        ScopedMovementEntities entities=ScopedMovementEntities.capture(level,player,bounds,actionTicks,pickup);
         Pose pose=environment(mc,false);
         require(footprint.equals(terrain(mc)),"scoped_movement_footprint_changed");
         require(pose.equals(environment(mc,false)),"scoped_movement_facts_changed_after_hooks");
@@ -159,7 +167,7 @@ final class ScopedFlatMovement {
     }
     private JsonObject terrain(Minecraft mc) {
         JsonObject out=new JsonObject();
-        out.addProperty("profile",PROFILE);out.addProperty("source","native-client-loaded-level");
+        out.addProperty("profile",profile);out.addProperty("source","native-client-loaded-level");
         out.addProperty("min_x",bounds.minX());out.addProperty("max_x",bounds.maxX());
         out.addProperty("min_y",bounds.minY());out.addProperty("max_y",bounds.maxY());
         out.addProperty("min_z",bounds.minZ());out.addProperty("max_z",bounds.maxZ());
@@ -206,6 +214,7 @@ final class ScopedFlatMovement {
     }
     /** Final hook-free field/identity/time fence, immediately preceding a direct view/input write. */
     private void fence(Minecraft mc,Pose p,boolean owned,int actionTicks) {
+        if(pickup!=null)pickup.assertCurrent(level);
         long now=System.nanoTime();var v=player.getDeltaMovement();
         require(mc.isSameThread() && mc.player==player && mc.level==level && mc.gameMode!=null
                 && mc.getSingleplayerServer()==server && CapabilityGuard.privateSingleplayer(mc)
@@ -251,7 +260,7 @@ final class ScopedFlatMovement {
     static boolean neutral(Input input){return input==null || input.forwardImpulse==0 && input.leftImpulse==0
             && !input.up && !input.down && !input.left && !input.right && !input.jumping && !input.shiftKeyDown;}
     JsonObject terminal(boolean neutral) {
-        JsonObject out=new JsonObject();out.addProperty("profile",PROFILE);out.addProperty("effect_attempted",attempted);
+        JsonObject out=new JsonObject();out.addProperty("profile",profile);out.addProperty("effect_attempted",attempted);
         out.addProperty("local_checks",checks);out.addProperty("sampled_distance",sampledDistance);
         out.addProperty("distance_accounting","callback-sampled-not-all-move-instrumentation");
         out.addProperty("input_neutral",neutral);out.addProperty("velocity_stopped_proven",false);

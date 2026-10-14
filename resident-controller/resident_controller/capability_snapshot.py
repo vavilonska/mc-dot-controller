@@ -174,10 +174,10 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
              and _integer(value.get('defense_epoch')) and _integer(value.get('owner_generation'), 1)
              and value.get('action_id') == action_id and value.get('action_session') == native.get('action_session'),
              'scoped_owner_identity')
-    _require(value.get('profile') in ('state-menu-v1', 'state-use-v1', 'block-menu-v1', 'movement-flat-observed-v2')
+    _require(value.get('profile') in ('state-menu-v1', 'state-use-v1', 'block-menu-v1', 'movement-flat-observed-v2', 'mining-local-observed-v2', 'collect-local-observed-v1', 'combat-local-observed-v1')
              and native_intent.get('action') in {'state-menu-v1': {'click_slot','close_menu','select_hotbar'},
                  'state-use-v1': {'use_item'}, 'block-menu-v1': {'interact_block'},
-                 'movement-flat-observed-v2': {'follow_path'}}[value['profile']]
+                 'movement-flat-observed-v2': {'follow_path'}, 'collect-local-observed-v1': {'follow_path'}, 'mining-local-observed-v2': {'break_block'}, 'combat-local-observed-v1': {'combat_entity'}}[value['profile']]
              and value.get('coverage_complete') is True and value.get('admitted') is True
              and value.get('clock_domain') == 'native-system-nanotime'
              and _integer(value.get('source_tick')) and _integer(value.get('native_owner_revision'))
@@ -264,21 +264,28 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
     if value['profile'] == 'block-menu-v1':
         from .block_menu_snapshot import validate
         validate(value, native, native_intent)
-    if value['profile'] == 'movement-flat-observed-v2':
+    if value['profile'] in ('movement-flat-observed-v2','collect-local-observed-v1'):
         validate_movement_footprint(facts, value, native_intent)
+    if value['profile'] == 'mining-local-observed-v2':
+        from .mining_snapshot import validate_mining
+        validate_mining(value, native_intent, native)
+    if value['profile'] == 'combat-local-observed-v1':
+        from .combat_snapshot import validate_combat
+        validate_combat(value, native_intent, native)
     return value
 
 
 def validate_movement_footprint(facts, witness, intent):
     """Complete finite footprint validation; verifies attestation, not engine geometry itself."""
     m = facts.get('movement')
+    collecting = witness.get('profile') == 'collect-local-observed-v1'
     origin = intent.get('expected_origin', {})
     points = intent.get('waypoints')
-    _require(type(m) is dict and set(m) == {'profile','source','min_x','max_x','min_y','max_y',
+    _require(type(m) is dict and set(m) == ({'pickup_target'} if collecting else set()) | {'profile','source','min_x','max_x','min_y','max_y',
                  'min_z','max_z','feet_y','steps','halo','expected_cells','all_loaded','closed_inventory',
                  'survival','using_item','maximum_horizontal_speed','maximum_tick_sampled_displacement',
                  'deadline_nano','cells','entity_guard'}
-             and m.get('profile') == 'movement-flat-observed-v2'
+             and m.get('profile') == ('collect-local-observed-v1' if collecting else 'movement-flat-observed-v2')
              and m.get('source') == 'native-client-loaded-level'
              and facts['context']['dimension'] == 'minecraft:overworld'
              and facts.get('screen_class') == '' and facts.get('using_item') is False
@@ -330,6 +337,11 @@ def validate_movement_footprint(facts, witness, intent):
                  and (cell.get('id') in floors and .5999999<=cell['friction']<=.6000001 if floor
                       else cell.get('id') in ('minecraft:air','minecraft:cave_air') and cell['friction']==0),
                  'movement_cell_geometry')
+    if collecting:
+        from .collect_snapshot import validate_pickup
+        validate_pickup(m, witness, intent)
+    else:
+        _require('pickup_target' not in intent, 'collect_requires_distinct_profile')
     validate_movement_entity_guard(m['entity_guard'], m, witness)
 
 
@@ -356,7 +368,11 @@ def validate_movement_entity_guard(guard, movement, witness):
             'server_confirmed','entity_limit','enumerated_count','self_count','live_other_count',
             'removed_count','unsupported_count','source_tick','source_nano','maximum_action_ticks',
             'remaining_projection_ticks','prism','rows'}
+    pickup = movement.get('pickup_target') if witness.get('profile') == 'collect-local-observed-v1' else None
+    if pickup is not None: keys.add('permitted_pickup_uuid')
     _require(type(guard) is dict and set(guard) == keys, 'movement_entity_guard_schema')
+    if pickup is not None:
+        _require(guard.get('permitted_pickup_uuid') == pickup['uuid'], 'collect_guard_target_mismatch')
     _require(type(guard['schema_version']) is int and guard['schema_version'] == 1
              and guard['policy'] == 'observed-projection-v1'
              and guard['source'] == 'native-client-loaded-level'
@@ -408,7 +424,7 @@ def validate_movement_entity_guard(guard, movement, witness):
             removed_count += 1
             continue
         allowed = _MOVEMENT_ENTITY_TYPES.get(row['type'])
-        _require(allowed is not None and row['class'] == allowed[0] and row['verdict'] == 'outside',
+        _require(allowed is not None and row['class'] == allowed[0] and row['verdict'] == ('pickup_target' if pickup is not None and row['uuid'] == pickup['uuid'] else 'outside'),
                  'movement_entity_unsupported')
         flags = row['flags']
         _require(type(flags) is dict and set(flags) == flag_keys
@@ -437,7 +453,13 @@ def validate_movement_entity_guard(guard, movement, witness):
             projected[i], projected[i+3] = min(lows), max(highs)
         _require(all(a == b for a, b in zip(row['projected_aabb'], projected)),
                  'movement_entity_projection_mismatch')
-        _require(any(projected[i+3] < prism[i] or projected[i] > prism[i+3] for i in range(3)),
+        is_pickup = pickup is not None and row['uuid'] == pickup['uuid']
+        _require(not is_pickup or row['type'] == 'minecraft:item' and row['id'] == pickup['entity_id'],
+                 'collect_guard_target_identity')
+        _require(is_pickup or any(projected[i+3] < prism[i] or projected[i] > prism[i+3] for i in range(3)),
                  'movement_entity_projection_intersects')
+    if pickup is not None:
+        _require(sum(r['uuid'] == pickup['uuid'] and r['removed'] is False for r in rows) == 1,
+                 'collect_guard_target_missing')
     _require(order == sorted(order) and removed_count == guard['removed_count']
              and len(rows) - removed_count == guard['live_other_count'], 'movement_entity_row_coverage')

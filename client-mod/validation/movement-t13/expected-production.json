@@ -1,13 +1,170 @@
 {
-  "schema": "mdc.movement-t13-production/1",
+  "schema": "mdc.combined-native-production/1",
+  "scope": "All production Java including combined mining, collect and combat. Input review is explicit; runner never updates these pins.",
   "sources": [
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ActionRegistry.java",
+      "sha256": "def0e49e2c57923c352d447a09e0b25ef01dd7699f5111fcd84434a48d77b6f3"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/AimViewGuard.java",
+      "sha256": "549a61861cf091cb4ac5849b05281e29b4c64b25746048a7dc3bef5f27156071"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BlazeShieldPolicy.java",
+      "sha256": "40daab176c0c8f4d4e7e763f134f50d27f2b206979db46dba91dfbce559aed35"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BlockMenuPreflight.java",
+      "sha256": "58062d87b6e2eb450b604fcc2934a5ff5af88d7ce32c920d6233b8cb4706fcca"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatCollision.java",
+      "sha256": "d647101b8f6a7610f6aea9adfc4f95b74a9282c8475bf0c942c2cea510189a89"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatCorridor.java",
+      "sha256": "d94ad02e3a77637538796502d80ed46a7ffbf85213e87b79f44a3b2ab39e2a3b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatDriveGuard.java",
+      "sha256": "052769cdbd6e1910558ca7d4343635c30def916c17c87447e13c37af0acd7838"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatDriveRequest.java",
+      "sha256": "54bad5206e3d5da7906ea6008db5878a1a661fddb09de24f5f862591e8470323"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatInputRelease.java",
+      "sha256": "b54cfeeda7985360d5671f0d40e5885f49f2b9f8ceaf7dfddd37b33cec7e8b15"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatObservation.java",
+      "sha256": "152a118a49c01e2e8e851d7e2805090a7aa89891d21dfcfde09f467fadc0460a"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatPassengerEnvelope.java",
+      "sha256": "bcc100be8f34d0c563fd81d8bbf0cac8a52fdd0a5da373ea69a4150c1b7221ef"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatSteering.java",
+      "sha256": "2b79d58aecf40a1b1fdbeb7990f7bd1a9ae9fd6eefb637d9ca99d597a991a6be"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatTransferProgress.java",
+      "sha256": "6dff8d04382a94b7da0c5f12ec400d7e68779876fc2e301276ece5d36a69cb34"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatTransferRequest.java",
+      "sha256": "f38666ccf1d0e951140a25206dc72c6fe5360b03812fdaca89cb5b41794f9f01"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedBoatDrive.java",
+      "sha256": "de0af9c3328a7816872e7cd105d2d59c41c79db556d0bf4a4472d4f34c65d023"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedBoatTransfer.java",
+      "sha256": "ccf3f9323772fff19e9abcbabae2850bf2f314c952a8acb065c8c2884cb8f070"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombat.java",
+      "sha256": "bbe08a92fdcaab0e41f680899ed1a81ef9891b5634d9d4fc4854c5e357f1e9d3"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombatRequest.java",
+      "sha256": "2e6568288f66d838caba9a125c90cba0fcfac53ff04cb1d2a823a12cc00e31b7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedContainerSnapshot.java",
+      "sha256": "153804a07051d7e2876dddb6af82eaa328e2056feaa0ee437378abf6f3ef4d79"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedEncounter.java",
+      "sha256": "a65538b7909281b37f432e5f57c87278aab4acb552e303f2f92a23df4255fc98"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeConfig.java",
+      "sha256": "e166da6ce1d4b1ca511d9713d5c1ccf547d707e2ab2d516297af52ef7f218af0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeConfigStore.java",
+      "sha256": "80ea762436c52796523785ec1802b1015d09b98b7317e888ec06581fa121ecb2"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
+      "sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeLog.java",
+      "sha256": "cbb264b87a9149c2e4a83a243a3ecd11b9de7db2c6fa3fa663c6176465ab5176"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeReadTiming.java",
+      "sha256": "d2f7b1d57c68aca8e3047f460c16f3722171e9ac4c2f081352592001e2323191"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeSecurity.java",
+      "sha256": "9fe4e923efa76c2969adc80e6412b7041eac358cce8027a4599dc80af7fa2d7f"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
-      "sha256": "972550072b05b2bc4a7cc07667061a787697c808dcae027c8891c692f1013304"
+      "sha256": "ae49e2030c5c1d84cd7e062a849351cee1b401916a63a127f91cbd4917f66bed"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityCombatSafety.java",
+      "sha256": "2f6ceda07a377cc38ffd800262caeeb2c1b9f94fc97b7e8d52e3a890b6f12fc0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityEncounterPolicy.java",
+      "sha256": "adff4bd39a01aae497346fc9de3725447db6f4f8a882551110d5d9e58249f2e0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityEncounterRoute.java",
+      "sha256": "77198023ab44d48236dd3e29f3d7c06bf892cc7cfc6c0c3cf0b87ddd4faa3106"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityGateway.java",
+      "sha256": "191d488f47e16eedea5a80a5f514642baeaf3999a6c66adbd69bcc49a305eedd"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityGuard.java",
+      "sha256": "35d08e598e422f50451c241674d629bb7e8fe230f1a52c48ae5be486ef019715"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityItemBinding.java",
+      "sha256": "82cbfad34f2ccf46bd7a268b1556022fb25694fdcb24ac0aa4b4c66a428cfa7f"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityPath.java",
+      "sha256": "ec5da9f77a198ef70e31f83d2a02a89b6dfd21d549c7222bf42dc2883254fa40"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityPlacement.java",
+      "sha256": "c0da3f43b8d1531469e98cdc609dbfa773eaa5661d592103bc1da897373a1e6d"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityShelter.java",
+      "sha256": "da7df0949a8a177b1cb37b857a3ae7d40ea3926ef97444d6e8faea3604f457c6"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySnapshot.java",
       "sha256": "931f26efc3fb48b6bcbd359183f1ba5a0630704fdd6d53185923f39bee4a492a"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySpeciesPolicy.java",
+      "sha256": "c08d8e57c8dd0101df88db2cf215d026e8bcde5ac5cbd3ab63162cfc3c86e63e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityTargetAction.java",
+      "sha256": "a3982c9c6bb66de311b9a9e26c9c9605e968726b019a4c51c0b429fcb3a86a0c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityTargetPolicy.java",
+      "sha256": "ac247434a0052c02435fc2178563da7966c3e8f936d98199dd0d28d00b15bb19"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityUseTransition.java",
+      "sha256": "87f25551325894c88a954c9f871b6ffa381cc9a5d40a036805cd4be71f894131"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
@@ -15,39 +172,347 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "sha256": "66faa4773c9115ad50c6830dd649a1dfe927b010b8ae9d71344ce9b382cd51c9"
+      "sha256": "235baed8b68e63430206f8ce670feb6bfc6d4c1f99676b6f6333eeaa952a725f"
     },
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
-      "sha256": "ad54359f27396dc8084b1f25a2c416656152ff1cbbce6767e3fd15bb674d0017"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
+      "sha256": "8656d19dc27e120fc4ad1eca945227c06169d8b4318d63de8b4a2838c8e9a422"
     },
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
-      "sha256": "0d64fa1d8a3e37f42823d64a1023db1a86ebdbe50639061881d745c18f189fc0"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatCallbackFence.java",
+      "sha256": "79d6dc41f441424f3e6a475e0d1eea1364af720272a9759bb0226730ed907d42"
     },
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "sha256": "78fab2e888f70ca5c5513237a6e4bcbf4baedfa8b0aca7d48c6d0adf8945e735"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatCellCache.java",
+      "sha256": "7a457eac244da4d98d5f1ae8c97ce35a425f0e823c8029f0f7c7e7120c49bf80"
     },
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ActionRegistry.java",
-      "sha256": "def0e49e2c57923c352d447a09e0b25ef01dd7699f5111fcd84434a48d77b6f3"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatDetour.java",
+      "sha256": "9644dd4cd145d5c90d059595e453aef6d7c64411189a77d3abaf44dba408c71c"
     },
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "sha256": "8b44f8190f5f7e903b227520605de9106b43cd6240d83247a699fe10bd414fe5"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatHealthEvidence.java",
+      "sha256": "b342a631dbc0bd6e0fc19f1f7430fe97c62053505a6d7424afea9c804325ee66"
     },
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "sha256": "89f33305b451620ce1ead3e46054ed4bafd79458eef6deb48ac54d904c315e85"
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatInitialEvidence.java",
+      "sha256": "c194484ed7a8577e5679b4d240ff1da810b623cc1a9c7e27de7fe5d14581c1e8"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatPursuit.java",
+      "sha256": "68040e59403bfbd6da567b1ae7ee5b2707b99025f0fac664f593bfd06c8c088c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRecovery.java",
+      "sha256": "097b0ff3cd69cd78669cd8e88c756027577bb19dbd018c117c3ef3e3f2d5e86d"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRetreatDiagnostics.java",
+      "sha256": "a4ef799365091a3bbb920795c2a03ba4a4182b3e1d4939363de8b4a61e55ebb5"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRetreatEvidence.java",
+      "sha256": "259ad3e0fd1f63191fd9e89f0f6d10d85e5942501fa394bb7d8f373d8f9be11c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRetreatPolicy.java",
+      "sha256": "5a7be17f7281d8bff05f5e39229f7de7b26d89cb20192f0e17b9c98b3a8a2aef"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRetreatWindow.java",
+      "sha256": "0ff02b17a3d91b411d8285e907cb631930274ebde5d2a22ad2a7154abd0ad63c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRouteEnvelope.java",
+      "sha256": "f093e356039d40892b5d2b68f97bcffb6ab7e49926d1b28ac9abea8b11837a0b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRouteMotion.java",
+      "sha256": "e26b25ca6ead6995bd72841a67d49f73cfcab889414a6f323c401bd04f0c0cca"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRules.java",
+      "sha256": "95b9dad28eb40ec026b078f68a4682a4a1332f4f28fc018dd30fb9f838fd3af3"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatSpatial.java",
+      "sha256": "972e5b22c76f2cccf04682cc7b71fa365c44b822b2b893c425320ddf5c34a015"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatThreats.java",
+      "sha256": "dac788ad8b5f3c805f2ad2470aaa8b3f7797446802afd7df671f8cb0e1f1bcc5"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CoordinationStepGuard.java",
+      "sha256": "5067cfe58e63cd1ff62ab0d2ead21298f40bb64068653b8d70001b9d43c0a0ad"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CoordinationStepPolicy.java",
+      "sha256": "b1b471a2f5f8bace294fc9b7dd2d00912d1f87a562cd162cfa62bbc65bd0c334"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/EncounterPause.java",
+      "sha256": "673fd7bd086bb6f8f9b4d3429f796c36ffe7a48df2bce641a7298bab7b86e7c9"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/EncounterRequest.java",
+      "sha256": "0890c5d27d1ef1d5e4e52d81753323a0f607e320b8f95d916308f957c2d69f3b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/EncounterTerminalPause.java",
+      "sha256": "a24a063dbead6adfe1d97d076a6675232e4a4192d249120ccbc9b6a1fd08ae28"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/EnvironmentSteering.java",
+      "sha256": "7cd61e183ba9fe9da178a5f648d34b7f7b74c4aceca9b7677e183b067fe0f114"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/FlatStepCorridor.java",
+      "sha256": "786f2bcc14be909c6e587709e45d72d405fffddf13101ab6d50170c87893f70b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GatewayTrajectory.java",
+      "sha256": "0f7cc758fa807ae84a5ee8bcb078adae4ae067db552c97c9deecbdbe5ad09902"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GuardedAction.java",
+      "sha256": "5559579c7642cda66e55607796127ec51e5157c17b74fa0cdd2c76b9a1d00c14"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GuardedDispatch.java",
+      "sha256": "5ffef6a58c2cb9dc37642fbd8a447c269fe0b40167842b1f0acfdb8c19b299e0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GuardedGameActions.java",
+      "sha256": "a78d477e0b1187ac133a71c983428bd667f2a0c4d662f7bbeec16f368701f940"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GuardedGameMovement.java",
+      "sha256": "73b4eb2fac0ea4d8efb6f9899a300aada560113dddeb77a8e41b46b37ded3ff0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GuardedGameTurning.java",
+      "sha256": "1ac7dc9894abfe8ce7cbff6d53c91872d286aa923e15543c832bb32cb39f8084"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/GuardedMovement.java",
+      "sha256": "0a4b8c8e14213c68ce91f973f4dcc7d4b8a9f4eb905b376e85decf771c2e2600"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/InputEventProbe.java",
+      "sha256": "21722b994c8abb06e2993fa71992f7a44d8849cb32de14927ee50cbad0803e14"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/IntegratedServerIdentity.java",
+      "sha256": "62865b4246f2771ff46a291049eb72268ffe4052b7e7c6fd73701f4979b0696c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/LoadedScan.java",
+      "sha256": "26915098321947849a2bb3fdfff028433c88072d982dbdb8bde07534a0b1a47e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/LoadedScanRequest.java",
+      "sha256": "89e99c8066c152a0613926685ccbfcdfa96d486bbd643b4ddd8af2f650f7f752"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/LoadedWorldScanner.java",
+      "sha256": "a907afd563fa5e4a232637e9dc97b84403e773d855a8f151252cc03581459168"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/MineClientBridgeMod.java",
+      "sha256": "a8ee43eee47ec4d174df38db5dda1bbd04c0771144c6eae61c35e6f792574ccc"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/MiningAimPoints.java",
+      "sha256": "37f0881e8affb5202ff093f7398fc882e9444565f42cba34ff5d831150b1baef"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/MovementBudget.java",
+      "sha256": "65f5fb83b1f0c9c723da387cecae809a448708200c632fd6e76cea5c8499d4be"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/MovementBudgetLedger.java",
+      "sha256": "a0f4b136dc68db7868f7be3f00425e428a235d01c1b2cde31cb1831d21bd0e11"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeLivingObservation.java",
+      "sha256": "bb35806272f87c29a7ad8be5e2dd6846322be992019d5919e111d729cb292cdd"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeLivingSnapshot.java",
+      "sha256": "78e5a1408a312776e8435ed4fcd2188a76b6c8e7dbf361b8f2a1104a9a1eb71a"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeRabbitObservation.java",
+      "sha256": "e7fa2920094ce2876c8cb905f7aaccb00c0aa5a64b8fae9f98c051b7016e3d99"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NavigationPositionGuard.java",
+      "sha256": "0c39c490e017bb03aff82c4557eaa5d77c59286cc677275faf09075b8975aa5e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ObservationClientClock.java",
+      "sha256": "52608c6c0e028d6abda33cbe32f93f66419e76cb390e2f6e67ae30d56d38802d"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ObservationClockBridge.java",
+      "sha256": "c1887ac5497b12872fc04edc780dc167204fa302f438c0fb7d57211c60089db2"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ObservationClockWire.java",
+      "sha256": "bcfe83624883d7c69c6de413537fbca1c9e62be681b22c3276cd3a8aa3410368"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ObservedMenuGeneration.java",
+      "sha256": "914383cab6891c37e8d49ab0763ebf5650c93cfdd768d8e143e02768189f7dca"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PathSteering.java",
+      "sha256": "fffb8a3f2dcf701aff3b624e68b9600fcd36bcca0f423890755cc7d8a5f2b7f6"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PositionDiscontinuityGuard.java",
+      "sha256": "8c3b54bbee5b8841c0365d9a57ad4937aa51a35992e84e5ca2df7685fdd3907e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedBlockMenuDispatch.java",
+      "sha256": "48adec5e813764505a5700f2f51a0b1d241446b037dafe306c887434a28aae72"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedCollectTarget.java",
+      "sha256": "a4ab30f244b88c9ec98f0493ad1cf8699525534520a5973a5bdbef3ea3007b27"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedCombat.java",
+      "sha256": "40e678586d948c63295776db088ee13085ebacaf5761aef72cb3442ebf61c347"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedCombatDispatch.java",
+      "sha256": "c8687c4d008a74d9c38f421bba87e92595b8d629ac360a1d29ec774ca7864cd2"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedEntityPolicy.java",
-      "sha256": "1f9c733ed60734c7f8216db7b1b35f6b6021d604d53f5875ab5a11bc0af1aa9c"
+      "sha256": "e6061d020ba54fd4ae178afffb43d68cfe1fbf11e413e8612ab5fa83533c4e4b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
+      "sha256": "3579dab60fd78cb34c0cf64b44a087e42873456cec3293ab78a45e61c5f7421d"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatPolicy.java",
       "sha256": "4f03c0604b0250ef81e5e0bfeeec83dacde12e10e19e97ae5b12cf11f77a9774"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMining.java",
+      "sha256": "6bed6d84f2d607bb53c7e9f6668c7f219879f6fe1a5b33500f6d76aa4075d808"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMiningDispatch.java",
+      "sha256": "784d1f494c3d4b4760bbfb9db1443f34e87a3fd5114bcb716764722474eda8a4"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMiningEntities.java",
+      "sha256": "9de4cbf952db7d1847e1f40606bea538a18883763eea1e7510cff2d1de0c1c96"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMiningEntityPolicy.java",
+      "sha256": "acf3809123d34875dc2c37d02402ab30ea6094e546ae6cd30dafbe82d4dcc94f"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
+      "sha256": "f54e82c59bbaa9da0746de260e331ef94f699b7c623bf00bea2e11c1766b2c17"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
+      "sha256": "8b67d5049b09dcf3cc280ae59e197e5f4f6b5f69e549893f5483668e5974c01d"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
+      "sha256": "108cf950dd6328ec89a7ea780425f46231c212b7065d0f8a684e84399d1aea28"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/SprintKeyState.java",
+      "sha256": "f89e1cc8fc742661f146bb2a226b1a00156a13e20fe2680a3517206583f2c69f"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TerrainAcquisition.java",
+      "sha256": "ea1a63aefb2b074a6016d1b320f7080e988403f75a4c859f5f1de1512695ed22"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TerrainAcquisitionRequest.java",
+      "sha256": "bb5ecea30038fa5402ca43d52b1b162a1600685dbdff8cd7bd01d667d6969ca1"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TerrainDispatch.java",
+      "sha256": "d76a1a71a56b8fd4cd659a858db926b4ee212f8776006fa6f290f079d7a99819"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TerrainQuery.java",
+      "sha256": "2dab981c4567db182b97921cde31afe37985dae6f16300c3d3a227ca3f0dd504"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TerrainReader.java",
+      "sha256": "4c793d31826d49ec24fff58eaf4bb5971778a58d8387b3d7426dfabb8b10073e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TerrainScan.java",
+      "sha256": "66ca870c8a255b4389f8ab85f32a9124f5a58eb74bc133a9fa9789549a6009a6"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TokenStore.java",
+      "sha256": "c895e1ff64f66521d112b130ccbc510ece268d703bce8f54f18adb44196b7568"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/WorldGeneration.java",
+      "sha256": "22197a162a8b24c382d87b72c71b4d2516ef682aabe0a52e48271b25c3a43aeb"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/WorldSelectionObservation.java",
+      "sha256": "7fcdf9f56ba177f082548e6bbe47e708ca09d5d0e7ab2f2d76f762fe47e30887"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/WorldSelectionSnapshot.java",
+      "sha256": "8e625bd7c63b0a19816173cf45b55db53c7db21a64c5ceacda91a170ee136641"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/EntityMovementBudgetMixin.java",
+      "sha256": "c8d92175f6c8916610124d4459bdfb9e2da30cea0823cd49a43109d51baf6e0b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/InputConstantsMixin.java",
+      "sha256": "f45d4a4d7e287cf05e26909dee58931306af04128ca268b5dd660bd3638cddd9"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/KeyboardHandlerMixin.java",
+      "sha256": "97623f3184c8f21065eaf6b5bd1f4b96afd85104fe0f9fb3b680b25b9442fd6c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/MouseHandlerMixin.java",
+      "sha256": "de0ad3195d43147644187b3e3413928e29e04c231c2f05055d0b6e7338c092cd"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedBlockMenuPacketMixin.java",
+      "sha256": "3ec49d0ae336638b06de2b9fde2bc804ab1df3443d1aefca3578ea9f032e5472"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedCombatAttackMixin.java",
+      "sha256": "58ac9e67ec888db5eced69604c023ac3c5fcba88bffc3001a551c2804c045eee"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedCombatInteractAccessor.java",
+      "sha256": "c72bae9a1a5535d6ad04a49b63ec45a2087f0d86c9122c2be15fdf6330d2c3f8"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedCombatPacketMixin.java",
+      "sha256": "95ccddce1b016f3fc8b92f218e841562574853e4a7a8417d44d9902c5006f952"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedMiningClientMixin.java",
+      "sha256": "0f9dfcb64d239db57b900c8c12a7910c49de5e9f28033b1cb5aa69fff9d4176b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedMiningGameModeMixin.java",
+      "sha256": "874cda3f72bc80af4779216c6c6ae9b0d9c99b0843e545eb56882caf2ac1e265"
     }
   ]
 }

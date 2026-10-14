@@ -8,7 +8,12 @@
     "MouseHandlerMixin",
     "KeyboardHandlerMixin",
     "EntityMovementBudgetMixin",
-    "ScopedBlockMenuPacketMixin"
+    "ScopedBlockMenuPacketMixin",
+    "ScopedMiningClientMixin",
+    "ScopedMiningGameModeMixin",
+    "ScopedCombatPacketMixin",
+    "ScopedCombatAttackMixin",
+    "ScopedCombatInteractAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

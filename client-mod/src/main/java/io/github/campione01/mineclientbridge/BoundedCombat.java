@@ -32,6 +32,8 @@ final class BoundedCombat {
     private final CombatRecovery recovery = new CombatRecovery();
     private final CombatPursuit pursuit = new CombatPursuit();
     private boolean shieldOwned;
+    private ScopedCombat scopedGuard;
+    void bindScoped(ScopedCombat guard){scopedGuard=guard;}
     private final CombatDetour detour = new CombatDetour();
     private final CombatRouteMotion routeMotion = new CombatRouteMotion();
     private final CombatRetreatPolicy.Progress retreatProgress = new CombatRetreatPolicy.Progress();
@@ -86,6 +88,7 @@ final class BoundedCombat {
         currentTick = tick;
         pendingRetreatDiagnostics=null;pendingRetreatEvidence=null;pendingRetreatPlan=false;
         Step step = tickCombat(mc, tick);
+        if(!ClientActions.ownsCombat(this))return Step.end("cancelled","combat_owner_changed_after_callback");
         evidence.addProperty("combat_tick", tick);
         evidence.addProperty("requested_forward", step.forward());
         evidence.addProperty("shield_owned", shieldOwned);
@@ -117,6 +120,46 @@ final class BoundedCombat {
         return step;
     }
 
+    /** Revalidate live effects rather than treating a previous decision as authority. */
+    void beforeScopedAttack(Minecraft mc) {
+        ScopedCombat guard=ClientActions.scopedCombat(this);
+        ScopedCombat.require(guard!=null,"scoped_combat_owner_missing");guard.check(mc,true);
+        ScopedCombat.require(attacks<=16,"scoped_combat_attack_budget_16");
+        LivingEntity target=target(mc);
+        ScopedCombat.require(target!=null && target==guard.target && target.isAlive()
+            && mc.player.getHealth()>request.minHealth()
+            && CombatRules.cooldownReady(mc.player.getAttackStrengthScale(.5F))
+            && !mc.player.isUsingItem(),"scoped_combat_attack_precondition_changed");
+        captureThreats(mc,currentTick);
+        CombatThreats.Gate gate=CombatThreats.evaluate(threats,System.nanoTime(),currentTick,
+            mc.player.getX(),mc.player.getY(),mc.player.getZ(),request.targetId(),request.targetUuid(),
+            healthGuard.sample(currentTick,System.nanoTime(),mc.player.getHealth()));
+        ScopedCombat.require(!gate.stop() && safetyReason==null,"scoped_combat_attack_threat_changed");
+        ScopedCombat.require(!(mc.player.getMainHandItem().getItem() instanceof SwordItem) || !sweepRisk(mc,target),
+            "scoped_combat_protected_sweep_overlap");
+        ScopedCombat.require(mc.hitResult instanceof EntityHitResult hit && hit.getEntity()==target
+            && CombatRules.rayInReach(true,mc.player.getEyePosition().distanceTo(hit.getLocation()),mc.player.entityInteractionRange())
+            && mc.player.hasLineOfSight(target),"scoped_combat_attack_ray_changed");
+        guard.check(mc,true);
+    }
+    void beforeScopedMovement(Minecraft mc,float forward) {
+        ScopedCombat guard=ClientActions.scopedCombat(this);ScopedCombat.require(guard!=null,"scoped_combat_owner_missing");
+        long callbackStarted=System.nanoTime(),callbackTick=mc.level.getGameTime();
+        guard.check(mc,false);
+        if(forward==0){guard.callbackFence(mc,callbackStarted,callbackTick);return;}
+        ScopedCombat.require(currentTick<=600,"scoped_combat_tick_budget_600");
+        captureThreats(mc,currentTick);
+        var health=healthGuard.sample(currentTick,System.nanoTime(),mc.player.getHealth());
+        var gate=CombatThreats.evaluate(threats,System.nanoTime(),currentTick,mc.player.getX(),mc.player.getY(),mc.player.getZ(),
+            request.targetId(),request.targetUuid(),health);
+        if(gate.stop() && safetyReason==null){safetyReason=gate.reason();throw new ClientActionRequest.Rejected(409,"scoped_combat_stale_offensive_movement");}
+        double yaw=Math.toRadians(mc.player.getYRot());
+        CombatDetour.Point from=point(mc.player.position());
+        CombatDetour.Point to=new CombatDetour.Point(from.x()-Math.sin(yaw)*.65*Math.signum(forward),from.z()+Math.cos(yaw)*.65*Math.signum(forward));
+        var edge=liveRouteEdge(mc,from,to,safetyReason!=null);
+        ScopedCombat.require(edge.clear(),"scoped_combat_effect_corridor_changed");guard.check(mc,false);guard.callbackFence(mc,callbackStarted,callbackTick);
+    }
+
     boolean isEncounter() { return encounter!=null; }
     String encounterCallbackInterruption(long now,String phase) { return encounter==null?null:encounter.callbackInterruption(now,phase); }
     void terminal(String status,String reason) { if(encounter!=null) encounter.terminal(status,reason); }
@@ -141,11 +184,15 @@ final class BoundedCombat {
     }
 
     private Step tickCombat(Minecraft mc, int tick) {
+        ScopedCombat scoped=scopedGuard;
+        long callbackStarted=System.nanoTime(),callbackTick=mc.level.getGameTime();
+        if(scoped!=null)scoped.check(mc,false);
         if (CombatRules.manualViewChanged(mc.player.getYRot(),mc.player.getXRot(),expectedYaw,expectedPitch))
             return Step.end("cancelled", "manual_view_changed");
         captureThreats(mc, tick);
         CombatThreats.HealthGuard.Result health = healthGuard.sample(tick, System.nanoTime(), mc.player.getHealth());
         LivingEntity target = target(mc);
+        if(scoped!=null){scoped.check(mc,false);scoped.callbackFence(mc,callbackStarted,callbackTick);}
         CombatThreats.Gate gate = CombatThreats.evaluate(threats, System.nanoTime(), tick,
                 mc.player.getX(), mc.player.getY(), mc.player.getZ(),
                 target != null && !target.isAlive() ? -1 : request.targetId(), request.targetUuid(), health);
@@ -173,12 +220,13 @@ final class BoundedCombat {
             observeRecovery(motion);
             return Step.end("failed", "invalid_combat_motion");
         }
+        if(scoped!=null){scoped.check(mc,true);scoped.callbackFence(mc,callbackStarted,callbackTick);}
         Vec3 eye = mc.player.getEyePosition();
         Vec3 center = target.getBoundingBox().getCenter();
         Vec3 delta = center.subtract(eye);
         expectedYaw = (float)Math.toDegrees(Math.atan2(-delta.x,delta.z));
         expectedPitch = (float)-Math.toDegrees(Math.atan2(delta.y,Math.hypot(delta.x,delta.z)));
-        mc.player.setYRot(expectedYaw); mc.player.setXRot(expectedPitch); mc.player.setYHeadRot(expectedYaw);
+        scopedRawOwner(mc);mc.player.setYRot(expectedYaw);scopedRawOwner(mc);mc.player.setXRot(expectedPitch);scopedRawOwner(mc);mc.player.setYHeadRot(expectedYaw);
         mc.gameRenderer.pick(1.0F);
         double separation = Math.hypot(target.getX()-mc.player.getX(),target.getZ()-mc.player.getZ());
         boolean picked = mc.hitResult instanceof EntityHitResult hit
@@ -241,6 +289,7 @@ final class BoundedCombat {
             shield(mc,false);
             for (int slot=0;slot<9;slot++) {
                 if (mc.player.getInventory().getItem(slot).getItem() instanceof AxeItem) {
+                    if(scopedGuard!=null)return Step.end("failed","scoped_combat_protected_sweep_requires_selected_axe");
                     mc.player.getInventory().selected=slot; selectedTick=tick;
                     return Step.waitFor("selecting_axe_for_protected_bystander");
                 }
@@ -268,7 +317,7 @@ final class BoundedCombat {
         // Fresh renderer pick and cooldown above are from this same game tick.
         // Native startAttack honours normal hooks and server interaction rules.
         lastAttackTick=tick; attacks++;
-        mc.startAttack();
+        ScopedCombatDispatch.attack(this,mc::startAttack);
         evidence.addProperty("attack_dispatches",attacks);
         return Step.waitFor("attack_dispatched");
     }
@@ -551,7 +600,7 @@ final class BoundedCombat {
         // Lowered gaze avoids intentionally looking at a neutral Enderman while disengaging.
         // It is not a complete gaze-cone proof or teleport strategy.
         expectedPitch=65;
-        mc.player.setYRot(expectedYaw);mc.player.setXRot(expectedPitch);mc.player.setYHeadRot(expectedYaw);
+        scopedRawOwner(mc);mc.player.setYRot(expectedYaw);scopedRawOwner(mc);mc.player.setXRot(expectedPitch);scopedRawOwner(mc);mc.player.setYHeadRot(expectedYaw);
     }
 
     private Step safetyRetreat(Minecraft mc,int tick,CombatThreats.Gate gate) {
@@ -791,29 +840,39 @@ final class BoundedCombat {
     }
 
     private void shield(Minecraft mc, boolean wanted) {
+        if(scopedGuard!=null)scopedGuard.check(mc,false);
         wanted = wanted && mc.player.getOffhandItem().is(Items.SHIELD)
                 && !mc.player.getCooldowns().isOnCooldown(Items.SHIELD);
         if (!wanted) {
-            if (shieldOwned) {
-                mc.options.keyUse.setDown(false);
-                if (mc.player != null && mc.gameMode != null && mc.player.isUsingItem())
-                    mc.gameMode.releaseUsingItem(mc.player);
-            }
-            shieldOwned=false;
+            ScopedCombatDispatch.cleanup(scopedGuard,false,()->releaseShield(mc));
         } else if (!mc.player.isUsingItem()) {
             // A previous use can be interrupted while its key is still ours.
             // Clear that old hold before retrying, including a rejected use.
             if (shieldOwned) mc.options.keyUse.setDown(false);
             shieldOwned=true; // Cleanup also owns a use attempt that throws.
             // The explicit offhand shield use cannot open the block under the ray.
-            mc.gameMode.useItem(mc.player,InteractionHand.OFF_HAND);
+            ScopedCombatDispatch.shield(this,()->mc.gameMode.useItem(mc.player,InteractionHand.OFF_HAND));
+            if(!ClientActions.ownsCombat(this))return;
             boolean activeShield=mc.player.isUsingItem() && mc.player.getUsedItemHand() == InteractionHand.OFF_HAND
                     && mc.player.getUseItem().is(Items.SHIELD);
+            scopedRawOwner(mc);
             if (activeShield) mc.options.keyUse.setDown(true);
             else shield(mc,false);
         }
     }
-    void release(Minecraft mc) { shield(mc,false); }
+    private void releaseShield(Minecraft mc){
+        if(shieldOwned){
+            mc.options.keyUse.setDown(false);
+            if(mc.player!=null && mc.gameMode!=null && mc.player.isUsingItem())mc.gameMode.releaseUsingItem(mc.player);
+        }
+        shieldOwned=false;
+    }
+    private void scopedRawOwner(Minecraft mc){
+        if(scopedGuard!=null)ScopedCombat.require(ClientActions.ownsScopedCombat(scopedGuard,scopedGuard.entry)
+            && mc.player==scopedGuard.player && mc.level==scopedGuard.level && mc.gameMode==scopedGuard.gameMode,
+            "scoped_combat_owner_changed_before_local_effect");
+    }
+    void release(Minecraft mc) { ScopedCombatDispatch.cleanup(scopedGuard,true,()->releaseShield(mc)); }
     private LivingEntity target(Minecraft mc) {
         Entity entity=mc.level.getEntity(request.targetId());
         if (!(entity instanceof LivingEntity living) || !entity.getUUID().toString().equals(request.targetUuid())

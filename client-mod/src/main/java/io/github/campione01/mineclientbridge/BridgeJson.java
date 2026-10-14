@@ -87,7 +87,9 @@ final class BridgeJson {
                     && value.isJsonObject() && value.getAsJsonObject().has("profile")
                     && value.getAsJsonObject().get("profile").isJsonPrimitive()
                     && value.getAsJsonObject().get("profile").getAsJsonPrimitive().isString()
-                    && value.getAsJsonObject().get("profile").getAsString().equals(ScopedFlatMovement.PROFILE);
+                    && (value.getAsJsonObject().get("profile").getAsString().equals(ScopedFlatMovement.PROFILE)
+                        || value.getAsJsonObject().get("profile").getAsString().equals(ScopedMining.PROFILE)
+                        || value.getAsJsonObject().get("profile").getAsString().equals(ScopedCollectTarget.PROFILE));
             writer.name(key);
             writer.setSerializeNulls(wholeObject || observedMovementWitness || nullable.contains(key) && (!nativeLivingContract || value.isJsonNull())
                     || path.isEmpty() && pauseEnvelope && PAUSE_NULLABLE_FIELDS.contains(key)

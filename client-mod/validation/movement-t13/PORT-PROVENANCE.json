@@ -20,14 +20,14 @@
       "destination": "prepare_engine_fixtures.py",
       "origin": "independent-tests/action-ticks-v1/prepare_engine_fixtures.py",
       "original_sha256": "8c2ff9c4078b8de6eeccb3cbcee99607ef168437f80b6367295a5ddc712e3cf3",
-      "ported_sha256": "b2ecf086876bb484d7590c23df623127656cb2d56a84516f081eda45f74c5c4c",
+      "ported_sha256": "ffb58f37b692790957e1d56cf5207a72cae37a3f2f36b11dfb8a3e553f61c5cc",
       "byte_identical": false
     },
     {
       "destination": "check_source_relation.py",
       "origin": "independent-tests/action-ticks-v1/check_source_relation.py",
       "original_sha256": "2462a7604bfc39b0a43ab713f1c8b37bafcd8e94aeaf80671ca0e85db20d0e0a",
-      "ported_sha256": "f4a86027512fd0dc378432a39d67270afc3b8eea9e2dd46ccaf1c3473384ccad",
+      "ported_sha256": "e65da5d009c0edbec7c5ee0dc48f4d5d0dcaf4463d64e7f10288ea09a69fc392",
       "byte_identical": false
     },
     {
@@ -73,5 +73,21 @@
       "byte_identical": true
     }
   ],
-  "changes": "Repo-relative inputs; fresh direct production compilation; env-supplied pinned Java/classpath; fresh exclusive output; no old consumed runner invoked; clearly synthetic engine driver retained. Detached consumer uses this checkout and colocated predicate; actual cancelled generated action is preserved; historical private receipt replaced by explicitly synthetic legacy cancellation. Native compile includes all seven changed and five supporting source families, with code-source verification."
+  "changes": "Repo-relative inputs; fresh direct production compilation; env-supplied pinned Java/classpath; fresh exclusive output; no old consumed runner invoked; clearly synthetic engine driver retained. Detached consumer uses this checkout and colocated predicate; actual cancelled generated action is preserved; historical private receipt replaced by explicitly synthetic legacy cancellation. Native compile includes all seven changed and five supporting source families, with code-source verification. Combined checkpoint: full production source and dependency inventory, no baseline mod artifact, complete emitted-class origins, explicit reviewed lifecycle pins and fail-closed compile-only fixture dependencies. No production sources altered by this validation port.",
+  "combined_checkpoint_adaptation": {
+    "source_inventory": "expected-production.json",
+    "historical_source_pins": "historical-t13-production.json",
+    "historical_lifecycle_pins": "historical-t13-lifecycle-methods.json",
+    "changed_lifecycle_pins": [
+      "private static void preTick()",
+      "private static void input(",
+      "private static void finish("
+    ],
+    "unchanged_historical_bodies": [
+      "private static void followPath(",
+      "private static void look("
+    ],
+    "native_compile": "All production Java; no baseline mod JAR, reject any external JAR containing project classes. Verify fresh origin for every emitted class.",
+    "synthetic_fixture_delta": "Collect-only branch throws if constructed or used. Mining profile constant only. Original ActionTickLifetimeTest assertions and 15 scenarios unchanged."
+  }
 }

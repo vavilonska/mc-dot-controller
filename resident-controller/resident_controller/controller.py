@@ -51,6 +51,21 @@ def action_rejection_admission(exc):
     return result
 
 
+def scoped_uncertain_diagnostics(exc):
+    """Reported preview stage/size only. Does not establish effect-free execution or release ownership."""
+    if not isinstance(exc, BridgeError) or exc.status != 409 or exc.code not in (
+            'scoped_movement_response_evidence_too_large','scoped_movement_response_preview_failed'):
+        return None
+    result={'schema_version':1,'http_status':409,'reason':exc.code,
+            'reported_stage':'preview_before_native_action_registration','diagnostics_only':True,
+            'effect_free_proven':False,'input_release_proven':False}
+    size=getattr(exc,'scoped_movement_response_size',None)
+    if valid_size_diagnostic(size):result['scoped_movement_response_size']=deepcopy(size)
+    elif size is not None or getattr(exc,'scoped_movement_response_size_status',None)=='invalid':
+        result['scoped_movement_response_size_status']='invalid'
+    return result
+
+
 @dataclass
 class Running:
     command: dict
@@ -1246,6 +1261,8 @@ class Resident:
                 task.command.get('scoped_native_preflight', {}).get('profile') == 'block-menu-v1')
             definite_rejection = (sending_action and not block_menu_submission and isinstance(exc, BridgeError)
                                   and not exc.uncertain and exc.status is not None and 400 <= exc.status < 500)
+            if task.command.get('scoped_native_preflight', {}).get('profile') == 'mining-local-observed-v2':
+                definite_rejection = False  # No native proof that earlier hooks/input were effect-free.
             admission = {}
             if definite_rejection and exc.status == 409 and exc.code in NAVIGATION_REJECTIONS:
                 self.cache.native_binding.seen = True
@@ -1262,7 +1279,7 @@ class Resident:
                 self.finish(task.command, 'uncertain', reason='scoped_original_outcome_unknown:' + safe_reason(exc),
                             action_id=task.action_id, action=task.last_action_result,
                             resident_policy=self.observation_policy(), input_release_unconfirmed=True,
-                            unknown_outcome=True)
+                            unknown_outcome=True, native_refusal_diagnostics=scoped_uncertain_diagnostics(exc))
                 self.publish()
                 return
             uncertain = isinstance(exc, BridgeError) and (exc.uncertain or task.action_id is not None)

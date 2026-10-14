@@ -1,6 +1,6 @@
 {
-  "schema": "mdc.movement-t13-prerequisites/1",
-  "scope": "Existing Java 21 toolchain and compiler-only dependency jars; these are not distributed or installed by this runner.",
+  "schema": "mdc.combined-native-prerequisites/1",
+  "scope": "Pinned Java 21 and external compiler-only libraries. No baseline mod artifact or previously compiled project classes are accepted.",
   "javac_sha256": "55859b80e7a9c4c4736be19ad3addeb35112ca6d17a30c4e0e116afc0a499bdb",
   "java_sha256": "2a207f5e7d075afa01d97f8048389a64432a44c4a5af0f5e77d6e286ec5f401d",
   "classpath": [
@@ -8,11 +8,6 @@
       "basename": "compiler-public-fire-game.jar",
       "bytes": 22526071,
       "sha256": "1c47e83623a9a2634db3f3b2b93ebf69f0bfe5d975cc038248135d289d772b6f"
-    },
-    {
-      "basename": "mineclient-bridge-toolbox-menu-movement-observed-wire-test.1.jar",
-      "bytes": 771797,
-      "sha256": "4980cd12c4b94f963d36dea0fa2923e1929a5365acf7d0ce8794df74b8280d0e"
     },
     {
       "basename": "gson-2.10.1.jar",

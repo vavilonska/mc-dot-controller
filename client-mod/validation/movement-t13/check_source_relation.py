@@ -20,7 +20,13 @@ for row in json.loads((ROOT/'expected-production.json').read_text())['sources']:
 for signature in ['static boolean ownsScopedMovement(', 'static String session()', 'static boolean ownsInput()', 'static long ownershipRevision()']:
  check(method(a,signature) in (GENERATED/'io/github/campione01/mineclientbridge/ClientActions.java').read_text(),'exact production owner-query excerpt '+signature)
 for signature,digest in json.loads((ROOT/'expected-lifecycle-methods.json').read_text()).items():
- check(hashlib.sha256(method(a,signature).encode()).hexdigest()==digest,'unchanged historical lifecycle/callsite body '+signature)
+ check(hashlib.sha256(method(a,signature).encode()).hexdigest()==digest,'reviewed combined lifecycle/callsite body '+signature)
+historical=json.loads((ROOT/'historical-t13-lifecycle-methods.json').read_text())
+for signature in ['private static void followPath(', 'private static void look(']:
+ check(hashlib.sha256(method(a,signature).encode()).hexdigest()==historical[signature],'unchanged original T13 body '+signature)
+check('if(active!=a)return; // A native hook may cancel or replace this exact owner.' in a and 'if(active==entered)failException(failure)' in a,'combined combat Pre exact-owner interruption fence')
+check('active.scopedCombat.activate(active.entry);active.combat.bindScoped(active.scopedCombat)' in a and 'active.scopedMining.activate(active.entry)' in a,'combined exact Entry guard activation')
+check('ScopedMiningDispatch.cleanup(a.scopedMining,mc.gameMode::stopDestroyBlock)' in a and 'a.scopedMining.terminal(released,status.equals("succeeded")' in a,'combined mining guarded cleanup and terminal evidence')
 check(a.count('a.entry.ticks++')==1,'single native Pre increment')
 pre=method(a,'private static void preTick()')
 check(pre.index('context(mc,"pre_tick")')<pre.index('a.entry.ticks++')<pre.index('if (mc.isPaused())')<pre.index('case "follow_path"'),'Pre context/increment/pause/dispatch ordering')

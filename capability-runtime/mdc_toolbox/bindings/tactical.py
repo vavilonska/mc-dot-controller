@@ -50,7 +50,7 @@ def definition(name, schema, *, group, level, profile, sources, actions=(),
         'implementation_status': 'experimental' if experimental else 'implemented',
         'adapter_status': 'legacy_limited',
         'known_limits': [
-            'Initial toolbox runtime does not enable tactical, terrain or transition capabilities.',
+            'Only engage is enabled when combat-local-observed-v1 is negotiated; cross-action reactions remain stop.',
             'Existing guarded legacy skill path only; no scoped entity/terrain/transition admission is implemented here.',
             'Registration and offline fixtures do not imply live readiness; private singleplayer only.',
             'Shared Runtime charges every nested action/observation. No new writer, callbacks, retry or auto-resume.',
@@ -64,7 +64,7 @@ def definition(name, schema, *, group, level, profile, sources, actions=(),
 _SCHEMAS = {
     'engage': obj({'target_uuid': UUID, 'timeout_ms': default(integer(50, 30000), 15000),
         'approach': default({'type': 'boolean'}, True), 'shield': default({'type': 'boolean'}, True),
-        'min_health': default(HEALTH, 10)}, ('target_uuid',)),
+        'min_health': default(number(14, 20), 14)}, ('target_uuid',)),
     'strike': obj({'target_uuid': UUID, 'ranged': default({'type': 'boolean'}, False),
         'min_health': default(HEALTH, 10),
         'timeout_ms': {'oneOf': [integer(50, 10000), integer(18000, 20000)]},
@@ -125,10 +125,24 @@ _SPECS = {
 
 
 def definitions():
-    return [definition(name, _SCHEMAS[name], group='combat_threats', level=spec[0], profile=spec[1],
+    values = [definition(name, _SCHEMAS[name], group='combat_threats', level=spec[0], profile=spec[1],
         sources=(threats, combat_goals), actions=spec[2], description=spec[3], limits=spec[4],
         bounds={'argument_bounds': 'input_schema', 'shared_budget': 'original_job_ledger'})
         for name, spec in _SPECS.items()]
+    engage = next(value for value in values if value['capability'] == 'engage')
+    engage['native_features'] += ['scoped-native-preflight/1', 'profile:combat-local-observed-v1']
+    engage['adapter_status'] = 'scoped_native'
+    engage['bounds'].update(native_timeout_ms=30000, native_area_radius=12,
+        native_attack_dispatches=16, native_effect_packets=64, callback_budget_ms=50)
+    engage['known_limits'] = [line for line in engage['known_limits']
+        if not line.startswith('Existing guarded legacy skill path only;')]
+    engage['known_limits'] += [
+        'Explicit target only: zombie, husk, zombie_villager, skeleton, stray or bogged. Allies are forbidden.',
+        'Caller min_health is explicitly 14..20, default 14. No silent weakening of requested reserve.',
+        'One native controller action uses the original job ledger; internal effects have native finite limits.',
+        'Cross-action reactions remain stop. No suspended ordinary task is resumed after combat.',
+        'Native checks are same-callback current evidence; future safety and hard real-time scheduling are not guaranteed.']
+    return values
 
 
 _DISPATCH = {name: getattr(threats if hasattr(threats, name) else combat_goals, name) for name in _SCHEMAS}
