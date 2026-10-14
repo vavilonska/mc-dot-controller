@@ -1,0 +1,64 @@
+package io.github.campione01.mineclientbridge;
+import com.google.gson.JsonObject;
+import java.util.List;
+/** Exact placement finish blocks, synthetic observations, actual production registry. No native lifecycle execution. */
+public final class SettlementCleanupFixture {
+    static int checks;
+    static void yes(boolean b){checks++;if(!b)throw new AssertionError("cleanup check "+checks);}
+    static final class Key {boolean isDown(){return false;}}
+    static final class Options {Key keyAttack=new Key();}
+    static final class Minecraft {Options options=new Options();static Minecraft getInstance(){return new Minecraft();}}
+    static final class ScopedMining {static boolean neutral(Boolean input){return input;}static boolean otherKeys(Minecraft mc){return false;}}
+    static final class BridgeServer {static boolean hasHeldInputs(){return false;}}
+    static final class Player {Boolean input;Player(boolean n){input=n;}}
+    static final class Guard {
+        final boolean effect,semantic,binding;boolean unknown;int semanticCalls,bindingCalls;
+        Guard(boolean e,boolean s,boolean b){effect=e;semantic=s;binding=b;}
+        boolean attempted(){return effect;}void markUnknown(){unknown=true;}
+        boolean cleanupState(boolean success){semanticCalls++;return semantic;}
+        boolean releaseBinding(Minecraft mc){yes(semanticCalls==1);bindingCalls++;return binding;}
+        JsonObject diagnostics(boolean neutral,boolean bound,boolean context){
+            JsonObject d=new JsonObject();d.addProperty("physical_input_neutral",neutral);
+            d.addProperty("release_binding_confirmed",bound);d.addProperty("semantic_context_confirmed",context);return d;
+        }
+        JsonObject terminal(boolean neutral,boolean success){
+            JsonObject d=new JsonObject();d.addProperty("input_neutral",neutral);d.addProperty("unknown_outcome",unknown);
+            d.addProperty("block_placed",success&&!unknown);return d;
+        }
+    }
+    static final class RuntimeAction {
+        Guard scopedPlacement;Player player;Boolean input;ActionRegistry.Entry entry;
+        RuntimeAction(Guard g,boolean neutral,ActionRegistry.Entry e){scopedPlacement=g;player=new Player(neutral);input=neutral;entry=e;}
+    }
+    static void one(String status,boolean attempted,boolean semantic,boolean neutral,boolean binding,boolean priorReleased){
+        String original=status,reason="case_"+status,originalReason=reason;
+        ActionRegistry ACTIONS=new ActionRegistry();
+        ClientActionRequest request=new ClientActionRequest("cleanup-fixture","place_block",2000,List.of(),null,
+            new ClientActionRequest.Cell(14,63,25),"up",-1,false,false,-1,-1,0,null,new JsonObject());
+        RuntimeAction a=new RuntimeAction(new Guard(attempted,semantic,binding),neutral,ACTIONS.begin(request));
+        // @EXACT_ATTEMPTED_FAILURE_BLOCK@
+        boolean released=priorReleased;
+        // @EXACT_PLACEMENT_CLEANUP_BLOCK@
+        ACTIONS.finishAfterCleanup(status,reason,released);
+        boolean release=priorReleased&&neutral&&binding;
+        boolean unknown=attempted&&(!original.equals("succeeded")||!semantic||!release);
+        String expected=!release||!semantic&&original.equals("succeeded")?"failed":original;
+        String expectedReason=!release?"input_release_unconfirmed":!semantic&&original.equals("succeeded")?"placement_cleanup_context_unconfirmed":originalReason;
+        yes(a.entry.status.equals(expected));yes(a.entry.reason.equals(expectedReason));
+        yes(a.entry.result.get("input_release_confirmed").getAsBoolean()==release);
+        JsonObject terminal=a.entry.result.getAsJsonObject("placement"),diagnostics=a.entry.result.getAsJsonObject("placement_diagnostics");
+        yes(terminal.get("input_neutral").getAsBoolean()==neutral);
+        yes(terminal.get("unknown_outcome").getAsBoolean()==unknown);
+        yes(terminal.get("block_placed").getAsBoolean()==(original.equals("succeeded")&&release&&semantic&&!unknown));
+        yes(diagnostics.get("physical_input_neutral").getAsBoolean()==neutral);
+        yes(diagnostics.get("semantic_context_confirmed").getAsBoolean()==semantic);
+        yes(diagnostics.get("release_binding_confirmed").getAsBoolean()==binding);
+        yes(!unknown||a.entry.result.get("unknown_outcome").getAsBoolean()&&a.entry.result.get("requires_handoff").getAsBoolean());
+        yes(ACTIONS.active()==null&&ACTIONS.existing(request)==a.entry);yes(a.scopedPlacement.bindingCalls==1);
+    }
+    public static void main(String[] args){
+        for(String status:List.of("succeeded","cancelled","failed"))for(int bits=0;bits<32;bits++)
+            one(status,(bits&1)!=0,(bits&2)!=0,(bits&4)!=0,(bits&8)!=0,(bits&16)!=0);
+        System.out.println("PASS source-exact placement cleanup blocks with actual ActionRegistry: "+checks+" assertions / 96 synthetic observation cases");
+    }
+}

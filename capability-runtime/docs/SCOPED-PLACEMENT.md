@@ -17,3 +17,13 @@ Offline tests include closed witness mutations and producer checks. The real Jav
 Run `python -B capability-runtime/tests/fixtures/generate_crystal_worlds.py` if the generated crystal geometry fixture is absent from a source-only export. It deterministically restores the existing unrelated planner fixture; its SHA-256 is `3a989c6e5ccb88dd0c126abc6734a95e17dcfa69a01d06d727a1e8f1f80a0ce9`.
 
 Run the ordinary capability and Resident unit-test discovery with the repository's component directories on `PYTHONPATH`, plus `client-mod/mcp/toolbox-test.mjs` under Node's test runner. `client-mod/mcp/sync-toolbox-schema.py --check` checks the real JS/Python front-door schemas. Placement consumer fixtures live in `capability-runtime/tests/placement`; their files state explicitly that facts are synthetic. The pre-existing collect/combat Java-wire consumer suite additionally needs `MDC_NATIVE_WIRE_DIR`, and reports a skip rather than fabricating native inputs when those files are unavailable.
+
+
+## Settlement status
+
+The first live microtrial retained an unknown outcome after one effect and one
+packet; no successful live placement acceptance is claimed. The reviewed native
+settlement correction permits one expected menu-revision increment only after
+confirmed use return and exact consumption, retaining all identity and inventory
+fences. Physical neutrality is distinct from semantic cleanup, and unknown still
+forbids replay. See [native details](../../client-mod/docs/scoped-placement.md).

@@ -326,7 +326,7 @@ final class ClientActions {
         RuntimeAction a=active;
         try{return contextChecked(mc,phase);}
         catch(RuntimeException failure){
-            if(a!=null && a.scopedPlacement!=null){if(active==a)finish("cancelled","placement_context_hook_failed");return false;}
+            if(a!=null && a.scopedPlacement!=null){a.scopedPlacement.recordFailure(failure);if(active==a)finish("cancelled","placement_context_hook_failed");return false;}
             if(a!=null && a.scopedMining!=null){scopedMiningUnknown(a.scopedMining,"mining_context_hook_failed");return false;}
             throw failure;
         }
@@ -500,7 +500,7 @@ final class ClientActions {
             try {a.scopedPlacement.check(Minecraft.getInstance(),a.dispatched,false);
                 if(active!=a||event.getInput()!=input||input!=a.player.input||!ScopedMining.neutral(input))
                     throw new ClientActionRequest.Rejected(409,"placement_input_changed_after_hooks");
-            } catch(RuntimeException failure){if(active==a)finish("cancelled","placement_input_context_unconfirmed");return;}
+            } catch(RuntimeException failure){a.scopedPlacement.recordFailure(failure);if(active==a)finish("cancelled","placement_input_context_unconfirmed");return;}
         }
         a.input = input;
         input.forwardImpulse = a.forward;
@@ -541,6 +541,7 @@ final class ClientActions {
                 default -> { }
             }
         } catch (RuntimeException failure) {
+            if(entered.scopedPlacement!=null)entered.scopedPlacement.recordFailure(failure);
             if(entered.scopedPlacement==null || active==entered)failException(failure);
         }
     }
@@ -1191,10 +1192,21 @@ final class ClientActions {
                     && a.entry.result.has("observed_block") && a.entry.result.get("observed_block").getAsString().equals("minecraft:air")));
             }
             if(a.scopedPlacement!=null) {
-                Minecraft mc=Minecraft.getInstance();released &= a.scopedPlacement.cleanupState(status.equals("succeeded"))&&ScopedMining.neutral(a.input)&&ScopedMining.neutral(a.player.input)
+                Minecraft mc=Minecraft.getInstance();
+                boolean semanticContext=a.scopedPlacement.cleanupState(status.equals("succeeded"));
+                boolean keyNeutral=ScopedMining.neutral(a.input)&&ScopedMining.neutral(a.player.input)
                     &&!mc.options.keyAttack.isDown()&&!ScopedMining.otherKeys(mc)&&!BridgeServer.hasHeldInputs();
-                if(!released&&a.scopedPlacement.attempted()){a.scopedPlacement.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);}
-                a.entry.result.add("placement",a.scopedPlacement.terminal(released,status.equals("succeeded")&&released));
+                boolean releaseBinding=a.scopedPlacement.releaseBinding(mc);
+                released &= keyNeutral&&releaseBinding;
+                if((!released||!semanticContext)&&a.scopedPlacement.attempted()){
+                    a.scopedPlacement.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);
+                }
+                if(!semanticContext&&status.equals("succeeded")){
+                    a.entry.result.addProperty("requested_terminal_status",status);a.entry.result.addProperty("requested_terminal_reason",reason);
+                    status="failed";reason="placement_cleanup_context_unconfirmed";
+                }
+                a.entry.result.add("placement_diagnostics",a.scopedPlacement.diagnostics(keyNeutral,releaseBinding,semanticContext));
+                a.entry.result.add("placement",a.scopedPlacement.terminal(keyNeutral,status.equals("succeeded")&&released&&semanticContext));
             }
             ACTIONS.finishAfterCleanup(status, reason, released);
             if (a.combat != null)

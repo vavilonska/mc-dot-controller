@@ -1,6 +1,6 @@
 {
   "schema": "mdc.combined-native-production/1",
-  "scope": "All production Java including placement-local-observed-v1; explicit additive placement review freeze. Runner never updates pins.",
+  "scope": "All production Java including narrow post-use placement revision settlement and truthful cleanup diagnostics; explicit new-candidate review freeze. Runner never updates pins.",
   "sources": [
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ActionRegistry.java",
@@ -172,7 +172,7 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "sha256": "0873195f3a5ab7b9d5dbc455c129931639cd1a26ac99e1641691d939a539d4c8"
+      "sha256": "be417201f1d40b176b713a689af45dab7c708a3bffead22b03144a255bca23c4"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -379,6 +379,10 @@
       "sha256": "3de6c35048a8b0c8a89630bb6ea93f6c464b57ea3af6ea64ff0a6acefd2af80a"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PlacementSettlementPolicy.java",
+      "sha256": "1db86e81802ed3087f04269e43c63d28127d60070cf7c20a5a1cf36111001bb6"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PositionDiscontinuityGuard.java",
       "sha256": "8c3b54bbee5b8841c0365d9a57ad4937aa51a35992e84e5ca2df7685fdd3907e"
     },
@@ -440,7 +444,7 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
-      "sha256": "ee48a41de9039740c2acd294399370060e1a8867e3f7e1dd1aa56281ccb360d7"
+      "sha256": "8155763daad7931a8b257a72c867cb9488d56319cc9e2962b65ecb8cdf3fa35c"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementDispatch.java",

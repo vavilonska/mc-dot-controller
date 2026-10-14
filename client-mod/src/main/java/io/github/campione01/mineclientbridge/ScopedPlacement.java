@@ -53,7 +53,9 @@ final class ScopedPlacement {
     private final PlacementCallbackFence callbackFence;
     private int checks,effectCount,packetCount,lastTick,useCount,selectionPackets;
     private net.minecraft.network.protocol.Packet<?> expectedPacket;
-    private boolean attempted,unknown;
+    private boolean attempted,unknown,settling;
+    private final PlacementSettlementPolicy settlement;
+    private String firstGuardReason="",cleanupReason="";
     private BlockHitResult dispatchHit;
     private Vec3 dispatchLocation;
     private int expectedSequence;
@@ -71,6 +73,7 @@ final class ScopedPlacement {
         x=player.getX();y=player.getY();z=player.getZ();eye=player.getEyePosition();body=player.getBoundingBox();
         health=player.getHealth();food=player.getFoodData().getFoodLevel();saturation=player.getFoodData().getSaturationLevel();
         selected=player.getInventory().selected;initialCount=player.getMainHandItem().getCount();menuState=player.containerMenu.getStateId();
+        settlement=new PlacementSettlementPolicy(menuState);
         support=new BlockPos(request.support().x(),request.support().y(),request.support().z());
         face=Direction.valueOf(request.face().toUpperCase(java.util.Locale.ROOT));target=support.relative(face);standingSupport=BlockPos.containing(x,y-.01,z);
         require(Double.isFinite(x)&&Double.isFinite(y)&&Double.isFinite(z)&&eye.distanceTo(Vec3.atCenterOf(support))<=6
@@ -131,7 +134,17 @@ final class ScopedPlacement {
         if(p.getX()==standingSupport.getX()&&p.getZ()==standingSupport.getZ()&&p.getY()>standingSupport.getY()&&p.getY()<=standingSupport.getY()+2)require(air,"placement_body_not_clear");
         return s;
     }
-    void check(Minecraft mc,boolean permitEffect,boolean ray){callbackFence.check(()->checkCurrent(mc,permitEffect,ray));}
+    void check(Minecraft mc,boolean permitEffect,boolean ray){
+        try {
+            int[] observed={-1};
+            callbackFence.check(()->{
+                observed[0]=rawMenu.menu.getStateId();
+                checkCurrent(mc,permitEffect,ray);
+                require(rawMenu.menu.getStateId()==observed[0],"placement_menu_revision_changed_during_check");
+            });
+            settlement.commit(observed[0]); // No progression is committed by a failed or poisoned callback.
+        }catch(RuntimeException failure){recordFailure(failure);throw failure;}
+    }
     private void checkCurrent(Minecraft mc,boolean permitEffect,boolean ray){
         long began=System.nanoTime(),tick=level.getGameTime();int t=actionTick();float yaw=player.getYRot(),pitch=player.getXRot();
         raw(mc,permitEffect,t,began,tick,yaw,pitch);
@@ -152,8 +165,9 @@ final class ScopedPlacement {
     private void raw(Minecraft mc,boolean permitEffect,int t,long began,long tick,float yaw,float pitch){
         require(player.getInventory().getClass()==net.minecraft.world.entity.player.Inventory.class&&player.getInventory().getContainerSize()==41
             &&player.getInventory().selected==selected&&player.containerMenu==player.inventoryMenu&&player.containerMenu.getClass()==InventoryMenu.class
-            &&player.containerMenu.getStateId()==menuState&&player.containerMenu.getCarried().isEmpty(),"placement_menu_or_selection_changed");
-        for(int i=0;i<41;i++)require(sameStack(inventory.get(i),player.getInventory().getItem(i),permitEffect&&effectCount==1&&i==selected),"placement_inventory_changed");
+            &&revisionPermitted()&&player.containerMenu.getCarried().isEmpty(),"placement_menu_or_selection_changed");
+        for(int i=0;i<41;i++)require(i==selected&&settling?exactDecrement(inventory.get(i),player.getInventory().getItem(i))
+            :sameStack(inventory.get(i),player.getInventory().getItem(i),permitEffect&&effectCount==1&&i==selected),"placement_inventory_changed");
         rawMenu.check(player);
         for(int i=0;i<positions.size();i++){BlockPos p=positions.get(i);require(level.hasChunkAt(p),"placement_unloaded_after_hooks");var s=level.getBlockState(p);
             require((s==states.get(i)||permitEffect&&effectCount==1&&p.equals(target)&&s==Blocks.COBBLESTONE.defaultBlockState())&&s.getFluidState().isEmpty()&&level.getBlockEntity(p)==null,"placement_state_changed_after_hooks");}
@@ -178,6 +192,13 @@ final class ScopedPlacement {
                 :ClientActions.ownsScopedPlacement(this,entry)&&entry.ticks==t&&ownerRevision==ClientActions.ownershipRevision()
                     &&originalWitness.equals(entry.result.get("scoped_native_preflight"))),"placement_final_owner_context_or_budget_changed");
         if(attempted)require(player.getYRot()==dispatchYaw&&player.getXRot()==dispatchPitch,"placement_dispatch_pose_changed");
+    }
+    private boolean revisionPermitted(){
+        return settlement.permits(player.containerMenu.getStateId(),settling,effectCount,packetCount,
+            exactDecrement(inventory.get(selected),player.getInventory().getItem(selected)));
+    }
+    static boolean exactDecrement(ItemStack before,ItemStack actual){
+        return !before.isEmpty()&&(before.getCount()==1?actual.isEmpty():actual.getCount()==before.getCount()-1&&ItemStack.isSameItemSameComponents(before,actual));
     }
     static boolean sameStack(ItemStack before,ItemStack actual,boolean permitOne){
         if(ItemStack.matches(before,actual))return true;
@@ -229,7 +250,12 @@ final class ScopedPlacement {
         BlockHitResult h=p.getHitResult();BlockPos b=h.getBlockPos();Vec3 v=h.getLocation();
         return new PlacementPacketBinding(p.getSequence(),p.getHand().name(),b.getX(),b.getY(),b.getZ(),h.getDirection().name(),v.x,v.y,v.z,h.isInside(),h.getType().name());
     }
-    void afterUse(){check(Minecraft.getInstance(),true,false);require(effectCount==1&&packetCount==1&&settled(),"placement_dispatch_unconfirmed");}
+    void afterUse(){
+        require(!settling,"placement_repeated_use_return");
+        check(Minecraft.getInstance(),true,false); // Original revision remains strict throughout the dispatch callback.
+        require(effectCount==1&&packetCount==1&&settled(),"placement_dispatch_unconfirmed");
+        settling=true;
+    }
     boolean settled(){return level.hasChunkAt(target)&&level.getBlockState(target)==Blocks.COBBLESTONE.defaultBlockState()
         &&player.getMainHandItem().getCount()==initialCount-1;}
     boolean cleanupState(boolean success){
@@ -239,9 +265,33 @@ final class ScopedPlacement {
                 &&CapabilityGuard.privateSingleplayer(mc)&&session.equals(ClientActions.session())
                 &&worldGeneration.equals(WorldGeneration.current(level))&&navigationEpoch==NavigationPositionGuard.epoch()
                 &&player.getX()==x&&player.getY()==y&&player.getZ()==z&&player.getInventory().selected==selected,"placement_cleanup_context_changed");
-            for(int i=0;i<41;i++)require(sameStack(inventory.get(i),player.getInventory().getItem(i),effectCount==1&&i==selected),"placement_cleanup_inventory_changed");
+            for(int i=0;i<41;i++)require(i==selected&&settling?exactDecrement(inventory.get(i),player.getInventory().getItem(i))
+                :sameStack(inventory.get(i),player.getInventory().getItem(i),effectCount==1&&i==selected),"placement_cleanup_inventory_changed");
             rawMenu.check(player);require(!success||settled(),"placement_cleanup_effect_changed");return true;
-        }catch(RuntimeException failed){return false;}
+        }catch(RuntimeException failed){cleanupReason=specificReason(failed);return false;}
+    }
+    boolean releaseBinding(Minecraft mc){
+        try {
+            return mc.isSameThread()&&mc.player==player&&mc.level==level&&mc.gameMode==gameMode&&mc.getSingleplayerServer()==server
+                &&session.equals(ClientActions.session())&&worldGeneration.equals(WorldGeneration.current(level))
+                &&navigationEpoch==NavigationPositionGuard.epoch()&&ClientActions.ownershipRevision()==ownerRevision&&!ClientActions.ownsInput();
+        }catch(RuntimeException failed){cleanupReason=specificReason(failed);return false;}
+    }
+    static String specificReason(RuntimeException failure){
+        String reason=failure.getMessage();
+        return reason!=null&&reason.matches("(?:placement|scoped_movement)_[a-z0-9_]{1,100}")?reason:"placement_check_exception";
+    }
+    void recordFailure(RuntimeException failure){if(firstGuardReason.isEmpty())firstGuardReason=specificReason(failure);}
+    JsonObject diagnostics(boolean keyNeutral,boolean releaseBinding,boolean semanticContext){
+        JsonObject d=new JsonObject();d.addProperty("schema_version",1);d.addProperty("guard_reason",firstGuardReason);
+        d.addProperty("cleanup_reason",cleanupReason);d.addProperty("source_menu_revision",menuState);
+        d.addProperty("last_accepted_menu_revision",settlement.accepted());
+        // Read only captured exact vanilla objects. A replacement must not supply diagnostic callbacks.
+        d.addProperty("current_menu_revision",rawMenu.menu.getStateId());
+        d.addProperty("use_returned",settling);d.addProperty("expected_selected_count",initialCount-1);
+        d.addProperty("current_selected_count",rawMenu.inventory.getItem(selected).getCount());
+        d.addProperty("physical_input_neutral",keyNeutral);d.addProperty("release_binding_confirmed",releaseBinding);
+        d.addProperty("semantic_context_confirmed",semanticContext);return d;
     }
     void markUnknown(){unknown=true;}
     boolean attempted(){return attempted;}
@@ -289,12 +339,13 @@ final class ScopedPlacement {
             }
         }
         void check(LocalPlayer player) {
-            require(player.getInventory()==inventory && player.containerMenu==menu && menu.getStateId()==revision
+            require(player.getInventory()==inventory && player.containerMenu==menu && revisionPermitted()
                 && menu.containerId==0 && menu.slots.size()==slots.size() && menu.getCarried().isEmpty(),"placement_raw_menu_changed");
             for(int i=0;i<slots.size();i++) {
                 var slot=menu.slots.get(i);
                 require(slot==slots.get(i) && slot.index==i && slot.container==containers[i]
-                    && sameStack(items[i],containers[i].getItem(indices[i]),effectCount==1 && i==36+selected),"placement_raw_slot_or_stack_changed");
+                    && (settling&&i==36+selected?exactDecrement(items[i],containers[i].getItem(indices[i]))
+                        :sameStack(items[i],containers[i].getItem(indices[i]),effectCount==1 && i==36+selected)),"placement_raw_slot_or_stack_changed");
             }
         }
     }

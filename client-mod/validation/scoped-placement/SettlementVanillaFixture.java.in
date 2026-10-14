@@ -1,0 +1,104 @@
+package io.github.campione01.mineclientbridge;
+import java.util.*;
+/** Actual vanilla menu state methods + exact source-extracted guard bodies over explicit synthetic readers. */
+public final class SettlementVanillaFixture {
+    static int checks;
+    static void require(boolean ok,String why){if(!ok)throw new IllegalStateException(why);}
+    static void yes(boolean ok){checks++;if(!ok)throw new AssertionError("case "+checks);}
+    static void denied(Runnable f){boolean rejected=false;try{f.run();}catch(IllegalStateException expected){rejected=true;}yes(rejected);}
+    static final class ItemStack {
+        final int count;final String components;
+        ItemStack(int n,String c){count=n;components=c;}
+        boolean isEmpty(){return count==0;}
+        int getCount(){return count;}
+        static boolean matches(ItemStack a,ItemStack b){return a.count==b.count&&a.components.equals(b.components);}
+        static boolean isSameItemSameComponents(ItemStack a,ItemStack b){return a.components.equals(b.components);}
+    }
+    static final class Inventory {
+        ItemStack[] items=new ItemStack[41];
+        Inventory(){Arrays.fill(items,new ItemStack(0,"air"));items[0]=new ItemStack(5,"plain-cobblestone");}
+        ItemStack getItem(int i){return items[i];}
+    }
+    static final class Slot {int index;Inventory container;Slot(int n,Inventory i){index=n;container=i;}}
+    static final class Menu {
+        int state=1,containerId=0;List<Slot> slots=new ArrayList<>();
+        Menu(Inventory i){for(int n=0;n<46;n++)slots.add(new Slot(n,i));}
+        int getStateId(){return state;}
+        ItemStack getCarried(){return new ItemStack(0,"air");}
+    }
+    static final class LocalPlayer {
+        Inventory inv=new Inventory();Menu containerMenu=new Menu(inv);
+        Inventory getInventory(){return inv;}
+    }
+    final LocalPlayer player=new LocalPlayer();
+    final List<ItemStack> inventory=new ArrayList<>(Arrays.asList(player.inv.items.clone()));
+    final int selected=0;
+    boolean settling;int effectCount=1,packetCount=1;
+    final PlacementSettlementPolicy settlement=new PlacementSettlementPolicy(1);
+    // @EXACT_STACK_METHODS@
+    // @EXACT_REVISION_METHOD@
+    abstract class MenuFields {
+        final Inventory inventory=player.inv;
+        final Menu menu=player.containerMenu;
+        final List<Slot> slots=List.copyOf(menu.slots);
+        final Inventory[] containers=new Inventory[46];
+        final int[] indices=new int[46];final ItemStack[] items=new ItemStack[46];
+        final int selected=0,revision=1;
+        MenuFields(){for(int n=0;n<46;n++){containers[n]=inventory;indices[n]=n==36?0:1;items[n]=inventory.getItem(indices[n]);}}
+    }
+    final class RawMenu extends MenuFields {
+        // @EXACT_CURRENT_MENU_CHECK@
+    }
+    final class LegacyRawMenu extends MenuFields {
+        // @EXACT_BASELINE_MENU_CHECK@
+    }
+    // Constructor bypass is fixture-only: execute vanilla setItem/incrementStateId, with no game bootstrap.
+    static class RecordingSlot extends net.minecraft.world.inventory.Slot {
+        int writes;
+        RecordingSlot(){super(null,0,0,0);}
+        @Override public void set(net.minecraft.world.item.ItemStack stack){writes++;}
+    }
+    static class VanillaMenu extends net.minecraft.world.inventory.AbstractContainerMenu {
+        RecordingSlot record;
+        VanillaMenu(){super(null,0);}
+        @Override public boolean stillValid(net.minecraft.world.entity.player.Player p){return false;}
+        @Override public net.minecraft.world.item.ItemStack quickMoveStack(net.minecraft.world.entity.player.Player p,int i){return null;}
+        @Override public net.minecraft.world.inventory.Slot getSlot(int i){return record;}
+    }
+    static VanillaMenu vanilla() throws Exception {
+        var f=sun.misc.Unsafe.class.getDeclaredField("theUnsafe");f.setAccessible(true);
+        var m=(VanillaMenu)((sun.misc.Unsafe)f.get(null)).allocateInstance(VanillaMenu.class);
+        m.record=new RecordingSlot();return m;
+    }
+    public static void main(String[] args) throws Exception {
+        VanillaMenu vanilla=vanilla();vanilla.setItem(36,1,null);yes(vanilla.getStateId()==1&&vanilla.record.writes==1);
+        int next=vanilla.incrementStateId();yes(next==2);
+        // Actual inbound vanilla setItem applies packet revision; synthetic item reader models exact 5→4 stack.
+        vanilla.setItem(36,next,null);yes(vanilla.getStateId()==2&&vanilla.record.writes==2);
+        SettlementVanillaFixture f=new SettlementVanillaFixture();var old=f.new LegacyRawMenu();var current=f.new RawMenu();
+        f.player.inv.items[0]=new ItemStack(4,"plain-cobblestone");f.player.containerMenu.state=vanilla.getStateId();
+        denied(()->old.check(f.player)); // Exact published production guard reproduces ordinary-update rejection.
+        denied(()->current.check(f.player)); // Strict until confirmed use return, despite one effect and packet.
+        f.settling=true;current.check(f.player);yes(f.settlement.accepted()==1);
+        f.settlement.commit(2);current.check(f.player);yes(f.settlement.accepted()==2);
+        f.player.containerMenu.state=1;denied(()->current.check(f.player));f.player.containerMenu.state=2;
+        f.player.inv.items[0]=new ItemStack(5,"plain-cobblestone");denied(()->current.check(f.player));
+        f.player.inv.items[0]=new ItemStack(3,"plain-cobblestone");denied(()->current.check(f.player));
+        f.player.inv.items[0]=new ItemStack(4,"component-change");denied(()->current.check(f.player));
+        f.player.inv.items[0]=new ItemStack(4,"plain-cobblestone");
+        f.player.inv.items[1]=new ItemStack(1,"other-item");denied(()->current.check(f.player));f.player.inv.items[1]=new ItemStack(0,"air");
+        Menu saved=f.player.containerMenu;f.player.containerMenu=new Menu(f.player.inv);f.player.containerMenu.state=2;
+        denied(()->current.check(f.player));f.player.containerMenu=saved;
+        Slot slot=saved.slots.get(36);saved.slots.set(36,new Slot(36,f.player.inv));denied(()->current.check(f.player));saved.slots.set(36,slot);
+        slot.index=35;denied(()->current.check(f.player));slot.index=36;
+        Inventory inv=slot.container;slot.container=new Inventory();denied(()->current.check(f.player));slot.container=inv;
+        Inventory oldInv=f.player.inv;f.player.inv=new Inventory();denied(()->current.check(f.player));f.player.inv=oldInv;
+        saved.containerId=1;denied(()->current.check(f.player));saved.containerId=0;
+        current.check(f.player);yes(true);
+        vanilla.setItem(36,32767,null);int wrap=vanilla.incrementStateId();yes(wrap==0);
+        var policy=new PlacementSettlementPolicy(32767);yes(policy.permits(wrap,true,1,1,true));policy.commit(wrap);
+        yes(!policy.permits(32767,true,1,1,true));
+        System.out.println("PASS actual vanilla revision methods and source-exact protected menu guard: "+checks);
+        System.out.println("Synthetic slot/count/component readers; no engine, live settlement or original tick2 exception attribution.");
+    }
+}

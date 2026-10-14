@@ -1,115 +1,78 @@
 {
-  "schema": "mdc-mainline-source-integration-v7",
-  "repository_parent_commit": "20bf0c6f841d2242736cc7cd9bdd05f41dc24bf9",
-  "repository_parent_tree": "c1927d9fd8c8fa2869a70ec1c5b8839dc6747f10",
-  "source_stage": "Reviewed offline single-block scoped placement candidate",
-  "scope": "One ordinary stationary cobblestone placement, same-callback geometry/material/owner checks, one-use token, post-hook final packet fence and exact decrement. No live acceptance.",
-  "reviews": "Native r5 independently reviewed and compiled; Python/public source and full owner-chain reviewed; actual Java placement bytes validated by real Python closed consumers.",
+  "schema": "mdc-mainline-source-integration-v8",
+  "repository_parent_commit": "9aed63f4cb193030eab2bb779a306e5ec33f8d92",
+  "repository_parent_tree": "da41a679c9ceb9808122469b9911df80d9e23ec1",
+  "source_stage": "Reviewed bounded placement settlement correction",
+  "scope": "Strict dispatch revision; one monotonic post-return menu successor only with exact consumption/context; separate physical neutrality and semantic cleanup diagnostics.",
   "verification": {
-    "broad": [
+    "independent_settlement": {
+      "production_policy_callback_checks": 787,
+      "vanilla_and_source_exact_menu_checks": 22,
+      "cleanup_assertions": 1248,
+      "cleanup_synthetic_cases": 96
+    },
+    "full_native_source_compile": {
+      "java_sources": 137,
+      "project_classes": 331
+    },
+    "legacy_native_combined": {
+      "children": 7,
+      "all_exit_zero": true
+    },
+    "current_placement_java_wire": {
+      "synthetic_facts": true,
+      "exact_extracted_terminal_method": true,
+      "real_serializers": true,
+      "python_consumer_tests": 11
+    },
+    "python_focused": [
       {
-        "name": "resident-controller",
-        "exit": 0,
+        "name": "placement-python",
+        "exit_code": 0,
         "summary": [
-          "Ran 423 tests in 2.822s",
+          "Ran 18 tests in 0.169s",
           "OK"
         ]
       },
       {
-        "name": "navigation-cursor",
-        "exit": 0,
+        "name": "t21-compatibility",
+        "exit_code": 0,
         "summary": [
-          "Ran 83 tests in 0.117s",
+          "Ran 6 tests in 0.001s",
           "OK"
         ]
       },
       {
-        "name": "gameplay-helpers",
-        "exit": 0,
+        "name": "legacy-wire-python",
+        "exit_code": 0,
         "summary": [
-          "Ran 64 tests in 4.428s",
+          "Ran 8 tests in 0.103s",
           "OK"
-        ]
-      },
-      {
-        "name": "capability-runtime",
-        "exit": 0,
-        "summary": [
-          "Ran 759 tests in 272.698s",
-          "OK"
-        ]
-      },
-      {
-        "name": "toolbox",
-        "exit": 0,
-        "summary": [
-          "Ran 57 tests in 0.082s",
-          "OK"
-        ]
-      },
-      {
-        "name": "node-portable",
-        "exit": 0,
-        "summary": [
-          "\u2139 tests 138",
-          "\u2139 pass 138",
-          "\u2139 fail 0",
-          "\u2139 skipped 0"
-        ]
-      },
-      {
-        "name": "node-framing",
-        "exit": 0,
-        "summary": [
-          "\u2139 tests 9",
-          "\u2139 pass 9",
-          "\u2139 fail 0",
-          "\u2139 skipped 0"
-        ]
-      },
-      {
-        "name": "node-platform",
-        "exit": 0,
-        "summary": [
-          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
-          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
         ]
       }
     ],
-    "actual_placement_java_wire": {
-      "producer_checks": 14,
-      "python_consumers": 11,
-      "facts": "synthetic",
-      "terminal": "exact production method extraction with synthetic readers; source and method hashes verified",
-      "production_codec_classes": true
+    "capability_full": {
+      "name": "capability-full",
+      "exit_code": 0,
+      "summary": [
+        "Ran 759 tests in 272.498s",
+        "OK"
+      ]
     },
-    "native_offline": {
-      "production_sources": 136,
-      "intent_boundaries": 49,
-      "callback_fence_boundaries": 13,
-      "packet_identity_boundaries": 15,
-      "independent_gate_checks": 60,
-      "independent_children_exit_zero": 9,
-      "prior_movement_mining_collect_combat_regressions": "passed on same native source"
-    },
-    "t21_compatibility": {
-      "synthetic_tests": 6,
-      "historical_source_pins_preserved": true,
-      "current_BridgeJson_exact_single_additive_selector_line_verified": true
-    },
-    "remaining_gates": [
-      "transformed placement mixin application",
-      "live placement and saved outcome",
-      "full Gradle/NeoForge build",
-      "Windows/PowerShell platform validation"
+    "prior_owner_harness_attempt": "756/759 passed; three CLI import failures from incomplete PYTHONPATH. Corrected CLI module 5/5 passed; original and intermediate failed logs retained. Clean full integrated run supersedes the harness invocation only.",
+    "scope": "Offline compile, genuine vanilla revision methods, production pure policy/fence, exact extracted guards/cleanup with synthetic readers, actual emitted codec bytes. No live correction acceptance.",
+    "remaining": [
+      "fresh artifact assembly and independent package checks",
+      "bounded live validation of this correction",
+      "full Gradle/NeoForge build"
     ],
-    "whole_building_execution": "unavailable"
+    "original_T22": "Unknown after one effect/packet and selected count 5 to 4. Original specific exception unavailable; not reclassified or replayed."
   },
-  "live_evidence": "Prior bounded T21 documentation preserved exactly except README additive placement link; see docs/MINING-COLLECT-COMBAT.md. Prior artifact does not establish this changed native placement candidate.",
+  "reviews": "Independent frozen source/compile/policy/vanilla/extracted cleanup review passed; source owner verified all twelve owned paths and three integration docs.",
   "excluded": [
-    "Generated compressed synthetic fixture",
-    "Raw live receipts, worlds, GUI, accounts, credentials, installed state",
-    "Compiled artifacts and external dependency binaries"
+    "Raw live receipts, worlds, GUI, accounts, credentials and installed state",
+    "Compiled artifacts and external binaries",
+    "Generated synthetic fixtures and caches"
   ],
   "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt",
   "files": [
@@ -135,8 +98,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9755,
-      "sha256": "7f69ba2eed4c4fad914fef760c65d588af07011f28d59288a68bcb22bacc6f99"
+      "bytes": 9860,
+      "sha256": "e10c9da018e33c07f6b4d6041a27f62009d8bb6dd8ce23b348b1ddd854396ba2"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
@@ -350,8 +313,8 @@
     },
     {
       "path": "capability-runtime/docs/SCOPED-PLACEMENT.md",
-      "bytes": 3658,
-      "sha256": "1310e0fe5ff6fe2a8cebd48a216cd3040d16feee915bce2dcf5eaf3aa0b48de0"
+      "bytes": 4162,
+      "sha256": "253f50a748bed6e58f73766bff073c050d6381aba2199612ef4e740734075d70"
     },
     {
       "path": "capability-runtime/docs/SHELTERED-ENDERMAN-LOS.md",
@@ -1165,8 +1128,8 @@
     },
     {
       "path": "client-mod/docs/scoped-placement.md",
-      "bytes": 4573,
-      "sha256": "a80b0e11ebc3b62c1896ee456be9a51165ab7e29677015282036de60111bcbb0"
+      "bytes": 6645,
+      "sha256": "63e0241856bd7527328b58a0639b9d51cf64e3c6733911af2732a3413d2c0cd3"
     },
     {
       "path": "client-mod/docs/serialization-verification.md",
@@ -1585,8 +1548,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 78110,
-      "sha256": "0873195f3a5ab7b9d5dbc455c129931639cd1a26ac99e1641691d939a539d4c8"
+      "bytes": 79008,
+      "sha256": "be417201f1d40b176b713a689af45dab7c708a3bffead22b03144a255bca23c4"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -1844,6 +1807,11 @@
       "sha256": "3de6c35048a8b0c8a89630bb6ea93f6c464b57ea3af6ea64ff0a6acefd2af80a"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PlacementSettlementPolicy.java",
+      "bytes": 1452,
+      "sha256": "1db86e81802ed3087f04269e43c63d28127d60070cf7c20a5a1cf36111001bb6"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PositionDiscontinuityGuard.java",
       "bytes": 4739,
       "sha256": "8c3b54bbee5b8841c0365d9a57ad4937aa51a35992e84e5ca2df7685fdd3907e"
@@ -1920,8 +1888,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
-      "bytes": 27006,
-      "sha256": "ee48a41de9039740c2acd294399370060e1a8867e3f7e1dd1aa56281ccb360d7"
+      "bytes": 30507,
+      "sha256": "8155763daad7931a8b257a72c867cb9488d56319cc9e2962b65ecb8cdf3fa35c"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementDispatch.java",
@@ -2771,7 +2739,7 @@
     {
       "path": "client-mod/validation/movement-t13/expected-lifecycle-methods.json",
       "bytes": 511,
-      "sha256": "5e72f80b4e636f980635dd811e34c9291ec00613f1ea012edbcb6aa7bd5a85b2"
+      "sha256": "960e15dd235c78c7a74c406802abbced7f678a42dfea1b0d3cc7305a198b8b1b"
     },
     {
       "path": "client-mod/validation/movement-t13/expected-prerequisites.json",
@@ -2780,8 +2748,8 @@
     },
     {
       "path": "client-mod/validation/movement-t13/expected-production.json",
-      "bytes": 27523,
-      "sha256": "b2344cafaa8f3257193ca6235beb1da195669664e0a631cc15425e387d12efec"
+      "bytes": 27776,
+      "sha256": "51803e631d1fde34bc9f221f1bcd68666d47465c30497783b74f5aa33af9453d"
     },
     {
       "path": "client-mod/validation/movement-t13/historical-t13-lifecycle-methods.json",
@@ -2859,14 +2827,29 @@
       "sha256": "477c29bbc086b8b6e20add5339849cb6034c3df49dd36391eef7620e22a58aa3"
     },
     {
+      "path": "client-mod/validation/scoped-placement/PlacementSettlementChecks.java",
+      "bytes": 10725,
+      "sha256": "64702afb17aa137a6efa50ddcd9d3e3255cdf08bf0d30e9e3a96aae90b14e568"
+    },
+    {
       "path": "client-mod/validation/scoped-placement/PlacementWireProducer.java",
       "bytes": 11486,
       "sha256": "5cdb8cd575d5b5c37cca419734f6f758268734255f42d9a5611bea39e5165422"
     },
     {
       "path": "client-mod/validation/scoped-placement/README.md",
-      "bytes": 3285,
-      "sha256": "edb9c81f81ebafc90b37fc89050f66d897ceb0c26d8fda4d98a115e383a0b923"
+      "bytes": 6078,
+      "sha256": "86450ac978c372b7e23ece059fe1e50d8453c8e54af405d05719db03126bdf03"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/SettlementCleanupFixture.java.in",
+      "bytes": 4871,
+      "sha256": "23d44773ee1f53973cc73f46be3dec5f5b1c26686b9c82942a867fb6d4c9f0d8"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/SettlementVanillaFixture.java.in",
+      "bytes": 7031,
+      "sha256": "8f1a680e1c7b7dc9d71c3b24f73a4371c2987005b3036be6c1833490f0c376a5"
     },
     {
       "path": "client-mod/validation/scoped-placement/baseline-methods.json",
@@ -2875,13 +2858,23 @@
     },
     {
       "path": "client-mod/validation/scoped-placement/run.py",
-      "bytes": 7629,
-      "sha256": "d8754a35032da8e5f75f99eb66f7cc8cdfdf32f7773a5912c7db955c5a445e2f"
+      "bytes": 7619,
+      "sha256": "d48cda49ea13676b30b60788066f289a144b138d35c938c2de323e3e62283a42"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/run_settlement.py",
+      "bytes": 7980,
+      "sha256": "eaf134dab157dedfe0fc5369756282dc8dd18e77f9191ba409d5ce5e0e6d44e4"
     },
     {
       "path": "client-mod/validation/scoped-placement/run_wire.py",
       "bytes": 6818,
       "sha256": "bfb7209fd4e1c72e80c4ac62c8f0ab17e2ac35fa5d4137f9236af1546069cb5a"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/settlement-runtime-pins.json",
+      "bytes": 259,
+      "sha256": "3634cc90b5f05e30179c47cb9635ed969123d387d4458f747815aaaba65f7a53"
     },
     {
       "path": "client-mod/validation/terrain-adapter/.gitignore",

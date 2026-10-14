@@ -47,7 +47,7 @@ try:
  guard=(JAVA/'ScopedPlacement.java').read_text();effect=method(guard,'void beforeEffect(');send=method(guard,'void send(')
  check(effect.index('check(Minecraft.getInstance(),false,true)')<effect.index('"placement_effect_context_changed_after_hooks"')<effect.index('effectCount++'),'effect post-hook recount before latch')
  check(send.count('packetBinding(use)')==2 and send.index('packetBinding(use)')<send.index('check(Minecraft.getInstance(),true,false)')<send.rindex('packetBinding(use)')<send.index('packetCount++'),'exact packet fields before and after final checks')
- check('callbackFence.check(()->checkCurrent' in guard,'production uses poison-on-reentry helper')
+ check('callbackFence.check(()->{'  in guard,'production uses poison-on-reentry helper')
  dispatch=(JAVA/'ScopedPlacementDispatch.java').read_text();check('finally{CALL.remove();}' in dispatch,'dynamic token cleanup finally')
  check('itemInstalled&&packetInstalled&&sendInstalled&&ScopedMovementEntities.ready()' in dispatch,'all installed seams gate readiness')
  config=json.loads((ROOT/'client-mod/src/main/resources/mineclient_bridge.mixins.json').read_text())
