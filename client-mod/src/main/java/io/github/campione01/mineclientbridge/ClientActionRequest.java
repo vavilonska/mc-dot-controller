@@ -147,16 +147,23 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
     static final class Rejected extends RuntimeException {
         final int httpStatus;
         final JsonObject capabilitySourceFreshness;
+        final JsonObject scopedMovementResponseSize;
         Rejected(int httpStatus, String reason) { this(httpStatus, reason, null); }
         Rejected(int httpStatus, String reason, JsonObject freshness) {
+            this(httpStatus,reason,freshness,null);
+        }
+        Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize) {
             super(reason); this.httpStatus = httpStatus;
             capabilitySourceFreshness = freshness == null ? null : freshness.deepCopy();
+            scopedMovementResponseSize = httpStatus==409 && reason.equals("scoped_movement_response_evidence_too_large")
+                    && movementSize!=null ? movementSize.deepCopy() : null;
         }
         JsonObject response() {
             JsonObject body = new JsonObject();
             body.addProperty("ok", false); body.addProperty("error", getMessage());
             if (capabilitySourceFreshness != null)
                 body.add("capability_source_freshness", capabilitySourceFreshness.deepCopy());
+            if(scopedMovementResponseSize!=null)body.add("scoped_movement_response_size",scopedMovementResponseSize.deepCopy());
             return body;
         }
     }

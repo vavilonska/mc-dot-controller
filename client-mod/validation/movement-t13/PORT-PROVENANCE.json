@@ -1,0 +1,77 @@
+{
+  "schema": "mdc.movement-t13-test-port/1",
+  "source_checkpoint": "T13 action-ticks-v1 owner-r3 accepted test sequence; owner-r2 contains its corrected ActionTickLifetimeTest source",
+  "ports": [
+    {
+      "destination": "ActionTickLifetimeTest.java",
+      "origin": "independent-tests/action-ticks-v1/owner-r2/ActionTickLifetimeTest.java",
+      "original_sha256": "e8fcba64c0fe32b40ef26e03572afdba47dbf42c3b5cb89cd607c30a66834686",
+      "ported_sha256": "e8fcba64c0fe32b40ef26e03572afdba47dbf42c3b5cb89cd607c30a66834686",
+      "byte_identical": true
+    },
+    {
+      "destination": "ActionTickWitnessTest.java",
+      "origin": "independent-tests/action-ticks-v1/ActionTickWitnessTest.java",
+      "original_sha256": "b1d0705cbed15a42c931235c35a93faa6143a942ab1921df01cfb51f4ff593cb",
+      "ported_sha256": "594cae78d967eab3cdc10efcf43aa486e35d8a1197e926e0369f87b3cc496282",
+      "byte_identical": false
+    },
+    {
+      "destination": "prepare_engine_fixtures.py",
+      "origin": "independent-tests/action-ticks-v1/prepare_engine_fixtures.py",
+      "original_sha256": "8c2ff9c4078b8de6eeccb3cbcee99607ef168437f80b6367295a5ddc712e3cf3",
+      "ported_sha256": "b2ecf086876bb484d7590c23df623127656cb2d56a84516f081eda45f74c5c4c",
+      "byte_identical": false
+    },
+    {
+      "destination": "check_source_relation.py",
+      "origin": "independent-tests/action-ticks-v1/check_source_relation.py",
+      "original_sha256": "2462a7604bfc39b0a43ab713f1c8b37bafcd8e94aeaf80671ca0e85db20d0e0a",
+      "ported_sha256": "f4a86027512fd0dc378432a39d67270afc3b8eea9e2dd46ccaf1c3473384ccad",
+      "byte_identical": false
+    },
+    {
+      "destination": "check_generated_consumer.py",
+      "origin": "independent-tests/action-ticks-v1/check_generated_consumer.py",
+      "original_sha256": "98e6cb1f7d359fb11cfa1ae4b01e891b14c3316ca42dac4777a129aa0d320510",
+      "ported_sha256": "b30d92e86c6ce7eebbe5f6007219266fcb0d1f44dc64a46290bc72c878d928a3",
+      "byte_identical": false
+    },
+    {
+      "destination": "movement_checks.py",
+      "origin": "live-cases/action-tick-driver-delta-r1/movement_checks.py",
+      "original_sha256": "f6de18b0245540ac69783fd721c748bd1571d3b030f577574c236719a47b61aa",
+      "ported_sha256": "ed34b3f6a46b5d4ce2eb6484371fd4be94eb91c302aaa65882a20d1fe2d51033",
+      "byte_identical": false
+    },
+    {
+      "destination": "WireV1Fixture.java",
+      "origin": "extensions/scoped-movement-wire-v1/tests/java/io/github/campione01/mineclientbridge/WireV1Fixture.java",
+      "original_sha256": "95aabe2af94ab2486e9badc2f4e8b2c1026b34829420014d356a643c3ac3de8b",
+      "ported_sha256": "95aabe2af94ab2486e9badc2f4e8b2c1026b34829420014d356a643c3ac3de8b",
+      "byte_identical": true
+    },
+    {
+      "destination": "WireV1Facts.java",
+      "origin": "extensions/scoped-movement-wire-v1/tests/java/io/github/campione01/mineclientbridge/WireV1Facts.java",
+      "original_sha256": "be7810285e3b0afdf2c28635a4fa5937350a86e34c7e7c298485303a31082714",
+      "ported_sha256": "be7810285e3b0afdf2c28635a4fa5937350a86e34c7e7c298485303a31082714",
+      "byte_identical": true
+    },
+    {
+      "destination": "WireV1ProducerCases.java",
+      "origin": "extensions/scoped-movement-wire-v1/tests/java/io/github/campione01/mineclientbridge/WireV1ProducerCases.java",
+      "original_sha256": "ff5f8b90ad59a92727aa4af45366d484d5a53af8c2f6d57eba6d87fc89ce21c6",
+      "ported_sha256": "92f6fdd7463c048bd5a3ad5559134a6033f81b252ebcb78c64e6055aa42849f0",
+      "byte_identical": false
+    },
+    {
+      "destination": "LegacyBridgeJsonReference.java",
+      "origin": "extensions/scoped-movement-wire-v1/tests/java/io/github/campione01/mineclientbridge/LegacyBridgeJsonReference.java",
+      "original_sha256": "daf2ff70f7a427058ac52f2781eb134b691b4956854707c0fcd8bb4078e82449",
+      "ported_sha256": "daf2ff70f7a427058ac52f2781eb134b691b4956854707c0fcd8bb4078e82449",
+      "byte_identical": true
+    }
+  ],
+  "changes": "Repo-relative inputs; fresh direct production compilation; env-supplied pinned Java/classpath; fresh exclusive output; no old consumed runner invoked; clearly synthetic engine driver retained. Detached consumer uses this checkout and colocated predicate; actual cancelled generated action is preserved; historical private receipt replaced by explicitly synthetic legacy cancellation. Native compile includes all seven changed and five supporting source families, with code-source verification."
+}

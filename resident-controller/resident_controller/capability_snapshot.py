@@ -49,6 +49,8 @@ def validate_snapshot(bundle, entity_radius, *, observation_clock=None):
     Source nano values are retained, never compared with Python's clock.
     """
     _require(type(bundle) is dict, 'envelope')
+    from .movement_wire import decode
+    bundle = decode(bundle)  # Declared lossless representation only; raw input remains untouched.
     _require(observation_clock in (None, 'client-pre-tick-v1'), 'clock_selection')
     version = 2 if observation_clock is not None else 1
     _require(type(bundle.get('capability_snapshot_schema_version')) is int

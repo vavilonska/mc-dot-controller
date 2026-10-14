@@ -8,6 +8,7 @@ import re
 from urllib.parse import parse_qsl, urlsplit
 
 from .capability_snapshot import source_freshness
+from .movement_wire import MARKER as MOVEMENT_WIRE_MARKER, load_strict, retain, valid_size_diagnostic
 
 READS = {'/control/status', '/control/capabilities', '/control/state', '/control/screen',
          '/control/keymaps', '/control/terrain', '/control/action/status', '/control/frame',
@@ -68,7 +69,7 @@ def _acquisition_request(method, route, body):
         raise ValueError('invalid_acquisition_request')
 
 
-def _embedded_metadata(raw, names):
+def _embedded_metadata(raw, names, raw_values=None):
     """Hash the exact UTF-8 JSON value span, never a reserialized Python object."""
     text = raw.decode('utf-8')
     decoder = json.JSONDecoder(object_pairs_hook=_unique_object,
@@ -92,6 +93,8 @@ def _embedded_metadata(raw, names):
             encoded = text[start:position].encode('utf-8')
             metadata['embedded_' + key + '_sha256'] = hashlib.sha256(encoded).hexdigest()
             metadata['embedded_' + key + '_bytes'] = len(encoded)
+            if raw_values is not None:
+                raw_values[key] = encoded
         while position < len(text) and text[position].isspace(): position += 1
         if text[position:position + 1] == '}': break
         if text[position:position + 1] != ',': raise ValueError('invalid_acquisition_prepare')
@@ -102,11 +105,14 @@ def _embedded_metadata(raw, names):
 
 
 class BridgeError(RuntimeError):
-    def __init__(self, code, *, uncertain=False, status=None, capability_source_freshness=None, capability_source_freshness_status=None):
+    def __init__(self, code, *, uncertain=False, status=None, capability_source_freshness=None, capability_source_freshness_status=None,
+                 scoped_movement_response_size=None, scoped_movement_response_size_status=None):
         super().__init__(code)
         self.code, self.uncertain, self.status = code, uncertain, status
         self.capability_source_freshness = capability_source_freshness
         self.capability_source_freshness_status = capability_source_freshness_status
+        self.scoped_movement_response_size = scoped_movement_response_size
+        self.scoped_movement_response_size_status = scoped_movement_response_size_status
 
 
 def json_bytes(value):
@@ -216,9 +222,11 @@ class Bridge:
         self.host, self.port = match[1].strip('[]'), int(match[2])
         self._token, self.timeout = token, timeout
         self.last_response_metadata = None
+        self.last_capability_wire = None
 
     def request(self, method, path, body=None):
         # Only actual bytes from this exchange; reset before every request.
+        self.last_capability_wire = None
         self.last_response_metadata = {'response_bytes_read': None,
                                        'response_bytes_status': 'unknown', 'http_status': None}
         route = urlsplit(path)
@@ -270,8 +278,9 @@ class Bridge:
                 # Only a compact machine error code may leave this layer; never raw response text.
                 code = 'bridge_http_' + str(response.status)
                 freshness = None
+                movement_size = None
                 try:
-                    value = json.loads(raw)
+                    value = load_strict(raw) if route.path == '/control/scoped-action' else json.loads(raw)
                     candidate = value.get('error') if isinstance(value, dict) else None
                     if isinstance(candidate, str) and re.fullmatch(r'[a-z0-9_]{1,80}', candidate):
                         code = candidate
@@ -281,23 +290,39 @@ class Bridge:
                         if valid:
                             freshness = value['capability_source_freshness']
                             self.last_response_metadata['capability_source_freshness'] = freshness
+                    if (method == 'POST' and route.path == '/control/scoped-action' and response.status == 409
+                            and code == 'scoped_movement_response_evidence_too_large'
+                            and isinstance(value, dict) and 'scoped_movement_response_size' in value):
+                        valid = valid_size_diagnostic(value['scoped_movement_response_size'])
+                        self.last_response_metadata['scoped_movement_response_size_status'] = 'reported' if valid else 'invalid'
+                        if valid:
+                            movement_size = value['scoped_movement_response_size']
                 except (ValueError, UnicodeError):
                     pass
                 raise BridgeError(code, status=response.status, capability_source_freshness=freshness,
                                   capability_source_freshness_status=self.last_response_metadata.get('capability_source_freshness_status'),
+                                  scoped_movement_response_size=movement_size,
+                                  scoped_movement_response_size_status=self.last_response_metadata.get('scoped_movement_response_size_status'),
                                   uncertain=method == 'POST' and response.status >= 500)
             if is_frame:
                 if not raw.startswith(b'\x89PNG\r\n\x1a\n'):
                     raise BridgeError('invalid_frame')
                 return raw
-            result = json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()),
-                                **({'object_pairs_hook': _unique_object} if acquisition else {}))
+            result = (load_strict(raw) if route.path == '/control/capability-snapshot' else
+                      json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()),
+                                 **({'object_pairs_hook': _unique_object} if acquisition else {})))
             if not isinstance(result, dict):
                 raise ValueError()
             if acquisition and route.path == ACQUISITION_ROOT + 'prepare':
-                self.last_response_metadata.update(_embedded_metadata(raw, ('a', 'manifest')))
+                spans = {}
+                self.last_response_metadata.update(_embedded_metadata(raw, ('a', 'manifest'), spans))
+                if isinstance(result.get('a'), dict) and MOVEMENT_WIRE_MARKER in result['a']:
+                    self.last_capability_wire = retain(spans['a'])
             elif acquisition and route.path == ACQUISITION_ROOT + 'fetch' and dict(parse_qsl(route.query))['part'].startswith('p'):
                 self.last_response_metadata.update(_embedded_metadata(raw, ('cells',)))
+            if (route.path == '/control/capability-snapshot' or acquisition) and MOVEMENT_WIRE_MARKER in result:
+                self.last_capability_wire = retain(raw)
+                self.last_response_metadata['response_sha256'] = self.last_capability_wire['sha256']
             return result
         except BridgeError:
             raise

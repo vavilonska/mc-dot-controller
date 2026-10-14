@@ -1,42 +1,136 @@
 {
-  "schema": "mdc-mainline-source-integration-v1",
-  "source_stage": "movement-observed-v2 R4",
-  "source_manifest_sha256": "ae3d31eb02ce2f58f6ac05ad816e5eeed2911c8b736f8d9753a327296514342c",
-  "base_source_manifest_sha256": "fc6793ce7a5d7527fa032493f976a339d164f225eceee4625ae1cff684bfa1f6",
-  "source_file_count": 746,
-  "repository_parent_commit": "09e45143dc3e9b1aac5fa59c5a98c1e6a5274f14",
-  "deployed_state_menu_source_manifest_prefix": "acab5d0d",
-  "deployed_jar_sha256_prefix": "7018fcc6",
-  "runtime_source_changed_for_publication": true,
-  "publication_copy_changes": {
-    "test-tools/encounter-stage1.1-safety-v2/OPERATOR-CLOSEOUT.md": "Replace historical private workspace/queue paths with placeholders; no executable source change.",
-    "README.md": "Replace stale current-version claim with mainline R4 integration status; retain historical sections.",
-    "SOURCE-CHECKPOINT.md": "Add accurate mainline integration, source provenance and pending-live acceptance status.",
-    "navigation-cursor/navigation_binding.py": "Preserve Resident read-only observation_clock rejection in standalone adapter.",
-    "gameplay-helpers/navigation_binding.py": "Preserve Resident read-only observation_clock rejection in standalone adapter.",
-    "resident-controller/tests/test_navigation_binding_contract.py": "Add cross-adapter read-only observation regression.",
-    "capability-runtime/run_checks.py": "Make missing optional native wire truthful skip; include nested toolbox and additional Node suites.",
-    "capability-runtime/tests/toolbox/test_p5_tactical_dimensions.py": "Replace private sibling paths with pinned independently verified R2 source digests.",
-    "client-mod/mcp/ndjson-framing-test.mjs": "Expect additive toolbox descriptors in actual order.",
-    "client-mod/mcp/self-test.mjs": "Validate additive toolbox descriptors and conditional mdc_job schema alongside unchanged legacy rules.",
-    "client-mod/mcp/self-test-platform.mjs": "Include required toolbox modules in isolated synthetic fixture."
-  },
-  "excluded": {
-    "client-mod/gradle/wrapper/gradle-wrapper.jar": "Not copied from candidate; existing public main wrapper retained unchanged.",
-    "capability-runtime/tests/fixtures/crystal-tower-worlds.json.gz": "Generated compressed synthetic fixture; regenerate using included generate_crystal_worlds.py before full Python suite.",
-    "client-mod/validation/native-coordination/run-root-parser-red.sh": "Historical workspace-specific comparison script; not portable current validation.",
-    "client-mod/validation/native-coordination/verify-scope.py": "Historical workspace-specific comparison script; requires unpublished old work trees.",
-    "client-mod/validation/native-coordination/source-scope-result.json": "Historical machine-generated result; not current verification evidence."
-  },
+  "schema": "mdc-mainline-source-integration-v2",
+  "repository_parent_commit": "27f3539a7ecd5adffe31d8b68611c7c054a1aa50",
+  "repository_parent_tree": "079ccd067cef8b4525f91f7490243cbb2c4712bb",
+  "source_stage": "T13 single-authority wire and native action ticks",
+  "source_manifest_sha256": "091ea46c4dfcddff3949f006f97ed655862b03ce8c77904f07d8a5cbd4ecd6ba",
+  "frozen_source_files": 748,
+  "production_delta_files": 15,
+  "production_changed_after_tests": false,
+  "production_files": [
+    {
+      "path": "capability-runtime/mdc_skills/core.py",
+      "sha256": "0aeec400fe8cf99d1b1882849557e07c75fbd5ff0c3ecfedc7ce571bf252b2f5",
+      "base_git_blob": "6ff5e9ecd54c22eecc917c206b5dda8677e54a39"
+    },
+    {
+      "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
+      "sha256": "6df0d0a575d7a29f72f56615d4673eb2792359b7059d9a3fc695ef7215f08cd4",
+      "base_git_blob": "8b6f7ed83e0d4f588e82fc02e9a8d9ece4ed4eef"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
+      "sha256": "972550072b05b2bc4a7cc07667061a787697c808dcae027c8891c692f1013304",
+      "base_git_blob": "3126112005ee5fdfc4e3ef3da013b5227998072c"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySnapshot.java",
+      "sha256": "931f26efc3fb48b6bcbd359183f1ba5a0630704fdd6d53185923f39bee4a492a",
+      "base_git_blob": "5fb2e7de018ecdfb97e592fefac9d9c07c543ba7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
+      "sha256": "6ed383e7f698acaf0c09b56f01b21de23633f9bac702107db705777f0cdbc912",
+      "base_git_blob": "e9387ca945dc5ee38e15236a14e1b5d67a49fdc3"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
+      "sha256": "66faa4773c9115ad50c6830dd649a1dfe927b010b8ae9d71344ce9b382cd51c9",
+      "base_git_blob": "87a20d71fc8ff13f25f8da21b3c4b5a604d18c57"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
+      "sha256": "ad54359f27396dc8084b1f25a2c416656152ff1cbbce6767e3fd15bb674d0017",
+      "base_git_blob": "a1a9b764b44c3eb3bd8cf5ea6d907d9500c6ae69"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
+      "sha256": "0d64fa1d8a3e37f42823d64a1023db1a86ebdbe50639061881d745c18f189fc0",
+      "base_git_blob": "9bb5c7d44152022109fa0d7799a2cf955e610bc5"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
+      "sha256": "78fab2e888f70ca5c5513237a6e4bcbf4baedfa8b0aca7d48c6d0adf8945e735",
+      "base_git_blob": null
+    },
+    {
+      "path": "resident-controller/resident_controller/capability_snapshot.py",
+      "sha256": "a7c0dce11c810b66af2f3bf14e1d609a2b4128ca308473b5e53f46e5aa19caf7",
+      "base_git_blob": "d31867040fbd13556ced090185b7df85da6b4d52"
+    },
+    {
+      "path": "resident-controller/resident_controller/controller.py",
+      "sha256": "c714c7ab273ca3a7fcd97f68376ea8c0dab0e0573edb2a4618f530509d5fd39a",
+      "base_git_blob": "1f271a009fc7f9698adfdfd00219294129758235"
+    },
+    {
+      "path": "resident-controller/resident_controller/movement_wire.py",
+      "sha256": "9cf2d0010ecf481eb1c06180a5810a346f1cfd65127220094badd86aa12f53d8",
+      "base_git_blob": null
+    },
+    {
+      "path": "resident-controller/resident_controller/terrain_acquisition.py",
+      "sha256": "489d9faefc13cb3297673075ac555705889be3cfc59721a2e78f3fc0082903e2",
+      "base_git_blob": "e53054570b557ac9a37ca8f0f39cfa53b8c3b052"
+    },
+    {
+      "path": "resident-controller/resident_controller/transport.py",
+      "sha256": "284d4f6ba94eaff18bd8caa2d866d59053bd9987455f2be2b0f83204be8563c3",
+      "base_git_blob": "3580272c96d91b2957691640f4e4b5fd083fbe73"
+    },
+    {
+      "path": "resident-controller/resident_controller/world.py",
+      "sha256": "7ef816f9114d57fadc8fc5c5862c572a6b0071a686cdac33201d9e1c501bb915",
+      "base_git_blob": "ed3d374fee7619c5f7212a3b619f335be79e390c"
+    }
+  ],
+  "preserved_main_fixes": "Three adapter read-only observation guards, portable test hashes/discovery, toolbox descriptor and synthetic platform fixes.",
   "verification": {
-    "source_manifest_all_files_matched": true,
-    "genuine_native_compile": "Independently accepted original R4 run; not rerun for publication",
-    "focused_R4": "Original independently accepted R4 run: 218 policy assertions, 157 codec assertions, 16 Python methods, actual Java wire consumed by Resident",
-    "live_acceptance": "T10 known no-effect native admission refusal: scoped_movement_response_evidence_too_large; no movement. Closure 220.051 seconds versus 180-second bound.",
-    "access_transformer_runtime_application": "T10 startup reached native observed-v2 admission; does not establish successful live movement.",
-    "integrated_targeted_rerun": "Python: Resident410,cursor83,gameplay64,toolbox57 passed;coordination322 collected321passed1optional skip. Node131 passed;Linux synthetic platform passed. Full Gradle/Windows gate not rerun."
+    "resident_python": 410,
+    "cursor_python": 83,
+    "gameplay_python": 64,
+    "toolbox_python": 57,
+    "capability_python": 651,
+    "node_portable": 122,
+    "node_framing": 9,
+    "synthetic_platform": "passed; Windows/PowerShell not validated",
+    "native_source_checks": 37,
+    "native_source_families": 12,
+    "native_java21_classes": 37,
+    "synthetic_policy_assertions": 168,
+    "synthetic_policy_scenarios": 15,
+    "generated_consumer_checks": 52,
+    "wire_python_codec": 8,
+    "wire_python_full_reply_tests": 6,
+    "wire_python_full_reply_cases": 22,
+    "wire_node_cases": 38,
+    "full_gradle_build": "not performed",
+    "current_commit_github_ci": "not yet run",
+    "initial_capability_attempt": "Known 180-second timeout with owned child killed/reaped; original output retained. Distinct 450-second attempt passed.",
+    "python_wire_attempts": "Both passed; final attempt02 follows network-guard strengthening."
   },
-  "scope": "Private singleplayer development source integrated at normal mainline paths; publication performs no deployment or gameplay.",
+  "live_scope": {
+    "result": "one cardinal flat-block public/native movement and independent saved-world acceptance",
+    "action_ticks": 13,
+    "continuation_checks": 34,
+    "goal_error_blocks": 0.0743125,
+    "normal_closure_seconds": 51.382848,
+    "health_inventory_equipment_conserved": true,
+    "original_world_preserved": true,
+    "closed_success_seal_sha256": "074b6ba0d345757ca7687b85d6cded35c3062995a1b95750776403b44c050d71",
+    "not_claimed": [
+      "general pathfinding",
+      "all 49 toolbox cases",
+      "future entity dynamics",
+      "server-confirmed multiplayer result"
+    ]
+  },
+  "excluded": [
+    "Generated compressed fixtures; regenerate from checked-in generator",
+    "Compiled binaries, dependencies, private live receipts, GUI, world/account/profile/config/credential data",
+    "Stale candidate README/test regressions and historical nonportable scripts"
+  ],
+  "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt, to avoid hash cycles",
   "files": [
     {
       "path": ".gitignore",
@@ -60,8 +154,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 9110,
-      "sha256": "4d025724333dfd26f96d0c0546ace775ffbcd25879713e5960ccc3ba445e2b95"
+      "bytes": 9228,
+      "sha256": "81ed464f1a45fa7733c084a783cad6685d14dbdec31e0f62f96fbc13e4c26958"
+    },
+    {
+      "path": "SOURCE-CHECKPOINT.md",
+      "bytes": 7880,
+      "sha256": "a4e6db27c13567d3aadc97261fc5b37b9652679f6298af2873da1003de67596e"
     },
     {
       "path": "building-controller/.gitignore",
@@ -320,8 +419,8 @@
     },
     {
       "path": "capability-runtime/mdc_skills/core.py",
-      "bytes": 82818,
-      "sha256": "7eca33451bab8cc2ed086f2e38d0c6baa7cac24c4aff12d3844c301773c78077"
+      "bytes": 83400,
+      "sha256": "0aeec400fe8cf99d1b1882849557e07c75fbd5ff0c3ecfedc7ce571bf252b2f5"
     },
     {
       "path": "capability-runtime/mdc_skills/danger_policy.py",
@@ -505,8 +604,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "bytes": 19919,
-      "sha256": "f9c50054e67328b28e5741266e28fe085c2641758a6f23c9870a7d6c5d07fffe"
+      "bytes": 20368,
+      "sha256": "6df0d0a575d7a29f72f56615d4673eb2792359b7059d9a3fc695ef7215f08cd4"
     },
     {
       "path": "capability-runtime/mdc_toolbox/serialization.py",
@@ -949,6 +1048,11 @@
       "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
     },
     {
+      "path": "client-mod/gradle/wrapper/gradle-wrapper.jar",
+      "bytes": 43764,
+      "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
+    },
+    {
       "path": "client-mod/gradle/wrapper/gradle-wrapper.properties",
       "bytes": 253,
       "sha256": "7e0821d895908883350587c74476b717016ab416320c44dc82a10def916c6fb5"
@@ -1220,8 +1324,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
-      "bytes": 154287,
-      "sha256": "9382fafbc797c86152b0485b5f929c22c7b9714f34d5e713dda1f8da3a3ca67d"
+      "bytes": 154494,
+      "sha256": "972550072b05b2bc4a7cc07667061a787697c808dcae027c8891c692f1013304"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityCombatSafety.java",
@@ -1270,8 +1374,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySnapshot.java",
-      "bytes": 4830,
-      "sha256": "f8b2584887a8b9f89a1492d34e239237a5a95fd2fec012511dc9c4f38c955630"
+      "bytes": 4858,
+      "sha256": "931f26efc3fb48b6bcbd359183f1ba5a0630704fdd6d53185923f39bee4a492a"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilitySpeciesPolicy.java",
@@ -1295,13 +1399,13 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
-      "bytes": 9551,
-      "sha256": "8db24719d6b426dc6d17e4048217d81240388a2114eae866061b667a04533ade"
+      "bytes": 10086,
+      "sha256": "6ed383e7f698acaf0c09b56f01b21de23633f9bac702107db705777f0cdbc912"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 68042,
-      "sha256": "4b7e424575a8645669db28a28419876dadfd7b845b848d19403c346fc3c83783"
+      "bytes": 68193,
+      "sha256": "66faa4773c9115ad50c6830dd649a1dfe927b010b8ae9d71344ce9b382cd51c9"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -1560,8 +1664,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatMovement.java",
-      "bytes": 17362,
-      "sha256": "38a90104c43ccaf5019f316efc84fb4312117cd4442680e538a19d1be1c20a15"
+      "bytes": 19178,
+      "sha256": "ad54359f27396dc8084b1f25a2c416656152ff1cbbce6767e3fd15bb674d0017"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedFlatPolicy.java",
@@ -1570,8 +1674,13 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementEntities.java",
-      "bytes": 9121,
-      "sha256": "2e52ce7e3569f764a7364d805858d3a8059beafda920316b84cb57cc5975386c"
+      "bytes": 9071,
+      "sha256": "0d64fa1d8a3e37f42823d64a1023db1a86ebdbe50639061881d745c18f189fc0"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
+      "bytes": 4079,
+      "sha256": "78fab2e888f70ca5c5513237a6e4bcbf4baedfa8b0aca7d48c6d0adf8945e735"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
@@ -2259,6 +2368,96 @@
       "sha256": "7f4b156817499f3e3fc91b2370d23809aa61ff27cf72d1c07884cd5fb2cbd3ae"
     },
     {
+      "path": "client-mod/validation/movement-t13/.gitignore",
+      "bytes": 27,
+      "sha256": "cdd9665972268cfdd8229f8d745e2cdcae3ba0b38aafa34216503f6bc5d3d44e"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/ActionTickLifetimeTest.java",
+      "bytes": 18118,
+      "sha256": "e8fcba64c0fe32b40ef26e03572afdba47dbf42c3b5cb89cd607c30a66834686"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/ActionTickWitnessTest.java",
+      "bytes": 7277,
+      "sha256": "594cae78d967eab3cdc10efcf43aa486e35d8a1197e926e0369f87b3cc496282"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/LegacyBridgeJsonReference.java",
+      "bytes": 7759,
+      "sha256": "daf2ff70f7a427058ac52f2781eb134b691b4956854707c0fcd8bb4078e82449"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/NativeClassOrigins.java",
+      "bytes": 955,
+      "sha256": "9f523b47089ae1ddca0a044a6d553c4383a3aec52deb62d0f1fc51b82ac86e31"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/PORT-PROVENANCE.json",
+      "bytes": 4457,
+      "sha256": "aa29b9f9524cde807028972da8235e4205db0c6171b55584d81a84407b6d6694"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/README.md",
+      "bytes": 5096,
+      "sha256": "3f51a2c122890b65a9c65a21596ca0cdba814cfe1644a401c9096310440bffa5"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/WireV1Facts.java",
+      "bytes": 1089,
+      "sha256": "be7810285e3b0afdf2c28635a4fa5937350a86e34c7e7c298485303a31082714"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/WireV1Fixture.java",
+      "bytes": 12211,
+      "sha256": "95aabe2af94ab2486e9badc2f4e8b2c1026b34829420014d356a643c3ac3de8b"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/WireV1ProducerCases.java",
+      "bytes": 7959,
+      "sha256": "92f6fdd7463c048bd5a3ad5559134a6033f81b252ebcb78c64e6055aa42849f0"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/check_generated_consumer.py",
+      "bytes": 8098,
+      "sha256": "b30d92e86c6ce7eebbe5f6007219266fcb0d1f44dc64a46290bc72c878d928a3"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/check_source_relation.py",
+      "bytes": 4967,
+      "sha256": "f4a86027512fd0dc378432a39d67270afc3b8eea9e2dd46ccaf1c3473384ccad"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/expected-lifecycle-methods.json",
+      "bytes": 511,
+      "sha256": "dc2531ae513aff849d68052973bd9966742108aff425d9046c150ad488391828"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/expected-prerequisites.json",
+      "bytes": 3505,
+      "sha256": "81843365b5b3fda3a81ed8c9f46cf22eb92360055d480efde715d9c849d5c11c"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/expected-production.json",
+      "bytes": 2450,
+      "sha256": "f3f7b04f85b5701dfb903bbcee2b1f2dce8fe9e5db3a06f531f1c74e28fdd11d"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/movement_checks.py",
+      "bytes": 8843,
+      "sha256": "ed34b3f6a46b5d4ce2eb6484371fd4be94eb91c302aaa65882a20d1fe2d51033"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/prepare_engine_fixtures.py",
+      "bytes": 11911,
+      "sha256": "b2ecf086876bb484d7590c23df623127656cb2d56a84516f081eda45f74c5c4c"
+    },
+    {
+      "path": "client-mod/validation/movement-t13/run.py",
+      "bytes": 9671,
+      "sha256": "fb8354895a8ddad92466ea06bded83b8ce6aa90b6eb923d5b71a3a165c3ff7da"
+    },
+    {
       "path": "client-mod/validation/native-coordination/LegacyCoordinationParserProbe.java",
       "bytes": 1355,
       "sha256": "13fc5c7096a9796cb1b1c4004eae57369856853ed6c222a9a49007c539f495a6"
@@ -2537,6 +2736,11 @@
       "path": "defense-watchdog/watchdog.py",
       "bytes": 23974,
       "sha256": "0bc940ec2939e06f9c7e6123a886415756ad646e2a5c76431918c2444828987e"
+    },
+    {
+      "path": "docs/MOVEMENT-T13.md",
+      "bytes": 5541,
+      "sha256": "ad44ca0206adf44fee5b9793effa26fdcc3045e529aa04d2be4f10ca38abe882"
     },
     {
       "path": "docs/THREE-ZOMBIE-STAGE.md",
@@ -3170,8 +3374,8 @@
     },
     {
       "path": "resident-controller/PUBLIC-FILES.txt",
-      "bytes": 3083,
-      "sha256": "9de916acffd6d6b41ad355013c60a51feca913b544a4527a6a96132f4c31763b"
+      "bytes": 3443,
+      "sha256": "28746999a56e5e419e20215575b4aecef4c6febbd0c4413541fd54f62a95d342"
     },
     {
       "path": "resident-controller/README.md",
@@ -3250,13 +3454,13 @@
     },
     {
       "path": "resident-controller/resident_controller/capability_snapshot.py",
-      "bytes": 30396,
-      "sha256": "42b09f2903fbcd9e5552e2228c29579fb663c6d7ea86b0be97fca6fdcce4d46e"
+      "bytes": 30533,
+      "sha256": "a7c0dce11c810b66af2f3bf14e1d609a2b4128ca308473b5e53f46e5aa19caf7"
     },
     {
       "path": "resident-controller/resident_controller/controller.py",
-      "bytes": 81683,
-      "sha256": "aa5167c9feb70624bd7a26eb6b41f486342c4006d2b16a52c3abe2382fa978dc"
+      "bytes": 82448,
+      "sha256": "c714c7ab273ca3a7fcd97f68376ea8c0dab0e0573edb2a4618f530509d5fd39a"
     },
     {
       "path": "resident-controller/resident_controller/coordination_contract.py",
@@ -3277,6 +3481,11 @@
       "path": "resident-controller/resident_controller/ipc.py",
       "bytes": 3245,
       "sha256": "2a63c74260e169192accba829769285e67d7e0f0c887bcb31192db66e0d0f22a"
+    },
+    {
+      "path": "resident-controller/resident_controller/movement_wire.py",
+      "bytes": 9004,
+      "sha256": "9cf2d0010ecf481eb1c06180a5810a346f1cfd65127220094badd86aa12f53d8"
     },
     {
       "path": "resident-controller/resident_controller/native_combat.py",
@@ -3305,8 +3514,8 @@
     },
     {
       "path": "resident-controller/resident_controller/terrain_acquisition.py",
-      "bytes": 43657,
-      "sha256": "573699d78ed87445ec0b3f28f70d3df1851e34fc4e6ba6de29afed3767a52a44"
+      "bytes": 44298,
+      "sha256": "489d9faefc13cb3297673075ac555705889be3cfc59721a2e78f3fc0082903e2"
     },
     {
       "path": "resident-controller/resident_controller/terrain_diagnostics.py",
@@ -3315,13 +3524,13 @@
     },
     {
       "path": "resident-controller/resident_controller/transport.py",
-      "bytes": 16825,
-      "sha256": "645dbad91f275b792db15a07294d8fa7167a4cd60a738fd472f796694e9b3ec6"
+      "bytes": 18891,
+      "sha256": "284d4f6ba94eaff18bd8caa2d866d59053bd9987455f2be2b0f83204be8563c3"
     },
     {
       "path": "resident-controller/resident_controller/world.py",
-      "bytes": 20108,
-      "sha256": "cd5e7c542e2d62a266a3141b37615ebf36647fbf452cea882c6e90c6f63171ed"
+      "bytes": 20557,
+      "sha256": "7ef816f9114d57fadc8fc5c5862c572a6b0071a686cdac33201d9e1c501bb915"
     },
     {
       "path": "resident-controller/tests/capability_fixtures.py",
@@ -3417,6 +3626,46 @@
       "path": "resident-controller/tests/fixtures/world_pre_latency.py.txt",
       "bytes": 8606,
       "sha256": "4fdc749b7912fbb0b2b63eaee061a96708387de09140ac513592dbce3f5ed15d"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/PORT-PROVENANCE.json",
+      "bytes": 1730,
+      "sha256": "378b50aae86e6d6cb6c04e3cb66ed088f9cb250bff563ab1ade75504c23b9fb9"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/README.md",
+      "bytes": 4506,
+      "sha256": "770afba26bf2fba3a3289131d1812d4e5a00b08ef6f9b4cca7daa2c4e7678380"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/offline_guards.py",
+      "bytes": 1014,
+      "sha256": "d14afc98c87110d3a994b9f6ceef7f048753912aab2ab42253ac95a0f584c191"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/run_codec_cases.py",
+      "bytes": 1214,
+      "sha256": "6a8063773d8cf160028d82c38f5578322804a770c2130cb9b23a49b77422a6ac"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/run_offline.py",
+      "bytes": 14823,
+      "sha256": "98d21c601964d60e64bbe7d1430f73bf92b1fc13b8054bdcb0eadf9e8dbec5b7"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/test_full_reply_boundary.py",
+      "bytes": 27701,
+      "sha256": "57c9c2b3550e5981c45f0a3f09d0b4ba6dc0e0196d11d3304739ba7b09598050"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/test_movement_wire_contract.py",
+      "bytes": 10351,
+      "sha256": "660b23d6d09d1766d4aa0ffce9f2b41f374feff94cb2f20c873be90ec74bc9b2"
+    },
+    {
+      "path": "resident-controller/tests/movement_t13/test_node_reply_boundary.mjs",
+      "bytes": 8334,
+      "sha256": "90ab69f4c2bb0fd56f8bc941b0467c087f030bd3e1fcdb3c8ebd8042c64b45e3"
     },
     {
       "path": "resident-controller/tests/test_capability_action_radius.py",
@@ -3742,12 +3991,6 @@
       "path": "test-tools/encounter-stage1.1-safety-v2/tests/test_receipt_binding.py",
       "bytes": 13490,
       "sha256": "57e725af7204c51c3d24ed0c4a40b3b5e620dcd2df250ba5a26b74da4deed042"
-    },
-    {
-      "path": "SOURCE-CHECKPOINT.md",
-      "bytes": 4544,
-      "sha256": "a3a39e59e34ba85b8e8132da23c75e946bc9503a3a46f4e58590a9454b08fe13"
     }
-  ],
-  "retained_existing_build_resource": "client-mod/gradle/wrapper/gradle-wrapper.jar"
+  ]
 }

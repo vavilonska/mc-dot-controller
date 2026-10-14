@@ -303,10 +303,15 @@ class Acquisition:
                 and not r.combat.active and not r.combat.held, 'resident_owner')
 
     def observe_bundle(self, bundle):
-        validate_snapshot(bundle, 48, observation_clock=self.observation_clock)
-        self.cache.native_binding.observe(bundle['state'])
-        self.resident.check_identity(bundle['status'])
-        return bundle
+        from .movement_wire import MARKER, validate_retained
+        decoded = validate_snapshot(bundle, 48, observation_clock=self.observation_clock)
+        self.last_bundle_wire = None
+        if MARKER in bundle:
+            self.last_bundle_wire = deepcopy(getattr(self.bridge, 'last_capability_wire', None))
+            validate_retained(self.last_bundle_wire, decoded, 48, observation_clock=self.observation_clock)
+        self.cache.native_binding.observe(decoded['state'])
+        self.resident.check_identity(decoded['status'])
+        return decoded
 
     def inspect_until_closed(self, manifest):
         while manifest['status'] not in TERMINAL | {'expired'} or manifest['admission_held']:
@@ -340,6 +345,7 @@ class Acquisition:
     def run(self):
         self.cache.invalidate_terrain()
         self.cache.capability_bundle = self.cache.state_capture = self.cache.state_response_metadata = None
+        self.cache.capability_wire = None
         self.cache._scan_start = None
         self.cache.terrain_read = {'outcome': 'reading', 'attempts': 1, 'pages': 0, 'last_rejection': None,
                                    'elapsed_ms': 0, 'acquisition': self.evidence}
@@ -418,6 +424,7 @@ class Acquisition:
             if self.observation_clock is None: self.cache.grid, self.cache.cells = grid, cells
             self.cache.terrain_received_at = grid.received_at
             self.cache.state, self.cache.capability_bundle = c['state'], c
+            self.cache.capability_wire = deepcopy(self.last_bundle_wire)
             self.cache.received_at = delivered
             self.cache.state_capture = {'started_mono': self.started, 'finished_mono': delivered}
             self.cache.state_response_metadata = deepcopy(self.evidence['exchanges'][-1]['response_metadata'])
@@ -436,6 +443,7 @@ class Acquisition:
         except (BridgeError, ValueError, KeyError, TypeError) as exc:
             self.cache.invalidate_terrain()
             self.cache.capability_bundle = self.cache.state_capture = self.cache.state_response_metadata = None
+            self.cache.capability_wire = None
             uncertain = isinstance(exc, BridgeError) and exc.uncertain
             # Known prepared rejection may send one lifecycle cancel, only while
             # original ownership is unresolved. Unknown transport never cancels.
@@ -485,6 +493,8 @@ def snapshot(resident, command):
             'response_metadata': deepcopy(resident.cache.state_response_metadata)})
     if acquisition.observation_clock is not None:
         result.update({k:deepcopy(bundle[k]) for k in ('ok','protocol','schema_version','observation_clock_profile','observation_clock')})
+    if resident.cache.capability_wire is not None:
+        result['native_capability_wire'] = deepcopy(resident.cache.capability_wire)
     acquisition.deadline()
     return result
 

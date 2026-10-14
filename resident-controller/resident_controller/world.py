@@ -22,6 +22,7 @@ from navigation_controller.terrain import (Block, TerrainAssembler, TerrainError
                                           TerrainPageError, StaleTerrainError, WorldStamp, CapabilityWorldStamp)
 from .transport import BridgeError
 from .capability_snapshot import validate_snapshot, exact
+from .movement_wire import MARKER as MOVEMENT_WIRE_MARKER, validate_retained
 from navigation_controller.observation_clock import CONTRACT, PROFILE, ClockStamp
 from .terrain_diagnostics import ScanDiagnostics
 from .navigation_binding import NativeBindingContext
@@ -75,6 +76,7 @@ class WorldCache:
         self.state_capture = None
         self.state_response_metadata = None
         self.capability_bundle = None
+        self.capability_wire = None
         self.grid = None
         self.cells = {}
         self.received_at = 0.0
@@ -93,6 +95,7 @@ class WorldCache:
         self.state_capture = None
         self.state_response_metadata = None
         self.capability_bundle = None
+        self.capability_wire = None
         if type(capability) is not bool:
             raise ValueError('invalid_capability_observation')
         if type(entity_radius) is not int or not 1 <= entity_radius <= 128:
@@ -106,6 +109,10 @@ class WorldCache:
         response_metadata = deepcopy(getattr(bridge, 'last_response_metadata', None)) if coordination or capability else None
         try:
             bundle = validate_snapshot(value, entity_radius, observation_clock=observation_clock) if capability else None
+            wire = None
+            if capability and MOVEMENT_WIRE_MARKER in value:
+                wire = deepcopy(getattr(bridge, 'last_capability_wire', None))
+                validate_retained(wire, bundle, entity_radius, observation_clock=observation_clock)
         except ValueError as exc:
             raise TerrainError(str(exc)) from None
         state = bundle['state'] if capability else value
@@ -120,6 +127,7 @@ class WorldCache:
             self.invalidate_terrain()
         self.state, self.received_at = state, time.monotonic()
         self.capability_bundle = bundle
+        self.capability_wire = wire
         self.state_capture = ({'started_mono': capture_started, 'finished_mono': capture_finished}
                               if coordination or capability else None)
         self.state_response_metadata = response_metadata

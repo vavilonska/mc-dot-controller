@@ -213,7 +213,7 @@ final class ClientActions {
         if (scoped != null) {
             active.entry.result.add("scoped_native_preflight", scoped.witness(request.id()));
             active.scopedMovement = scoped.movement;
-            if (active.scopedMovement != null) active.scopedMovement.activate();
+            if (active.scopedMovement != null) active.scopedMovement.activate(active.entry);
         }
         if (scoped != null && scoped.blockMenu()) {
             active.scopedBlockMenu = scoped; active.entry.result.addProperty("dispatched", false);
@@ -273,7 +273,10 @@ final class ClientActions {
         if(active==null||active.capabilityTarget!=target)throw new IllegalStateException("target_owner_changed");
         active.dispatched=true;
     }
-    static boolean ownsScopedMovement(ScopedFlatMovement movement) { return active!=null && active.scopedMovement==movement; }
+    static boolean ownsScopedMovement(ScopedFlatMovement movement,ActionRegistry.Entry entry) {
+        return active!=null && active.scopedMovement==movement && active.entry==entry
+                && ACTIONS.active()==entry && entry!=null && entry.running();
+    }
     static boolean ownsCapabilityTarget(CapabilityTargetAction target) { return active!=null && active.capabilityTarget==target; }
     static JsonObject status(String id) { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(id);j.add("movement_budget",MovementBudget.snapshot(Minecraft.getInstance()));return j; }
     /** Recheck a coherent read without creating another movement-budget boundary sample. */

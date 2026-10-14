@@ -57,7 +57,7 @@ final class CapabilitySnapshot {
         JsonObject actionEndpoint=action.deepCopy();
         actionEndpoint.addProperty("protocol","mineclient-bridge");actionEndpoint.addProperty("schema_version",2);
         result.add("status",status);result.add("action",actionEndpoint);result.add("state",state);result.add("screen",screen);
-        return result;
+        return ScopedMovementWire.project(result);
     }
     private static void require(boolean condition) {
         if(!condition)throw new ClientActionRequest.Rejected(409,"capability_snapshot_incoherent");

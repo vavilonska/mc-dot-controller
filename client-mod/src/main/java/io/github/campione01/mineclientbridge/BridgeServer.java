@@ -389,11 +389,13 @@ public final class BridgeServer {
             CapabilitySnapshot.Context after=capabilityContext(mc);
             JsonObject bundle=CapabilitySnapshot.assemble(before,after,status,proposedAction,state.body(),screen,proposedAction);
             JsonObject standalone=clientActionResult(()->proposedAction.deepCopy(),true).body();
-            // There are exactly three copies in the coherent capability response, one in standalone status.
+            // The shared assembler projects one authoritative movement witness and two fixed local refs.
+            // Terminal action metadata still occurs three times, so all existing reserves remain unchanged.
             int one=BridgeJson.toJson(standalone).getBytes(StandardCharsets.UTF_8).length;
             int three=BridgeJson.toJson(bundle).getBytes(StandardCharsets.UTF_8).length;
             try {ScopedEntityPolicy.requireResponseSizes(one,three,MAX_JSON_BYTES);}
-            catch(IllegalArgumentException oversized){throw new ClientActionRequest.Rejected(409,oversized.getMessage());}
+            catch(IllegalArgumentException oversized){throw new ClientActionRequest.Rejected(409,oversized.getMessage(),null,
+                    ScopedMovementWire.sizeDiagnostic(proposedAction,one,three,MAX_JSON_BYTES));}
         } catch(ClientActionRequest.Rejected known){throw known;}
         catch(Exception unknown){throw new ClientActionRequest.Rejected(409,"scoped_movement_response_preview_failed");}
     }

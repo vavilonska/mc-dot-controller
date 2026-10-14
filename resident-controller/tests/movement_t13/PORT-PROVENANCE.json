@@ -1,0 +1,35 @@
+{
+  "schema": "mdc.movement-t13-python-port/1",
+  "production_files_changed": [],
+  "original_sources": [
+    {
+      "original_path": "extensions/scoped-movement-wire-v1/tests/test_movement_wire_contract.py",
+      "original_sha256": "dad6e072388f96baa47e27ae9b27cd99b1242bd51dc0fe060111dc29ad9f4aac",
+      "ported_path": "test_movement_wire_contract.py",
+      "ported_sha256": "660b23d6d09d1766d4aa0ffce9f2b41f374feff94cb2f20c873be90ec74bc9b2"
+    },
+    {
+      "original_path": "extensions/scoped-movement-wire-v1/tests/e2e/test_full_reply_boundary.py",
+      "original_sha256": "7ee9a74f9d22c3d033ba104cc900b031cc47a44bb824593c38d0946d4648e0c1",
+      "ported_path": "test_full_reply_boundary.py",
+      "ported_sha256": "57c9c2b3550e5981c45f0a3f09d0b4ba6dc0e0196d11d3304739ba7b09598050"
+    },
+    {
+      "original_path": "extensions/scoped-movement-wire-v1/tests/e2e/test_node_reply_boundary.mjs",
+      "original_sha256": "896ac0f721822f8ff90a883ffbce37d5afcc2bd077b76bcbf3c471bb2a0de7b8",
+      "ported_path": "test_node_reply_boundary.mjs",
+      "ported_sha256": "90ab69f4c2bb0fd56f8bc941b0467c087f030bd3e1fcdb3c8ebd8042c64b45e3"
+    }
+  ],
+  "adaptations": [
+    "Repository-relative production imports and a portable bounded runner.",
+    "Removed obsolete source-only/release gates only from new copies.",
+    "Replaced historical live-receipt assertions with synthetic definite-refusal negatives.",
+    "Preserved malformed, duplicate-key, provenance, frame, diagnostic, and cap tests.",
+    "Kept no-network and no-nested-process guards, with explicit Node guards added."
+  ],
+  "synthetic_facts": true,
+  "live_world_evidence": false,
+  "historical_live_receipts_included": false,
+  "automatic_retry": false
+}

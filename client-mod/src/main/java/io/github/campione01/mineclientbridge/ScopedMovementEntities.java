@@ -37,19 +37,19 @@ final class ScopedMovementEntities {
     final ClientLevel level;
     final LocalPlayer player;
     final ScopedFlatPolicy.Bounds bounds;
-    final long actionSourceTick;
+    final int actionTicks;
     final ScopedEntityPolicy.Frame frame;
     final List<Entry> entries;
-    private ScopedMovementEntities(ClientLevel level,LocalPlayer player,ScopedFlatPolicy.Bounds bounds,long sourceTick,
+    private ScopedMovementEntities(ClientLevel level,LocalPlayer player,ScopedFlatPolicy.Bounds bounds,int actionTicks,
             ScopedEntityPolicy.Frame frame,List<Entry> entries){
-        this.level=level;this.player=player;this.bounds=bounds;actionSourceTick=sourceTick;this.frame=frame;this.entries=List.copyOf(entries);
+        this.level=level;this.player=player;this.bounds=bounds;this.actionTicks=actionTicks;this.frame=frame;this.entries=List.copyOf(entries);
     }
-    static ScopedMovementEntities capture(ClientLevel level,LocalPlayer player,ScopedFlatPolicy.Bounds bounds,long sourceTick){
+    static ScopedMovementEntities capture(ClientLevel level,LocalPlayer player,ScopedFlatPolicy.Bounds bounds,int actionTicks){
         try {
             require(ready(),"scoped_movement_entity_fire_reader_unavailable");
             long began=System.nanoTime(),tick=level.getGameTime();
-            require(tick>=sourceTick && tick-sourceTick>=0 && tick-sourceTick<ScopedEntityPolicy.MAX_TICKS,"scoped_movement_entity_tick_budget");
-            int horizon=(int)(ScopedEntityPolicy.MAX_TICKS-(tick-sourceTick));
+            require(actionTicks>=0 && actionTicks<ScopedEntityPolicy.MAX_TICKS,"scoped_movement_entity_tick_budget");
+            int horizon=ScopedEntityPolicy.MAX_TICKS-actionTicks;
             var prism=new ScopedEntityPolicy.Box(bounds.minX(),bounds.minY(),bounds.minZ(),bounds.maxX()+1,bounds.maxY()+1,bounds.maxZ()+1);
             var entries=new ArrayList<Entry>();var seen=new IdentityHashMap<Entity,Boolean>();
             var ids=new HashSet<Integer>();var uuids=new HashSet<String>();int examined=0,self=0;
@@ -92,14 +92,14 @@ final class ScopedMovementEntities {
             long elapsed=System.nanoTime()-began;
             require(elapsed>=0 && elapsed<=ScopedNativePreflight.MAX_NANOS && level.getGameTime()==tick,
                     "scoped_movement_entity_capture_stale");
-            return new ScopedMovementEntities(level,player,bounds,sourceTick,frame,entries);
+            return new ScopedMovementEntities(level,player,bounds,actionTicks,frame,entries);
         } catch(ClientActionRequest.Rejected known){throw known;}
         catch(IllegalArgumentException invalid){throw new ClientActionRequest.Rejected(409,invalid.getMessage());}
         catch(RuntimeException unavailable){throw new ClientActionRequest.Rejected(409,"scoped_movement_entity_coverage_unknown");}
     }
     /** Readers are the audited exact-class data accessors, not classification/shape/capability callbacks. */
     void assertUnchanged(){
-        ScopedMovementEntities current=capture(level,player,bounds,actionSourceTick);
+        ScopedMovementEntities current=capture(level,player,bounds,actionTicks);
         require(current.frame.tick()==frame.tick() && current.entries.size()==entries.size(),"scoped_movement_entities_changed_after_hooks");
         for(int i=0;i<entries.size();i++){
             Entry old=entries.get(i),now=current.entries.get(i);

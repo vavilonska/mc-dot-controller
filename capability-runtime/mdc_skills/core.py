@@ -768,6 +768,14 @@ class Runtime:
         payload = result.get("result")
         require(not self._unsafe_flags(result) and not self._unsafe_flags(payload),
                 "observation_requires_handoff_or_is_uncertain")
+        # New wire provenance remains original bytes; semantic siblings are independently rechecked.
+        # This never changes diagnostic observation-clock eligibility for action dispatch.
+        try:
+            from resident_controller.movement_wire import validate_delivery
+            validate_delivery(payload, (options or {}).get("entity_radius", 8),
+                              observation_clock=self.observation_clock_contract)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise SkillError("invalid_native_capability_wire_provenance") from exc
         state, identity, tick = self._validate_state(payload, allow_menu=allow_menu,
                                                     context=context, allowed_dimension=allowed_dimension)
         stamp=None

@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.GrassBlock;
  */
 final class ScopedFlatMovement {
     static final String PROFILE="movement-flat-observed-v2";
+    static final String TIMING_CONTRACT="native-action-pre-ticks-v1";
     static final Set<String> FLOORS=Set.of("minecraft:stone","minecraft:cobblestone","minecraft:dirt",
             "minecraft:grass_block","minecraft:oak_planks","minecraft:andesite","minecraft:granite",
             "minecraft:diorite","minecraft:cobbled_deepslate","minecraft:smooth_stone",
@@ -38,7 +39,9 @@ final class ScopedFlatMovement {
     private final ScopedMovementEntities admissionEntities;
     private long lastEntityTick,lastEntityNano;
     private int maximumCheckedPopulation;
-    private long ownerRevision, sampleTick;
+    private long ownerRevision;
+    private ActionRegistry.Entry actionEntry;
+    private int sampleActionTick=0;
     private double sampleX,sampleZ,tickDistance,sampledDistance;
     private boolean activated, attempted;
     private int checks;
@@ -64,8 +67,9 @@ final class ScopedFlatMovement {
                 && Math.abs(origin.get("y").getAsDouble()-player.getY())<=.03
                 && Math.abs(origin.get("z").getAsDouble()-player.getZ())<=.03,"scoped_movement_origin_changed");
         initialHealth=player.getHealth();deadline=sourceNano+request.timeoutMs()*1_000_000L;
-        sampleX=player.getX();sampleZ=player.getZ();sampleTick=sourceTick;
-        admissionEntities=ScopedMovementEntities.capture(level,player,bounds,sourceTick);
+        sampleX=player.getX();sampleZ=player.getZ();
+        // Admission has no Entry yet; its action age is explicitly zero.
+        admissionEntities=ScopedMovementEntities.capture(level,player,bounds,0);
         lastEntityTick=admissionEntities.frame.tick();lastEntityNano=admissionEntities.frame.nano();
         maximumCheckedPopulation=admissionEntities.frame.population();
         Pose pose=environment(mc,true);
@@ -74,10 +78,25 @@ final class ScopedFlatMovement {
         require(pose.equals(environment(mc,true)),"scoped_movement_facts_changed_after_hooks");
         assertRawFootprint();
         admissionEntities.assertUnchanged();
-        fence(mc,pose,false);
+        fence(mc,pose,false,0);
     }
 
-    void activate() {ownerRevision=ClientActions.ownershipRevision();activated=true;}
+    void activate(ActionRegistry.Entry entry) {
+        require(!activated && actionEntry==null && entry!=null && entry.running() && entry.ticks==0
+                && entry.request.id().equals(request.id()) && entry.request.action().equals(request.action())
+                && entry.request.timeoutMs()==request.timeoutMs() && ClientActions.ownsScopedMovement(this,entry),
+                "scoped_movement_activation_changed");
+        actionEntry=entry;ownerRevision=ClientActions.ownershipRevision();activated=true;
+    }
+    /** Raw native Entry state only; no supplier, world-clock age, or per-effect increment. */
+    private int actionTicks() {
+        require(activated && actionEntry!=null && ClientActions.ownsScopedMovement(this,actionEntry)
+                && ClientActions.ownershipRevision()==ownerRevision,"scoped_movement_action_owner_changed");
+        int ticks=actionEntry.ticks;
+        require(ticks>=0 && ticks<ScopedEntityPolicy.MAX_TICKS,"scoped_movement_entity_tick_budget");
+        require(ticks>=sampleActionTick && ticks-sampleActionTick<=1,"scoped_movement_tick_gap");
+        return ticks;
+    }
     JsonObject facts(){
         try {JsonObject out=footprint.deepCopy();out.add("entity_guard",admissionEntities.frame.json());return out;}
         catch(IllegalArgumentException invalid){throw new ClientActionRequest.Rejected(409,invalid.getMessage());}
@@ -88,18 +107,19 @@ final class ScopedFlatMovement {
         require(pose.equals(environment(mc,true)),"scoped_movement_facts_changed_after_hooks");
         assertRawFootprint();
         admissionEntities.assertUnchanged();
-        fence(mc,pose,false);
+        fence(mc,pose,false,0);
     }
     /** Runs after final generic inventory/menu facts; never performs shape/friction/attribute/slot hooks. */
     void admissionRawFence(Minecraft mc) {
         assertRawFootprint();
         admissionEntities.assertUnchanged();
-        fence(mc,admissionPose,false);
+        fence(mc,admissionPose,false,0);
     }
     /** Reads may call mod hooks. The final fence deliberately does no block/entity/attribute hooks. */
     void beforeEffect(Minecraft mc) {
         long began=System.nanoTime();
-        ScopedMovementEntities entities=ScopedMovementEntities.capture(level,player,bounds,sourceTick);
+        int actionTicks=actionTicks();
+        ScopedMovementEntities entities=ScopedMovementEntities.capture(level,player,bounds,actionTicks);
         Pose pose=environment(mc,false);
         require(footprint.equals(terrain(mc)),"scoped_movement_footprint_changed");
         require(pose.equals(environment(mc,false)),"scoped_movement_facts_changed_after_hooks");
@@ -107,8 +127,8 @@ final class ScopedFlatMovement {
         entities.assertUnchanged();
         require(System.nanoTime()-began>=0 && System.nanoTime()-began<=ScopedNativePreflight.MAX_NANOS,
                 "scoped_movement_check_budget_exceeded");
-        fence(mc,pose,true);
-        account(pose);
+        fence(mc,pose,true,actionTicks);
+        account(pose,actionTicks);
         lastEntityTick=entities.frame.tick();lastEntityNano=entities.frame.nano();
         maximumCheckedPopulation=Math.max(maximumCheckedPopulation,entities.frame.population());
         checks++;
@@ -185,7 +205,7 @@ final class ScopedFlatMovement {
         }
     }
     /** Final hook-free field/identity/time fence, immediately preceding a direct view/input write. */
-    private void fence(Minecraft mc,Pose p,boolean owned) {
+    private void fence(Minecraft mc,Pose p,boolean owned,int actionTicks) {
         long now=System.nanoTime();var v=player.getDeltaMovement();
         require(mc.isSameThread() && mc.player==player && mc.level==level && mc.gameMode!=null
                 && mc.getSingleplayerServer()==server && CapabilityGuard.privateSingleplayer(mc)
@@ -193,7 +213,7 @@ final class ScopedFlatMovement {
                 && worldGeneration.equals(WorldGeneration.current(level)) && player.getUUID().toString().equals(playerUuid)
                 && NavigationPositionGuard.epoch()==navigationEpoch
                 && ClientActions.session().equals(session)
-                && now>=sourceNano && now<deadline && p.tick>=sourceTick && p.tick-sourceTick>=0 && p.tick-sourceTick<ScopedEntityPolicy.MAX_TICKS
+                && now>=sourceNano && now<deadline && actionTicks>=0 && actionTicks<ScopedEntityPolicy.MAX_TICKS
                 && level.getGameTime()==p.tick
                 && mc.isWindowActive() && !mc.isPaused() && mc.screen==null
                 && player.containerMenu==player.inventoryMenu && player.containerMenu.getCarried().isEmpty()
@@ -207,17 +227,22 @@ final class ScopedFlatMovement {
                 && v.x==p.vx && v.y==p.vy && v.z==p.vz && player.getHealth()==p.health && player.getYRot()==p.yaw && player.getXRot()==p.pitch
                 && player.hurtTime==0 && player.onGround() && !player.horizontalCollision
                 && !keysDown(mc) && !BridgeServer.hasHeldInputs()
-                && (owned ? activated && ClientActions.ownsScopedMovement(this)
-                    && ClientActions.ownershipRevision()==ownerRevision : !ClientActions.ownsInput()),
+                && (owned ? activated && actionEntry!=null && ClientActions.ownsScopedMovement(this,actionEntry)
+                    && ClientActions.ownershipRevision()==ownerRevision
+                    // Re-read the trusted Entry after every potentially reentrant fact hook.
+                    && actionEntry.ticks==actionTicks
+                    : !activated && actionEntry==null && actionTicks==0 && !ClientActions.ownsInput()),
                 "scoped_movement_final_boundary_changed");
     }
-    private void account(Pose p) {
-        require(p.tick>=sampleTick && p.tick-sampleTick>=0 && p.tick-sampleTick<=1,"scoped_movement_tick_gap");
-        if(p.tick!=sampleTick){tickDistance=0;sampleTick=p.tick;}
+    private void account(Pose p,int actionTicks) {
+        require(actionTicks>=sampleActionTick && actionTicks-sampleActionTick<=1,"scoped_movement_tick_gap");
         double distance=Math.hypot(p.x-sampleX,p.z-sampleZ);
-        tickDistance+=distance;sampledDistance+=distance;sampleX=p.x;sampleZ=p.z;
-        require(tickDistance<=ScopedFlatPolicy.MAX_TICK_DISPLACEMENT
-                && sampledDistance<=bounds.steps()+1,"scoped_movement_sampled_displacement_exceeded");
+        double nextTickDistance=(actionTicks==sampleActionTick?tickDistance:0)+distance;
+        double nextSampledDistance=sampledDistance+distance;
+        require(nextTickDistance<=ScopedFlatPolicy.MAX_TICK_DISPLACEMENT
+                && nextSampledDistance<=bounds.steps()+1,"scoped_movement_sampled_displacement_exceeded");
+        tickDistance=nextTickDistance;sampledDistance=nextSampledDistance;
+        sampleActionTick=actionTicks;sampleX=p.x;sampleZ=p.z;
     }
     static boolean keysDown(Minecraft mc){return mc.options.keyUp.isDown() || mc.options.keyDown.isDown()
             || mc.options.keyLeft.isDown() || mc.options.keyRight.isDown() || mc.options.keyJump.isDown()
@@ -233,6 +258,7 @@ final class ScopedFlatMovement {
         out.addProperty("deadline_nano",Long.toString(deadline));
         out.addProperty("entity_guard_policy",ScopedEntityPolicy.POLICY);out.addProperty("entity_guard_checks",checks);
         out.addProperty("last_entity_check_tick",lastEntityTick);out.addProperty("last_entity_check_nano",Long.toString(lastEntityNano));
+        out.addProperty("timing_contract",TIMING_CONTRACT);out.addProperty("last_entity_check_action_tick",sampleActionTick);
         out.addProperty("maximum_checked_population",maximumCheckedPopulation);return out;
     }
     static String rejection(RuntimeException failure) {

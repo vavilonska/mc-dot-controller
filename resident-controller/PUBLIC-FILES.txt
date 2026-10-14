@@ -74,3 +74,12 @@ tests/fixtures/capability-bundle-wire/encoded-bundle-persistent_target.json
 tests/fixtures/capability-bundle-wire/encoded-bundle-stale_absent.json
 tests/fixtures/capability-bundle-wire/encoded-bundle-unknown_absent.json
 tests/fixtures/capability-bundle-wire/encoded-bundle-unrelated_nulls.json
+resident_controller/movement_wire.py
+tests/movement_t13/PORT-PROVENANCE.json
+tests/movement_t13/README.md
+tests/movement_t13/offline_guards.py
+tests/movement_t13/run_codec_cases.py
+tests/movement_t13/run_offline.py
+tests/movement_t13/test_full_reply_boundary.py
+tests/movement_t13/test_movement_wire_contract.py
+tests/movement_t13/test_node_reply_boundary.mjs

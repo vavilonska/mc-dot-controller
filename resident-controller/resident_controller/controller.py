@@ -26,6 +26,7 @@ from .encounter_contract import (validate_encounter_command, validate_encounter_
 from .pause_contract import pause_body, validate_pause_receipt
 from .transport import BridgeError, DIRECT
 from .capability_snapshot import source_freshness
+from .movement_wire import valid_size_diagnostic
 from .world import WorldCache, scan_identity
 
 TERMINAL = {'succeeded', 'failed', 'cancelled'}
@@ -41,6 +42,12 @@ def action_rejection_admission(exc):
         result['capability_source_freshness'] = deepcopy(freshness)
     elif freshness is not None or getattr(exc, 'capability_source_freshness_status', None) == 'invalid':
         result['capability_source_freshness_status'] = 'invalid'
+    movement_size = getattr(exc, 'scoped_movement_response_size', None)
+    if exc.status == 409 and exc.code == 'scoped_movement_response_evidence_too_large':
+        if valid_size_diagnostic(movement_size):
+            result['scoped_movement_response_size'] = deepcopy(movement_size)
+        elif movement_size is not None or getattr(exc, 'scoped_movement_response_size_status', None) == 'invalid':
+            result['scoped_movement_response_size_status'] = 'invalid'
     return result
 
 
@@ -293,6 +300,9 @@ class Resident:
                 'clock': 'python_monotonic', 'started_monotonic': capture['started_mono'],
                 'finished_monotonic': capture['finished_mono'],
                 'response_metadata': deepcopy(self.cache.state_response_metadata)}
+        if capability and self.cache.capability_wire is not None:
+            # Original bytes are stored once, separately from the decoded semantic siblings.
+            result['native_capability_wire'] = deepcopy(self.cache.capability_wire)
         if command.get('frame'):
             frame = self.bridge.request('GET', '/control/frame')
             path = self.root / 'latest.png'

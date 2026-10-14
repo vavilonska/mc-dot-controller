@@ -291,6 +291,12 @@ class OwnerRuntimeBackend:
                           'inventory_truncated': observation.player.get('inventory_truncated'),
                           'menu_slots_truncated': observation.state.get('menu', {}).get('slots_truncated')},
                       'server_confirmed': False}
+            wire = observation.raw.get('native_capability_wire')
+            if wire is not None:
+                # Raw bytes stay once in the archived receipt/data, not duplicated into public output.
+                result['provenance'].update(state_representation='decoded-semantic-native-siblings',
+                    native_wire_encoding=wire['encoding'], native_wire_bytes=wire['bytes'],
+                    native_wire_sha256=wire['sha256'])
         finally:
             if begun:
                 release = self.runtime.finish_job()
