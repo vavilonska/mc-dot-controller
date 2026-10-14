@@ -39,3 +39,14 @@ Consumers must recheck age and original identities when reading the persisted fi
 Missing, stale, replaced, terminal, cancel-attempted or unknown tasks expose null.
 It is diagnostic evidence, never dispatch authority or proof of effect attribution.
 Existing native safety remains active; progress does not suppress it.
+
+## MCP schema parity
+
+The Node MCP façade embeds the pure Python `mdc_toolbox/contracts.py` schemas.
+After any contract change, run `python3 client-mod/mcp/sync-toolbox-schema.py`,
+then `python3 client-mod/mcp/sync-toolbox-schema.py --check` and
+`node --test client-mod/mcp/toolbox-test.mjs` from the repository root.
+The check loads only the contract module, without starting a runtime or game.
+All policy declarations, including plan and job submission, must stay identical.
+The regression covers production MCP parsing and forwarding; synthetic tests do
+not establish live combat success or authorize replay of an earlier request.

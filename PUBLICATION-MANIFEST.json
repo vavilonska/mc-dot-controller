@@ -1,127 +1,53 @@
 {
-  "schema": "mdc-mainline-source-integration-v4",
-  "repository_parent_commit": "3f78ade9a6662d37e78526ce5bf56cd501297462",
-  "repository_parent_tree": "248aaf57df1ff65eeb0d499608ceeadbcb86a680",
-  "source_stage": "Explicit request-only policy and cached scoped combat progress",
+  "schema": "mdc-mainline-source-integration-v5",
+  "repository_parent_commit": "1ae85950e05ce192ed74d4fa36280c3cfeec77df",
+  "repository_parent_tree": "822813fbdf4df6a9762828d1545d1c0914559dde",
+  "source_stage": "MCP front-door request-only schema parity",
   "source_delta": [
     {
       "path": "capability-runtime/REQUEST-ONLY.md",
-      "sha256": "018dc73f45782643879c1a76d19b57fc1b83cbad3885a7a30f2a794a89642eb7",
-      "new": true,
-      "boundary": "policy"
+      "sha256": "3fc97e61314f12683300fc00d19e4db5bfdb6c68f308eda0686eb95e29a08f42"
     },
     {
-      "path": "capability-runtime/PUBLIC-FILES.txt",
-      "sha256": "555d953854f7bac7f97bb9fe778d1b22a7c0460b0dee31f7c91730bf7db38219",
-      "new": false,
-      "boundary": "policy"
+      "path": "client-mod/mcp/sync-toolbox-schema.py",
+      "sha256": "fc92dc29e3ea2a4ef0da17e9cf71a0a5abf74e57dfd76742ca3efb2fc4c1f0a7"
     },
     {
-      "path": "resident-controller/PUBLIC-FILES.txt",
-      "sha256": "780edf85a6979e1ae2b1c9e3c982f4cc72343b82b51618bd718517c84328fd6f",
-      "new": false,
-      "boundary": "progress"
+      "path": "client-mod/mcp/toolbox-owner-chain-fixture.py",
+      "sha256": "748edff7eb3f85719b246fa4c4efccfe03c51a3aa232070522a6a5bbe8c100a8"
     },
     {
-      "path": "defense-watchdog/capability_ownership.py",
-      "sha256": "b946bbfa32af9ea49951dc5f53109bc77cbe2b8ce95c761052c9fa0769a28872",
-      "new": false,
-      "boundary": "policy"
+      "path": "client-mod/mcp/toolbox-owner-chain-test.mjs",
+      "sha256": "d335aaaab5f5d3939f2f1de9b414bc5d18efff0e86528b5d7f1ab45c2c09d03a"
     },
     {
-      "path": "defense-watchdog/base_watchdog.py",
-      "sha256": "61b1cca88a685b473764761fcf52d3e979343e84a9f564ef40cc92119b7c15c1",
-      "new": false,
-      "boundary": "policy"
+      "path": "client-mod/mcp/toolbox-schema-test.mjs",
+      "sha256": "479f26940e314e2aed902480f04f1e2bf3c063f40f419d6b3ade9f08b822b374"
     },
     {
-      "path": "defense-watchdog/watchdog.py",
-      "sha256": "a133a9e4a781169092db2bc8957379adb19c6e8502d1734b6fc7357458edf475",
-      "new": false,
-      "boundary": "policy"
+      "path": "client-mod/mcp/toolbox-test.mjs",
+      "sha256": "8bb51b333f5a7e4aa236bd003ad4cecdf11db7d1d429c8b067b3e0d9644e7d66"
     },
     {
-      "path": "capability-runtime/mdc_skills/__main__.py",
-      "sha256": "ab50db726d460534c40b5a2e5f0cee940bec125d3c1254d423ba9d8f3be3a5fe",
-      "new": false,
-      "boundary": "policy"
-    },
-    {
-      "path": "capability-runtime/mdc_skills/core.py",
-      "sha256": "447c8e7e22c96fe1864d8431be0cfdd1b1679f44ba40ea9d5584372ad83bde0a",
-      "new": false,
-      "boundary": "policy"
-    },
-    {
-      "path": "capability-runtime/tests/test_request_only_policy.py",
-      "sha256": "7ac50168b3d0182a46bc1f3d93190ef957905fbd59cd7885999a2bdc544200ad",
-      "new": true,
-      "boundary": "policy"
-    },
-    {
-      "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "sha256": "65e30dfb6b818b7e2f7c41ff0d6df2f1302c30dc81f38babfe423714d24578fc",
-      "new": false,
-      "boundary": "policy"
-    },
-    {
-      "path": "capability-runtime/mdc_toolbox/contracts.py",
-      "sha256": "588a7f4fdfb7fe42e9a61bb467a6eb9b528c5322bc45f1127b69297ee539fc18",
-      "new": false,
-      "boundary": "policy"
-    },
-    {
-      "path": "resident-controller/tests/test_action_progress.py",
-      "sha256": "71df265be8e81bdc797bf547033dfdc31d0912070223284bd7c588e8cef4d91a",
-      "new": true,
-      "boundary": "progress"
-    },
-    {
-      "path": "resident-controller/resident_controller/controller.py",
-      "sha256": "ccf4055a6e25e3fe1f3c79232d717a658c23a4e9d687da1d57c385730110a873",
-      "new": false,
-      "boundary": "progress"
-    },
-    {
-      "path": "resident-controller/resident_controller/action_progress.py",
-      "sha256": "c2fe02718d0949bfbf6cef8b85299e7f7afc1659ae0661155629c5136355deed",
-      "new": true,
-      "boundary": "progress"
+      "path": "client-mod/mcp/toolbox.mjs",
+      "sha256": "be8eb10880852a3f6adf2eda9f4b5d01c012c252f84b0135bd38106c0f838d26"
     }
   ],
-  "source_review": "Independent offline source review passed; nested payload robustness and exact target/profile/epoch checks verified",
+  "source_review": "Independent review of schema-only production correction and subprocess regression",
   "verification": {
-    "broad": [
-      {
-        "name": "capability-runtime",
-        "exit": 0,
-        "summary": [
-          "Ran 729 tests in 267.525s",
-          "OK (skipped=1)"
-        ]
-      },
-      {
-        "name": "toolbox",
-        "exit": 0,
-        "summary": [
-          "Ran 57 tests in 0.081s",
-          "OK"
-        ]
-      }
-    ],
-    "default_discovery_skip": "Actual Java wire class requires external fixtures; all 8 cases passed separately on unchanged verified Java-emitted bytes",
-    "java_wire_consumer_tests": 8,
-    "policy_owner_regressions": 52,
-    "resident_regressions": 423,
-    "owner_chain_after_progress": 17,
-    "independent_policy_tests": 21,
-    "independent_progress_tests": 11,
-    "native_files_unchanged": 379,
+    "portable_node_tests": 129,
+    "toolbox_node_tests": 14,
+    "python_toolbox_tests": 57,
+    "ndjson_framing_tests": 9,
+    "schema_parity": "All four complete embedded schemas equal pure Python contracts; all three policy enums include request_only; check-mode drift detection and no bytecode writes verified",
+    "original_T20_request": "Exact private original arguments pass production executeToolbox and real MCP stdio schema gate; no live action replay",
+    "subprocess_chain": "Production executeToolbox to real Python Owner/Watchdog/Resident with synthetic native: one scoped admission, exact cancel, known terminal and cleared lease",
+    "native_source_resources_unchanged": 229,
     "native_artifact_sha256": "8048dde926387954edd47028703da0c2b3c8b97a1b441f85de77d670e741b3e7",
-    "scope": "Offline/synthetic only; no new game or native functional acceptance"
+    "scope": "Offline and synthetic; no new live combat claim"
   },
-  "native_provenance": "All 379 client-mod files byte-identical to parent; reuse separately verified 8048dde9 artifact without repack. Native safetyRetreat unchanged.",
-  "live_evidence": "Prior mining/collect evidence remains bounded; this Python change establishes no new live combat result. See capability-runtime/REQUEST-ONLY.md.",
+  "native_provenance": "All 229 client-mod/src files byte-identical to parent; only MCP adapter schema and tests changed. Reuse 8048dde9 artifact without repack.",
+  "live_evidence": "Prior mining/collect evidence remains bounded; this MCP schema change establishes no new live combat result. See capability-runtime/REQUEST-ONLY.md.",
   "excluded": [
     "Raw worlds, GUI, account data, credentials, runtime receipts and compiled artifacts",
     "Generated compressed synthetic test fixture"
@@ -325,8 +251,8 @@
     },
     {
       "path": "capability-runtime/REQUEST-ONLY.md",
-      "bytes": 2641,
-      "sha256": "018dc73f45782643879c1a76d19b57fc1b83cbad3885a7a30f2a794a89642eb7"
+      "bytes": 3277,
+      "sha256": "3fc97e61314f12683300fc00d19e4db5bfdb6c68f308eda0686eb95e29a08f42"
     },
     {
       "path": "capability-runtime/THREATS-DIMENSIONS.md",
@@ -1279,6 +1205,11 @@
       "sha256": "0bf72330b1fd4de8f339e537d4113d10cbeeb25984deca1deced787dca936235"
     },
     {
+      "path": "client-mod/mcp/sync-toolbox-schema.py",
+      "bytes": 1568,
+      "sha256": "fc92dc29e3ea2a4ef0da17e9cf71a0a5abf74e57dfd76742ca3efb2fc4c1f0a7"
+    },
+    {
       "path": "client-mod/mcp/three-zombie-contract-test.mjs",
       "bytes": 5649,
       "sha256": "f1aef800825e38bb9c1eac0eb5da297bb90e44c3deb14cf1ef1d628fd86bacec"
@@ -1289,14 +1220,29 @@
       "sha256": "69de54b0076ae0a5917263c184dc4404fe2d680de268d101b1c0d70eaa3f0655"
     },
     {
+      "path": "client-mod/mcp/toolbox-owner-chain-fixture.py",
+      "bytes": 3053,
+      "sha256": "748edff7eb3f85719b246fa4c4efccfe03c51a3aa232070522a6a5bbe8c100a8"
+    },
+    {
+      "path": "client-mod/mcp/toolbox-owner-chain-test.mjs",
+      "bytes": 3982,
+      "sha256": "d335aaaab5f5d3939f2f1de9b414bc5d18efff0e86528b5d7f1ab45c2c09d03a"
+    },
+    {
+      "path": "client-mod/mcp/toolbox-schema-test.mjs",
+      "bytes": 5455,
+      "sha256": "479f26940e314e2aed902480f04f1e2bf3c063f40f419d6b3ade9f08b822b374"
+    },
+    {
       "path": "client-mod/mcp/toolbox-test.mjs",
-      "bytes": 1803,
-      "sha256": "08c1b37b1184f49cb7f2a3954a41e82497cd41ca5822ed8423f28c29a619f0be"
+      "bytes": 1941,
+      "sha256": "8bb51b333f5a7e4aa236bd003ad4cecdf11db7d1d429c8b067b3e0d9644e7d66"
     },
     {
       "path": "client-mod/mcp/toolbox.mjs",
-      "bytes": 28788,
-      "sha256": "ac3b1d55ec8e84159230ff02222427978b8688cc06138a373fce0f5b7c7bbde7"
+      "bytes": 28833,
+      "sha256": "be8eb10880852a3f6adf2eda9f4b5d01c012c252f84b0135bd38106c0f838d26"
     },
     {
       "path": "client-mod/scripts/audit-terrain-source.py",

@@ -9,3 +9,8 @@ test('status exact identity XOR',async()=>{const r=await executeToolbox('mdc_job
 test('valid call uses supplied long-lived bridge',async()=>{let calls=0;const r=await executeToolbox('mdc_catalog',{api_version},{backend:{call(name,args){calls++;return {name,args};}}});assert.equal(r.name,'mdc_catalog');assert.equal(calls,1);});
 test('unavailable execute does not invent success',async()=>{const r=await executeToolbox('mdc_observe',{api_version,session_ref:'s',profile:'player'});assert.equal(r.error.code,'capability_unavailable');});
 test('nonfinite deeply invalid values never reach backend',async()=>{const r=await executeToolbox('mdc_catalog',{api_version,limit:NaN});assert.equal(r.error.code,'invalid_request');});
+
+// Contract parity and production MCP front-door coverage.
+import "./toolbox-schema-test.mjs";
+
+import "./toolbox-owner-chain-test.mjs";
