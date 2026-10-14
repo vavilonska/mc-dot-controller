@@ -89,3 +89,5 @@ resident_controller/mining_entities.py
 resident_controller/mining_snapshot.py
 tests/combat_witness_fixture.py
 tests/test_combat_scoped_witness.py
+resident_controller/action_progress.py
+tests/test_action_progress.py

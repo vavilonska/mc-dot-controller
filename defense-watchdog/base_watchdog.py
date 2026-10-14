@@ -31,7 +31,8 @@ from capability_ownership import CapabilityOwnership, CONTROL_OPS, context_of, s
 TERMINAL = {'succeeded', 'failed', 'cancelled', 'uncertain'}
 OWNER_OPS = {'observe', 'direct', 'action', 'walk_to', 'craft_planks', 'pillar',
              'scan_start', 'scan_status', 'scan_cancel', 'recovery_close_menu'} | CONTROL_OPS
-EXECUTION_POLICIES = frozenset({'standard', 'noncombat'})
+EXECUTION_POLICIES = frozenset({'standard', 'noncombat', 'request_only'})
+EXPLICIT_POLICIES = frozenset({'noncombat', 'request_only'})
 # Deliberately enumerated: a future native action is not silently authorized.
 # use_item is restricted to consumables by the native ClientActions handler.
 NONCOMBAT_ACTIONS = frozenset({'follow_path', 'break_block', 'place_block', 'click_slot',
@@ -153,15 +154,15 @@ class Watchdog(CapabilityOwnership):
                            for k in ('alive', 'health', 'food', 'x', 'y', 'z', 'selected_slot')}}
 
     def send(self, kind, command):
-        if (self.execution_policy == 'noncombat' and command.get('op') != 'observe'
+        if (self.execution_policy in EXPLICIT_POLICIES and command.get('op') != 'observe'
                 and not (self.stop_requested and kind == 'stop_cancel' and command == {'op': 'cancel'})):
             # Failure/timeout/death handling may ask for an automatic cancel.
             # This policy pauses instead; only explicit STOP may release input.
             # The exact pending owner/queue IDs are left untouched.
             if self.armed:
-                self.attention('noncombat_automatic_mutation_suppressed')
+                self.attention(self.execution_policy + '_automatic_mutation_suppressed')
             elif self.reason == 'observation_delayed_cancel_requested':
-                self.reason = 'noncombat_observation_delayed_no_cancel'
+                self.reason = self.execution_policy + '_observation_delayed_no_cancel'
             self.recover_observation = False
             return
         bridge = getattr(self, "_coordination_owner", None)
@@ -235,14 +236,15 @@ class Watchdog(CapabilityOwnership):
 
     def submit_owner(self, intent_id, command, *, queue_request_id=None):
         """Return False to keep a deferred intent in its inbox during combat."""
-        if (self.execution_policy == 'noncombat' and command.get('op') not in CONTROL_OPS
+        if (self.execution_policy in EXPLICIT_POLICIES and command.get('op') not in CONTROL_OPS
                 and command.get('op') != 'observe'
                 and not (command.get('op') == 'action' and self.capability_lease
                          and self.capability_lease['state'] == 'active'
                          and isinstance(command.get('_capability_owner_id'), str)
                          and bool(command['_capability_owner_id'])
                          and command['_capability_owner_id'] == self.capability_lease['owner_id']
-                         and command.get('action') in NONCOMBAT_ACTIONS)):
+                         and (command.get('action') in NONCOMBAT_ACTIONS if self.execution_policy == 'noncombat'
+                              else isinstance(command.get('scoped_native_preflight'), dict)))):
             self.capability_expired()
             if self.input_release_latched or self.handoff_latched:
                 return self.capability_complete(intent_id, 'cancelled', 'capability_owner_requires_handoff',
@@ -252,8 +254,8 @@ class Watchdog(CapabilityOwnership):
             if self.owner:
                 return False  # Do not obscure the pending owner's unknown outcome.
             # This is positive local non-dispatch evidence, not an HTTP receipt.
-            return self.capability_complete(intent_id, 'cancelled', 'noncombat_execution_policy',
-                policy_rejection={'schema_version': 1, 'execution_policy': 'noncombat', 'dispatched': False})
+            return self.capability_complete(intent_id, 'cancelled', self.execution_policy + '_execution_policy',
+                policy_rejection={'schema_version': 1, 'execution_policy': self.execution_policy, 'dispatched': False})
         capability = self.capability_submit(intent_id, command, queue_request_id=queue_request_id)
         if capability is not None:
             return capability
@@ -620,13 +622,13 @@ class Watchdog(CapabilityOwnership):
                         return
                     self.armed, self.recover_observation = True, False
                     self.phase, self.reason = 'watching', 'fresh_observations_recovered_no_action_replay'
-                if self.execution_policy == 'noncombat':
+                if self.execution_policy in EXPLICIT_POLICIES:
                     # Keep readiness for bounded lease admission without running
                     # hostile, health-loss, retreat or environmental tactics.
                     if context_of(state) is None or not safe_idle(self.latest):
-                        self.attention('noncombat_observation_not_safe_idle')
+                        self.attention(self.execution_policy + '_observation_not_safe_idle')
                         return
-                    self.phase, self.reason = 'watching', 'noncombat_observation_ready'
+                    self.phase, self.reason = 'watching', self.execution_policy + '_observation_ready'
                     return
                 if self.observe_tactics(state, combat, damaged, kind):
                     return
@@ -747,7 +749,7 @@ def read_policy_checkpoint(path, limit):
 
 
 def enforce_execution_policy(directory, execution_policy):
-    """A noncombat control directory cannot restart into automatic defense."""
+    """An explicit-only control directory cannot switch its pinned policy."""
     if execution_policy not in EXECUTION_POLICIES:
         raise ValueError('invalid_execution_policy')
     path = directory / 'execution-policy.json'
@@ -756,9 +758,9 @@ def enforce_execution_policy(directory, execution_policy):
         try:
             pin = read_policy_checkpoint(path, 1024)
             if (type(pin) is not dict or type(pin.get('schema_version')) is not int
-                    or pin['schema_version'] != 1 or pin.get('execution_policy') != 'noncombat'):
+                    or pin['schema_version'] != 1 or pin.get('execution_policy') not in EXPLICIT_POLICIES):
                 raise ValueError('invalid_execution_policy_checkpoint')
-            pinned = True
+            pinned = pin['execution_policy']
         except (OSError, ValueError, TypeError):
             raise ValueError('execution_policy_checkpoint_unconfirmed') from None
     elif os.path.lexists(directory / 'state.json'):
@@ -768,15 +770,15 @@ def enforce_execution_policy(directory, execution_policy):
                 raise ValueError('invalid_previous_watchdog_state')
         except (OSError, ValueError, TypeError):
             raise ValueError('execution_policy_previous_state_unconfirmed') from None
-        if prior.get('execution_policy') == 'noncombat':
-            raise ValueError('execution_policy_published_noncombat_pin_missing')
-    if pinned and execution_policy != 'noncombat':
-        raise ValueError('execution_policy_pinned_noncombat_requires_explicit_flag')
-    if execution_policy == 'noncombat' and not os.path.lexists(path):
+        if prior.get('execution_policy') in EXPLICIT_POLICIES:
+            raise ValueError('execution_policy_published_' + prior['execution_policy'] + '_pin_missing')
+    if pinned and execution_policy != pinned:
+        raise ValueError('execution_policy_pinned_' + pinned + '_requires_explicit_flag')
+    if execution_policy in EXPLICIT_POLICIES and not os.path.lexists(path):
         # Before any observation or queue dispatch, fsync the policy selection.
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, 'w') as stream:
-            json.dump({'schema_version': 1, 'execution_policy': 'noncombat'}, stream)
+            json.dump({'schema_version': 1, 'execution_policy': execution_policy}, stream)
             stream.flush()
             os.fsync(stream.fileno())
         fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
@@ -797,8 +799,8 @@ def run(queue, directory, watchdog_class=Watchdog, *, coordination_factory=None,
         raise ValueError('remove_previous_STOP_explicitly_before_new_run')
     try:
         enforce_execution_policy(directory, execution_policy)
-        if execution_policy == 'noncombat' and coordination_factory is not None:
-            raise ValueError('noncombat_coordination_not_supported')
+        if execution_policy in EXPLICIT_POLICIES and coordination_factory is not None:
+            raise ValueError(execution_policy + '_coordination_not_supported')
         dog = (watchdog_class(QueueClient(queue), execution_policy=execution_policy)
                if execution_policy != 'standard' else watchdog_class(QueueClient(queue)))
     except BaseException:

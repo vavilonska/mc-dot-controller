@@ -99,3 +99,5 @@ tests/mining_collect/references/accepted_movement_sha256.json
 tests/mining_collect/references/original_resources.py
 tests/mining_collect/run_offline.py
 tests/mining_collect/test_native_wire.py
+REQUEST-ONLY.md
+tests/test_request_only_policy.py

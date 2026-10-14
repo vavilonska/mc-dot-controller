@@ -169,7 +169,7 @@ class Runtime:
                 and 0 < wait_timeout <= 660, "invalid_wait_budget")
         require(type(capability_duration_seconds) in (int, float) and math.isfinite(capability_duration_seconds)
                 and 1 <= capability_duration_seconds <= 86400, "invalid_capability_ownership_duration")
-        require(required_execution_policy in (None, "standard", "noncombat"), "invalid_required_execution_policy")
+        require(required_execution_policy in (None, "standard", "noncombat", "request_only"), "invalid_required_execution_policy")
         self.required_execution_policy = required_execution_policy
         self._lease_duration_ms = int(capability_duration_seconds * 1000)
         self._lease_enabled = callable(getattr(client, "acquire_capability", None))
@@ -1073,11 +1073,13 @@ class Runtime:
         if cls._unsafe_flags(result) or cls._unsafe_flags(result.get("result")):
             return False
         policy = result.get("policy_rejection")
-        if (result.get("status") == "cancelled" and result.get("reason") == "noncombat_execution_policy"
+        if (result.get("status") == "cancelled" and result.get("reason") in ("noncombat_execution_policy", "request_only_execution_policy")
                 and result.get("gameplay_effect_confirmed") is False and "queue_request_id" in result
                 and result["queue_request_id"] is None and isinstance(policy, dict) and not cls._unsafe_flags(policy)
                 and type(policy.get("schema_version")) is int and policy["schema_version"] == 1
-                and policy.get("execution_policy") == "noncombat" and policy.get("dispatched") is False
+                and policy.get("execution_policy") in ("noncombat", "request_only")
+                and result.get("reason") == policy["execution_policy"] + "_execution_policy"
+                and policy.get("dispatched") is False
                 and result.get("action") is None and result.get("action_id") is None
                 and result.get("cancellation") is None
                 and result.get("result") in (None, {})):

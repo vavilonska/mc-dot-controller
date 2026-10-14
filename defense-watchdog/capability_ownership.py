@@ -337,6 +337,9 @@ class CapabilityOwnership:
         elif op == 'action':
             context = lease['context']; guard = body.get('capability_guard')
             scoped = body.get('scoped_native_preflight')
+            if (getattr(self, 'execution_policy', 'standard') == 'request_only'
+                    and (not isinstance(scoped, dict) or not isinstance(scoped.get('profile'), str))):
+                return self.capability_complete(intent_id, 'cancelled', 'capability_command_out_of_scope')
             scoped_valid = scoped is None or (isinstance(scoped, dict)
                 and set(scoped) == {'version', 'profile', 'owner_id', 'owner_generation', 'job_id', 'defense_epoch'}
                 and scoped.get('version') == 'scoped-native-preflight/1'
@@ -345,6 +348,11 @@ class CapabilityOwnership:
                 and type(scoped.get('owner_generation')) is int and scoped['owner_generation'] > 0
                 and isinstance(scoped.get('job_id'), str) and 0 < len(scoped['job_id']) <= 80
                 and scoped.get('profile') in (self.latest or {}).get('state', {}).get('scoped_native_preflight', {}).get('profiles', {}))
+            if getattr(self, 'execution_policy', 'standard') == 'request_only':
+                profiles = (self.latest or {}).get('state', {}).get('scoped_native_preflight', {}).get('profiles', {})
+                scoped_valid = (scoped_valid and isinstance(scoped, dict)
+                    and isinstance(profiles.get(scoped.get('profile')), list)
+                    and body.get('action') in profiles[scoped['profile']])
             valid = (scoped_valid and not lease['post_observation_required']
                 and body.get('action') in ACTIONS and isinstance(guard, dict)
                 and (expected_dimension is None or body.get('action') == 'follow_path'

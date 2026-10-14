@@ -85,7 +85,7 @@ class OwnerRuntimeBackend:
                 'session_ref': _ref(session.get('session_id')), 'context_ref': _ref(session.get('capability_context')),
                 'supported_capabilities': supported, 'native_features': sorted(features),
                 'supported_budget_metrics': list(SharedBudget.METRICS),
-                'supported_policies': {'version': 1, 'execution_mode': ['noncombat','guarded'], 'reactions': ['stop']},
+                'supported_policies': {'version': 1, 'execution_mode': ['noncombat','guarded','request_only'], 'reactions': ['stop']},
                 'execution_policy': session.get('execution_policy'),
                 'cancellation_supported': session.get('capability_cancel_schema_version') == 1,
                 'scoped_profiles': deepcopy(scoped.get('profiles', {})) if isinstance(scoped, dict) else {},
@@ -126,10 +126,10 @@ class OwnerRuntimeBackend:
                 return self._blocked('expected_context_changed', context)
             policy = context.get('policy', {})
             if (not isinstance(policy, dict) or set(policy) - {'version','execution_mode','reactions'}
-                    or policy.get('version') != 1 or policy.get('execution_mode') not in ('noncombat','guarded')
+                    or policy.get('version') != 1 or policy.get('execution_mode') not in ('noncombat','guarded','request_only')
                     or policy.get('reactions', 'stop') != 'stop'):
                 return self._blocked('unsupported_execution_or_reaction_policy', context)
-            expected_policy = 'noncombat' if policy['execution_mode'] == 'noncombat' else 'standard'
+            expected_policy = {'noncombat': 'noncombat', 'guarded': 'standard', 'request_only': 'request_only'}[policy['execution_mode']]
             if description.get('execution_policy') != expected_policy:
                 return self._blocked('requested_gateway_execution_policy_not_active', context)
             if context.get('budget', {}).get('cleanup_reserve_actions', 1) < 1:

@@ -28,6 +28,7 @@ from .transport import BridgeError, DIRECT
 from .capability_snapshot import source_freshness
 from .movement_wire import valid_size_diagnostic
 from .world import WorldCache, scan_identity
+from .action_progress import active_progress
 
 TERMINAL = {'succeeded', 'failed', 'cancelled'}
 TASKS = {'action', 'walk_to', 'craft_planks', 'pillar'}
@@ -74,6 +75,8 @@ class Running:
     step_number: int = 0
     response: object = None
     last_action_result: object = None
+    last_action_observed_monotonic: float | None = None
+    last_action_observed_unix: float | None = None
     wake_at: float = 0.0
     encounter_request: dict | None = None
     capability_cancel_attempted: bool = False
@@ -126,6 +129,8 @@ class Resident:
                 'bridge_identity': self.bridge_identity,
                 'active_request_id': self.active.command['request_id'] if self.active else None,
                 'active_action_id': self.active.action_id if self.active else None,
+                'active_action_progress': active_progress(self.active, self.session_id,
+                    (self.bridge_identity or {}).get('action_session'), time.monotonic()),
                 'pending': len(self.pending),
                 'pending_request_ids': [c['request_id'] for c in self.pending], 'aim_lock': self.aim.status(),
                 'combat': self.combat.status(), 'scan_cache': self.prospecting.summary(),
@@ -1323,7 +1328,9 @@ class Resident:
             validate_encounter_receipt(result, task.encounter_request)
         except (ValueError, KeyError, TypeError):
             raise BridgeError('encounter_action_receipt_invalid', uncertain=True) from None
-        task.last_action_result = result
+        task.last_action_result = deepcopy(result)
+        task.last_action_observed_monotonic = time.monotonic()
+        task.last_action_observed_unix = time.time()
         status = result.get('status')
         if status == 'running':
             return

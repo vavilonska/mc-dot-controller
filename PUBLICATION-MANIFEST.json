@@ -1,64 +1,102 @@
 {
-  "schema": "mdc-mainline-source-integration-v3",
-  "repository_parent_commit": "9bfd430ee5b7667ae6a036e42df03b1c5d503bac",
-  "repository_parent_tree": "d29ff413100f08946f8178f22c74e382ffcc01ef",
-  "source_stage": "scoped mining-preview plus collect and offline combat integration",
-  "source_freezes": {
-    "mining_preview": "983e40170b33dd4fd74adbc92d85d2adc297f4302891925ac8d8f15b690b6728",
-    "collect": "c8630710c97f11f09809d5d6e79869af4fc8a731bb76adf1df58d957d8593fe0",
-    "combat_delta": "9aba7055079fec2537698aa6360099b90e759bcea1b0523740afc225dcca9498"
-  },
-  "merge_strategy": "Exact cumulative mining+collect source plus reviewed additive combat shared-file merges. Retained published-main fixes.",
-  "integration_corrections": [
+  "schema": "mdc-mainline-source-integration-v4",
+  "repository_parent_commit": "3f78ade9a6662d37e78526ce5bf56cd501297462",
+  "repository_parent_tree": "248aaf57df1ff65eeb0d499608ceeadbcb86a680",
+  "source_stage": "Explicit request-only policy and cached scoped combat progress",
+  "source_delta": [
     {
-      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "reason": "Confirmed standalone collect wire lost required explicit nullable mob_target_uuid; include collect in existing witness null-preservation selector only.",
-      "before_sha256": "2a25c428a60b9a831a80069df7700596e879c73c39d0e251e536acee8f448f36",
-      "after_sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
+      "path": "capability-runtime/REQUEST-ONLY.md",
+      "sha256": "018dc73f45782643879c1a76d19b57fc1b83cbad3885a7a30f2a794a89642eb7",
+      "new": true,
+      "boundary": "policy"
     },
     {
-      "path": "capability-runtime/tests/test_scoped_combat_chain.py",
-      "reason": "Preserve standard main test discovery without unqualified cross-package fixture import; fixture and all assertions unchanged.",
-      "before_sha256": "7527cbc349613edc974017edfe56fedb2a2e51db78358407ac1c39d1e80e0c21",
-      "after_sha256": "09e46d436742f715f70513e563547de94006bbc5bf9acf16e8a09e3e32f21dbf"
+      "path": "capability-runtime/PUBLIC-FILES.txt",
+      "sha256": "555d953854f7bac7f97bb9fe778d1b22a7c0460b0dee31f7c91730bf7db38219",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "resident-controller/PUBLIC-FILES.txt",
+      "sha256": "780edf85a6979e1ae2b1c9e3c982f4cc72343b82b51618bd718517c84328fd6f",
+      "new": false,
+      "boundary": "progress"
+    },
+    {
+      "path": "defense-watchdog/capability_ownership.py",
+      "sha256": "b946bbfa32af9ea49951dc5f53109bc77cbe2b8ce95c761052c9fa0769a28872",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "defense-watchdog/base_watchdog.py",
+      "sha256": "61b1cca88a685b473764761fcf52d3e979343e84a9f564ef40cc92119b7c15c1",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "defense-watchdog/watchdog.py",
+      "sha256": "a133a9e4a781169092db2bc8957379adb19c6e8502d1734b6fc7357458edf475",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "capability-runtime/mdc_skills/__main__.py",
+      "sha256": "ab50db726d460534c40b5a2e5f0cee940bec125d3c1254d423ba9d8f3be3a5fe",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "capability-runtime/mdc_skills/core.py",
+      "sha256": "447c8e7e22c96fe1864d8431be0cfdd1b1679f44ba40ea9d5584372ad83bde0a",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "capability-runtime/tests/test_request_only_policy.py",
+      "sha256": "7ac50168b3d0182a46bc1f3d93190ef957905fbd59cd7885999a2bdc544200ad",
+      "new": true,
+      "boundary": "policy"
+    },
+    {
+      "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
+      "sha256": "65e30dfb6b818b7e2f7c41ff0d6df2f1302c30dc81f38babfe423714d24578fc",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "capability-runtime/mdc_toolbox/contracts.py",
+      "sha256": "588a7f4fdfb7fe42e9a61bb467a6eb9b528c5322bc45f1127b69297ee539fc18",
+      "new": false,
+      "boundary": "policy"
+    },
+    {
+      "path": "resident-controller/tests/test_action_progress.py",
+      "sha256": "71df265be8e81bdc797bf547033dfdc31d0912070223284bd7c588e8cef4d91a",
+      "new": true,
+      "boundary": "progress"
+    },
+    {
+      "path": "resident-controller/resident_controller/controller.py",
+      "sha256": "ccf4055a6e25e3fe1f3c79232d717a658c23a4e9d687da1d57c385730110a873",
+      "new": false,
+      "boundary": "progress"
+    },
+    {
+      "path": "resident-controller/resident_controller/action_progress.py",
+      "sha256": "c2fe02718d0949bfbf6cef8b85299e7f7afc1659ae0661155629c5136355deed",
+      "new": true,
+      "boundary": "progress"
     }
   ],
-  "source_reviews": {
-    "collect": "passed actual combined source",
-    "combat": "passed actual combined source",
-    "scope": "offline source only"
-  },
+  "source_review": "Independent offline source review passed; nested payload robustness and exact target/profile/epoch checks verified",
   "verification": {
     "broad": [
-      {
-        "name": "resident-controller",
-        "exit": 0,
-        "summary": [
-          "Ran 419 tests in 2.818s",
-          "OK"
-        ]
-      },
-      {
-        "name": "navigation-cursor",
-        "exit": 0,
-        "summary": [
-          "Ran 83 tests in 0.118s",
-          "OK"
-        ]
-      },
-      {
-        "name": "gameplay-helpers",
-        "exit": 0,
-        "summary": [
-          "Ran 64 tests in 4.422s",
-          "OK"
-        ]
-      },
       {
         "name": "capability-runtime",
         "exit": 0,
         "summary": [
-          "Ran 718 tests in 260.669s",
+          "Ran 729 tests in 267.525s",
           "OK (skipped=1)"
         ]
       },
@@ -66,81 +104,27 @@
         "name": "toolbox",
         "exit": 0,
         "summary": [
-          "Ran 57 tests in 0.082s",
+          "Ran 57 tests in 0.081s",
           "OK"
-        ]
-      },
-      {
-        "name": "node-portable",
-        "exit": 0,
-        "summary": [
-          "\u2139 tests 122",
-          "\u2139 pass 122",
-          "\u2139 fail 0",
-          "\u2139 skipped 0"
-        ]
-      },
-      {
-        "name": "node-framing",
-        "exit": 0,
-        "summary": [
-          "\u2139 tests 9",
-          "\u2139 pass 9",
-          "\u2139 fail 0",
-          "\u2139 skipped 0"
-        ]
-      },
-      {
-        "name": "node-platform",
-        "exit": 0,
-        "summary": [
-          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
-          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
         ]
       }
     ],
-    "capability_discovery_skip": "One actual-Java-wire fixture-dependent class skipped in default discovery; its8 cases passed separately.",
-    "focused_python": {
-      "mining": 32,
-      "collect": 22,
-      "collect_actual_owner_chain_synthetic_native": 7,
-      "combat_recheck": 32,
-      "actual_java_wire_consumers": 8
-    },
-    "native": {
-      "production_sources": 128,
-      "fresh_class_origins": 321,
-      "baseline_mod_jar_used": false,
-      "t13_scenarios": 15,
-      "t13_policy_assertions": 168,
-      "mining_policy_codec": 10,
-      "collect_policy": 338,
-      "combat_fence": 14,
-      "combat_intent": 16,
-      "combined_codec": 15
-    },
-    "existing_t13_wire": {
-      "codec_tests": 8,
-      "python_full_reply_tests": 6,
-      "python_reported_cases": 22,
-      "node_cases": 38
-    },
-    "not_run": [
-      "full Gradle/NeoForge build",
-      "Windows/PowerShell validation",
-      "transformed mixin application",
-      "native combat functional attack/shield/cancel",
-      "live collect",
-      "live combat"
-    ]
+    "default_discovery_skip": "Actual Java wire class requires external fixtures; all 8 cases passed separately on unchanged verified Java-emitted bytes",
+    "java_wire_consumer_tests": 8,
+    "policy_owner_regressions": 52,
+    "resident_regressions": 423,
+    "owner_chain_after_progress": 17,
+    "independent_policy_tests": 21,
+    "independent_progress_tests": 11,
+    "native_files_unchanged": 379,
+    "native_artifact_sha256": "8048dde926387954edd47028703da0c2b3c8b97a1b441f85de77d670e741b3e7",
+    "scope": "Offline/synthetic only; no new game or native functional acceptance"
   },
-  "live_evidence": "See docs/MINING-COLLECT-COMBAT.md for T15/T16 mining/saved readback and failed automatic marker distinction; collect/combat remain offline only.",
-  "reactions": "cross-action stop; no automatic resume",
+  "native_provenance": "All 379 client-mod files byte-identical to parent; reuse separately verified 8048dde9 artifact without repack. Native safetyRetreat unchanged.",
+  "live_evidence": "Prior mining/collect evidence remains bounded; this Python change establishes no new live combat result. See capability-runtime/REQUEST-ONLY.md.",
   "excluded": [
-    "Generated compressed synthetic fixture; regenerate from checked-in generator",
-    "Raw live receipts, worlds, GUI, account/profile/config/credential data",
-    "Compiled artifacts, dependency binaries, consumed operational packets",
-    "Stale candidate docs/tests and case-only build stamp"
+    "Raw worlds, GUI, account data, credentials, runtime receipts and compiled artifacts",
+    "Generated compressed synthetic test fixture"
   ],
   "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt to avoid hash cycles",
   "files": [
@@ -331,13 +315,18 @@
     },
     {
       "path": "capability-runtime/PUBLIC-FILES.txt",
-      "bytes": 3286,
-      "sha256": "380cafd6f8bddd1320364afe64e650ffb6b2d1f1ec27782891681cbd6481c9c5"
+      "bytes": 3336,
+      "sha256": "555d953854f7bac7f97bb9fe778d1b22a7c0460b0dee31f7c91730bf7db38219"
     },
     {
       "path": "capability-runtime/README.md",
       "bytes": 13472,
       "sha256": "a974c443d7dc290cb66b6b331a2f2457c32a070ef57790ecf973f7f019b16954"
+    },
+    {
+      "path": "capability-runtime/REQUEST-ONLY.md",
+      "bytes": 2641,
+      "sha256": "018dc73f45782643879c1a76d19b57fc1b83cbad3885a7a30f2a794a89642eb7"
     },
     {
       "path": "capability-runtime/THREATS-DIMENSIONS.md",
@@ -401,8 +390,8 @@
     },
     {
       "path": "capability-runtime/mdc_skills/__main__.py",
-      "bytes": 5036,
-      "sha256": "29d9fdad038abba20f4d860096a235e0a9b45d0171f0964a68727c28c5d67fe2"
+      "bytes": 5284,
+      "sha256": "ab50db726d460534c40b5a2e5f0cee940bec125d3c1254d423ba9d8f3be3a5fe"
     },
     {
       "path": "capability-runtime/mdc_skills/building.py",
@@ -431,8 +420,8 @@
     },
     {
       "path": "capability-runtime/mdc_skills/core.py",
-      "bytes": 83400,
-      "sha256": "0aeec400fe8cf99d1b1882849557e07c75fbd5ff0c3ecfedc7ce571bf252b2f5"
+      "bytes": 83578,
+      "sha256": "447c8e7e22c96fe1864d8431be0cfdd1b1679f44ba40ea9d5584372ad83bde0a"
     },
     {
       "path": "capability-runtime/mdc_skills/danger_policy.py",
@@ -611,8 +600,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/contracts.py",
-      "bytes": 12823,
-      "sha256": "60e848eb6ea897f23d4d4d0da3f0ddfffcf5b5c21fad0a73c292023c573c2d0c"
+      "bytes": 12838,
+      "sha256": "588a7f4fdfb7fe42e9a61bb467a6eb9b528c5322bc45f1127b69297ee539fc18"
     },
     {
       "path": "capability-runtime/mdc_toolbox/control.py",
@@ -626,8 +615,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "bytes": 21176,
-      "sha256": "f0ce7871890f277a1c972762fef3b974c79d0e3c7c7467aea86edce5b76f750f"
+      "bytes": 21243,
+      "sha256": "65e30dfb6b818b7e2f7c41ff0d6df2f1302c30dc81f38babfe423714d24578fc"
     },
     {
       "path": "capability-runtime/mdc_toolbox/serialization.py",
@@ -935,6 +924,11 @@
       "sha256": "0f6dab5cbb5e23c7708b56f1bc4e44fafe4826ad7327ac6d082d980a2186f84b"
     },
     {
+      "path": "capability-runtime/tests/test_request_only_policy.py",
+      "bytes": 4805,
+      "sha256": "7ac50168b3d0182a46bc1f3d93190ef957905fbd59cd7885999a2bdc544200ad"
+    },
+    {
       "path": "capability-runtime/tests/test_runtime_ownership.py",
       "bytes": 6607,
       "sha256": "6b9203bcc424c0bb04915f70143adf18e0efa103b59b174cff841bd30f5a1c52"
@@ -1175,6 +1169,11 @@
       "sha256": "0322b26903d890aafa885741cadd7e7a598b566079e169c4dd14f67abb08dfd8"
     },
     {
+      "path": "client-mod/gradle.properties",
+      "bytes": 416,
+      "sha256": "f49ba38b5c6269fb7073e7254f558ab4865ad7a75f5e4a3a0d69961c3e8460f1"
+    },
+    {
       "path": "client-mod/gradle/wrapper/LICENSE",
       "bytes": 10174,
       "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
@@ -1188,11 +1187,6 @@
       "path": "client-mod/gradle/wrapper/gradle-wrapper.properties",
       "bytes": 253,
       "sha256": "7e0821d895908883350587c74476b717016ab416320c44dc82a10def916c6fb5"
-    },
-    {
-      "path": "client-mod/gradle.properties",
-      "bytes": 416,
-      "sha256": "f49ba38b5c6269fb7073e7254f558ab4865ad7a75f5e4a3a0d69961c3e8460f1"
     },
     {
       "path": "client-mod/gradlew",
@@ -2901,13 +2895,13 @@
     },
     {
       "path": "defense-watchdog/base_watchdog.py",
-      "bytes": 50477,
-      "sha256": "61466d9d57e677edb9a2bed2f150b18c0821bc89d9fb40be1b14ec7dffad17c2"
+      "bytes": 50876,
+      "sha256": "61b1cca88a685b473764761fcf52d3e979343e84a9f564ef40cc92119b7c15c1"
     },
     {
       "path": "defense-watchdog/capability_ownership.py",
-      "bytes": 30170,
-      "sha256": "c7b865c7b2c27b0f18deb0bb59914085912eb5a51899b7fcccbb4180322ebd85"
+      "bytes": 30886,
+      "sha256": "b946bbfa32af9ea49951dc5f53109bc77cbe2b8ce95c761052c9fa0769a28872"
     },
     {
       "path": "defense-watchdog/environment_recovery.py",
@@ -2986,8 +2980,8 @@
     },
     {
       "path": "defense-watchdog/watchdog.py",
-      "bytes": 23974,
-      "sha256": "0bc940ec2939e06f9c7e6123a886415756ad646e2a5c76431918c2444828987e"
+      "bytes": 24064,
+      "sha256": "a133a9e4a781169092db2bc8957379adb19c6e8502d1734b6fc7357458edf475"
     },
     {
       "path": "docs/MINING-COLLECT-COMBAT.md",
@@ -3631,8 +3625,8 @@
     },
     {
       "path": "resident-controller/PUBLIC-FILES.txt",
-      "bytes": 3668,
-      "sha256": "bde5c8b115225cd2ef1a3694ee10ab4756887d1b0f58d0dcbd13bd31364a443b"
+      "bytes": 3737,
+      "sha256": "780edf85a6979e1ae2b1c9e3c982f4cc72343b82b51618bd718517c84328fd6f"
     },
     {
       "path": "resident-controller/README.md",
@@ -3700,6 +3694,11 @@
       "sha256": "a7f69822c098988fec2da5f9fe4113fa9c584e897a3f5fe368d7f78a1aaea884"
     },
     {
+      "path": "resident-controller/resident_controller/action_progress.py",
+      "bytes": 3782,
+      "sha256": "c2fe02718d0949bfbf6cef8b85299e7f7afc1659ae0661155629c5136355deed"
+    },
+    {
       "path": "resident-controller/resident_controller/action_safety.py",
       "bytes": 1471,
       "sha256": "96da16ecbcc53348bbd8817ee280189cbac970a0a6370eada84191fd360929b2"
@@ -3726,8 +3725,8 @@
     },
     {
       "path": "resident-controller/resident_controller/controller.py",
-      "bytes": 83641,
-      "sha256": "5a3b4325198b3e022d6273a6b1f3e8255a97cb29f9cd7267c8e92751b6f0ba3a"
+      "bytes": 84098,
+      "sha256": "ccf4055a6e25e3fe1f3c79232d717a658c23a4e9d687da1d57c385730110a873"
     },
     {
       "path": "resident-controller/resident_controller/coordination_contract.py",
@@ -3948,6 +3947,11 @@
       "path": "resident-controller/tests/movement_t13/test_node_reply_boundary.mjs",
       "bytes": 8334,
       "sha256": "90ab69f4c2bb0fd56f8bc941b0467c087f030bd3e1fcdb3c8ebd8042c64b45e3"
+    },
+    {
+      "path": "resident-controller/tests/test_action_progress.py",
+      "bytes": 4122,
+      "sha256": "71df265be8e81bdc797bf547033dfdc31d0912070223284bd7c588e8cef4d91a"
     },
     {
       "path": "resident-controller/tests/test_capability_action_radius.py",

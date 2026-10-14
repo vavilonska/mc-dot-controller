@@ -134,7 +134,7 @@ REFERENCE = string(256)
 VERSION = {'type':'string','const':API_VERSION}
 CAPABILITY = {'type':'string','pattern':'^[a-z][a-z0-9_]{0,79}$','maxLength':80}
 WAIT = integer(0,10000)
-POLICY = obj({'version':{'type':'integer','const':1}, 'execution_mode':{'type':'string','enum':['noncombat','guarded']},
+POLICY = obj({'version':{'type':'integer','const':1}, 'execution_mode':{'type':'string','enum':['noncombat','guarded','request_only']},
               'reactions':{'type':'string','enum':['stop','avoid','defend']}}, ('version','execution_mode'))
 BUDGETS = obj({'deadline_seconds':integer(1,86400),'max_actions':integer(1,32768),'max_observations':integer(1,32768),
                'reflex_reserve_actions':integer(0,32768),'cleanup_reserve_actions':integer(0,32768)}, ('deadline_seconds','max_actions'))

@@ -17,7 +17,9 @@ def parser():
     run = sub.add_parser('run-goal', help='Explicitly run one bounded goal through an existing watchdog')
     run.add_argument('--control', type=Path, required=True, help='Already-authorized existing watchdog control directory')
     run.add_argument('--journal', type=Path, required=True, help='Private capability checkpoint directory')
-    run.add_argument('--require-noncombat', action='store_true', help='Refuse a watchdog without the explicit noncombat execution policy')
+    policies = run.add_mutually_exclusive_group()
+    policies.add_argument('--require-request-only', action='store_true', help='Require scoped request-only ownership; no autonomous defense')
+    policies.add_argument('--require-noncombat', action='store_true', help='Refuse a watchdog without the explicit noncombat execution policy')
     run.add_argument('--file', type=Path, required=True, help='Explicit JSON goal, unique goal_id, skill, arguments, max_actions, deadline_seconds')
     return p
 
@@ -60,7 +62,7 @@ def main(argv=None):
         if type(deadline) not in (int, float) or not 1 <= deadline <= 86400:
             raise SkillError('invalid_goal_deadline')
         with Runtime(client, args.journal, capability_duration_seconds=min(86400, deadline + 30),
-                     required_execution_policy='noncombat' if args.require_noncombat else None) as runtime:
+                     required_execution_policy=('request_only' if args.require_request_only else 'noncombat' if args.require_noncombat else None)) as runtime:
             scheduler = Scheduler(runtime, registry)
             scheduler.add(goal['goal_id'], goal['skill'], goal['arguments'],
                           max_actions=goal['max_actions'], deadline_seconds=goal['deadline_seconds'])

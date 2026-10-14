@@ -61,7 +61,7 @@ class Watchdog(base.Watchdog):
                      if e.get('uuid')==identity and e.get('type') in base.HOSTILES and e.get('alive') is True),None)
 
     def send(self,kind,command):
-        if self.execution_policy == 'noncombat':
+        if self.execution_policy in base.EXPLICIT_POLICIES:
             return super().send(kind,command)
         if kind=='start_combat':
             state=(self.latest or {}).get('state',{})
@@ -252,7 +252,7 @@ class Watchdog(base.Watchdog):
                     and 0 <= self.clock()-lease.get('observed_at',-math.inf) <= .5)
 
     def submit_owner(self,intent_id,command, *, queue_request_id=None):
-        if (self.execution_policy == 'noncombat' or command.get("op") in base.CONTROL_OPS
+        if (self.execution_policy in base.EXPLICIT_POLICIES or command.get("op") in base.CONTROL_OPS
                 or self.capability_lease or "_capability_owner_id" in command):
             return super().submit_owner(intent_id, command, queue_request_id=queue_request_id)
         if self.environment.active:return False
@@ -360,7 +360,7 @@ class Watchdog(base.Watchdog):
         self.phase,self.reason='retreating','following_observed_dry_route'
 
     def tick(self):
-        if self.execution_policy == 'noncombat':
+        if self.execution_policy in base.EXPLICIT_POLICIES:
             return super().tick()
         bridge=getattr(self,'_coordination_owner',None)
         if bridge is not None:return bridge.tick_watchdog()
@@ -405,7 +405,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='mode',required=True)
     start=sub.add_parser('run');start.add_argument('--queue',required=True);start.add_argument('--control',type=Path,required=True)
     start.add_argument('--execution-policy',choices=sorted(base.EXECUTION_POLICIES),default='standard',
-                       help='noncombat: explicit guarded capability actions only; no automatic defense/recovery')
+                       help='noncombat: noncombat leased actions; request_only: scoped leased actions including explicit combat; neither runs automatic defense/recovery')
     send=sub.add_parser('submit');send.add_argument('--control',type=Path,required=True);send.add_argument('--json',required=True)
     stop=sub.add_parser('stop');stop.add_argument('--control',type=Path,required=True)
     a=p.parse_args()
