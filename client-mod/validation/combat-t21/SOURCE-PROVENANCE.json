@@ -1,0 +1,26 @@
+{
+  "parent_commit": "eab30261271d5577cdfc4cd4d3a1a0f5fd471393",
+  "scope": "Source-derived encoding regression only, not runtime validation or a replacement full case verifier",
+  "proof": {
+    "optional_null": "CombatHealthEvidence writes JsonNull when trigger() is null; BridgeJson writeObject omits nested null outside explicit nullable branches, while coherent client_action preserves nested nulls",
+    "health": "BridgeServer nearby living.getHealth() boxes Float; BoundedCombat number(double) widens float health to Double; compare identical binary32, never epsilon"
+  },
+  "files": [
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
+      "sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
+      "sha256": "ae49e2030c5c1d84cd7e062a849351cee1b401916a63a127f91cbd4917f66bed"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombat.java",
+      "sha256": "bbe08a92fdcaab0e41f680899ed1a81ef9891b5634d9d4fc4854c5e357f1e9d3"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatHealthEvidence.java",
+      "sha256": "b342a631dbc0bd6e0fc19f1f7430fe97c62053505a6d7424afea9c804325ee66"
+    }
+  ]
+}

@@ -52,7 +52,7 @@ The accepted candidate has genuine native compilation, 338 pure policy checks,
 with a synthetic native endpoint. These are prior candidate results. There is
 no installed collector artifact, live pickup or real physics/cleanup acceptance.
 
-## Combat: offline candidate, further gates required
+## Combat: historical offline integration gate (before T21)
 
 The engage route uses a separate scoped combat profile and exact owner binding.
 Attack, shield and cancellation paths are guarded by the scoped callback/intent
@@ -67,7 +67,48 @@ not establish transformed mixin application or real native attack/shield/cancel
 behavior. Mixin application, native functional combat and live combat remain
 NOT_RUN. This is not a game-ready combat release.
 
-## Combined verification and publication boundary
+## T21: one bounded live combat microtrial
+
+On 2026-10-14, source commit `eab30261271d5577cdfc4cd4d3a1a0f5fd471393`
+and the separately verified native artifact
+`8048dde926387954edd47028703da0c2b3c8b97a1b441f85de77d670e741b3e7`
+were used for one explicit single-target engage under request_only policy.
+Exactly one attack dispatch was observed, with the zombie's health changing from
+20 to 16.06399917602539. One exact public cancellation reached the original native
+action; input release and public cleanup were confirmed. Sampled player health
+remained 20 and sampled pose was unchanged. This establishes this bounded
+attack/cancel path, not general combat readiness.
+
+Independent saved-state readback found the same target alive at the final health,
+player health/position preserved, wooden sword wear increased by one, shield and
+armor wear unchanged, and all 90 compared enclosure cells unchanged. Automated
+ordinary closure completed in 69.698 seconds. Shield use (20 ticks) and observed
+blocking stance (16 ticks) do not prove any damage was blocked. No chase,
+multi-target combat, kill, loot, causal damage attribution, continuous absence of
+motion, or server-confirmation claim is made.
+
+The original harness report remains failed at `same_exact_terminal_action`.
+Separate read-only verification of the original evidence passed after exactly
+two source-backed encoding reconciliations:
+
+- The optional `result.combat.threat_gate.health_diagnostics.latch_trigger` may
+  be absent or null only when both `latched` and `latch_triggered_now` are exactly
+  false. Every other terminal field and type remains exact.
+- The same target's nearby health is serialized as Float (`16.064`), while the
+  combat evidence widens that float to Double (`16.06399917602539`). Both encode
+  binary32 bits `41808312`. This is exact float32 equivalence, not an epsilon
+  allowance; target identity and all other state predicates remain required.
+
+The original failed report was not overwritten and no action was replayed.
+The independent verifier checked 183 frozen evidence pins and seven focused
+cases. Final combined handoff SHA-256:
+`239c3cc5588930557060a5ec301c9e456422db50ba03a790c986597b77f5c244`.
+Only this bounded summary is public; original receipts, identities and saves are
+excluded. Portable synthetic encoding regressions and source provenance are in
+`client-mod/validation/combat-t21/`; these are offline tests, not a replacement
+for the complete original-evidence verifier or production admission rules.
+
+## Historical combined verification and publication boundary
 
 Both source-owner reviews approved the actual combined tree and additive shared
 merges. All combined checks below completed successfully. Fresh combined checks:
