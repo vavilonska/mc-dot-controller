@@ -89,6 +89,7 @@ final class ScopedCollectTarget {
  JsonObject facts(){throw new AssertionError("Collect engine branch is outside synthetic T13 coverage");}
 }
 final class ScopedMining {static final String PROFILE="mining-local-observed-v2";}
+final class ScopedPlacement {static final String PROFILE="placement-local-observed-v1";}
 final class ScopedNativePreflight {static final long MAX_NANOS=250_000_000L;}
 final class EncounterRequest {static final String PAUSE_ON_TERMINAL="encounter_pause_on_terminal";}
 final class MovementBudget {static boolean budgetAction(String s){return false;}static void validate(ClientActionRequest r){}}

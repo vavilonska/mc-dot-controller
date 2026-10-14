@@ -1,6 +1,6 @@
 {
   "schema": "mdc.combined-native-production/1",
-  "scope": "All production Java including combined mining, collect and combat. Input review is explicit; runner never updates these pins.",
+  "scope": "All production Java including placement-local-observed-v1; explicit additive placement review freeze. Runner never updates pins.",
   "sources": [
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ActionRegistry.java",
@@ -92,7 +92,7 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
+      "sha256": "6ec723b524f29d7618fcfe3028a4632c52c3fb378eec9721e8b5b64376395938"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeLog.java",
@@ -172,7 +172,7 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "sha256": "235baed8b68e63430206f8ce670feb6bfc6d4c1f99676b6f6333eeaa952a725f"
+      "sha256": "0873195f3a5ab7b9d5dbc455c129931639cd1a26ac99e1641691d939a539d4c8"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -371,6 +371,14 @@
       "sha256": "fffb8a3f2dcf701aff3b624e68b9600fcd36bcca0f423890755cc7d8a5f2b7f6"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PlacementCallbackFence.java",
+      "sha256": "70566e8bfb2deaa27efd8bfa0a4a958198585d749a68a0e454adb88e46e3996d"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PlacementPacketBinding.java",
+      "sha256": "3de6c35048a8b0c8a89630bb6ea93f6c464b57ea3af6ea64ff0a6acefd2af80a"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PositionDiscontinuityGuard.java",
       "sha256": "8c3b54bbee5b8841c0365d9a57ad4937aa51a35992e84e5ca2df7685fdd3907e"
     },
@@ -424,11 +432,23 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "sha256": "8b67d5049b09dcf3cc280ae59e197e5f4f6b5f69e549893f5483668e5974c01d"
+      "sha256": "260937786de65b4dd0e9668abbaeb5cb6ca389d3906dcebf6269cb152a403650"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "sha256": "108cf950dd6328ec89a7ea780425f46231c212b7065d0f8a684e84399d1aea28"
+      "sha256": "e1199bc9017835015c1217e1b0aa55cf6262b03cca2ace9d2017f386829c0527"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
+      "sha256": "ee48a41de9039740c2acd294399370060e1a8867e3f7e1dd1aa56281ccb360d7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementDispatch.java",
+      "sha256": "84d7356499dafe1472b186bdbcbb4c44cf995b257df69b63695c210055bd7e33"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementIntent.java",
+      "sha256": "367ff5bc65dfef8e3d22c0f6666e12c61145249705e5440f22246f3b419ca641"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/SprintKeyState.java",
@@ -513,6 +533,18 @@
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedMiningGameModeMixin.java",
       "sha256": "874cda3f72bc80af4779216c6c6ae9b0d9c99b0843e545eb56882caf2ac1e265"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedPlacementItemMixin.java",
+      "sha256": "3e7271f93ab99744bf508b6380be5f190a4945749b8dcbed7f6e4838717e05c7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedPlacementPacketMixin.java",
+      "sha256": "d75fec9601dd3f1c333bf784b8402adf402a1739404a8f725f6ea7963a42c5a4"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedPlacementSendMixin.java",
+      "sha256": "60a3c4beb0d8c67983e003d6078ef57b426fe94eb59937941fcc83880fd58903"
     }
   ]
 }

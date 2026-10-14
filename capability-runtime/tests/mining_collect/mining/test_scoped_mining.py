@@ -40,7 +40,7 @@ class WitnessTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256((JAVA_ROOT/name).read_bytes()).hexdigest(),digest,name)
         java=JAVA_ROOT
         self.assertIn('active.scopedMovement.activate(active.entry)',(java/'ClientActions.java').read_text())
-        self.assertIn('if(capture.movement!=null || capture.mining!=null)',(java/'ScopedNativePreflight.java').read_text())
+        self.assertIn('if(capture.movement!=null || capture.mining!=null || capture.placement!=null)',(java/'ScopedNativePreflight.java').read_text())
         mining=(java/'ScopedMining.java').read_text()
         self.assertIn('ScopedMiningEntities.capture',mining)
         self.assertIn('actionEntry.ticks',mining)

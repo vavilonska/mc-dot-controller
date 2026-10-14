@@ -1,57 +1,117 @@
 {
-  "schema": "mdc-mainline-source-integration-v6",
-  "repository_parent_commit": "eab30261271d5577cdfc4cd4d3a1a0f5fd471393",
-  "repository_parent_tree": "7e1130bbab312561cb4d4d466463f0fc17ed21b1",
-  "source_stage": "T21 bounded acceptance documentation and portable encoding regression",
-  "source_delta": [
-    {
-      "path": "README.md",
-      "sha256": "71ea5553e3b2ff07adca49ceabe48d71aca1b6e72595722b8ce6ca60401c22dd"
-    },
-    {
-      "path": "client-mod/validation/combat-t21/README.md",
-      "sha256": "e30a7d8c9d6ce7a84b1e4d733ccc8ad4e42df4c9f79ab075cacbd00fd1ee3859"
-    },
-    {
-      "path": "client-mod/validation/combat-t21/SOURCE-PROVENANCE.json",
-      "sha256": "d9c4b5b2b55b5db5c23c70af7e07b6d77a8273246880ab2a13b8a0e2fcd5de57"
-    },
-    {
-      "path": "client-mod/validation/combat-t21/encoding_checks.py",
-      "sha256": "e3357310f0debd5f3d8a9f74c96f5516e8ec85d08791d25280aee41de5ca6f30"
-    },
-    {
-      "path": "client-mod/validation/combat-t21/test_encoding.py",
-      "sha256": "6064af100bccfabb7686bee115585c68094a24dfeb5ba59d86601cc040c3c0f9"
-    },
-    {
-      "path": "docs/MINING-COLLECT-COMBAT.md",
-      "sha256": "73d4be325aa79abc5c2fbce581984de984bd113ad2b7b8c0895ecb319b8256fb"
-    }
-  ],
-  "source_review": "Independent review of bounded public summary and portable synthetic encoding regressions",
+  "schema": "mdc-mainline-source-integration-v7",
+  "repository_parent_commit": "20bf0c6f841d2242736cc7cd9bdd05f41dc24bf9",
+  "repository_parent_tree": "c1927d9fd8c8fa2869a70ec1c5b8839dc6747f10",
+  "source_stage": "Reviewed offline single-block scoped placement candidate",
+  "scope": "One ordinary stationary cobblestone placement, same-callback geometry/material/owner checks, one-use token, post-hook final packet fence and exact decrement. No live acceptance.",
+  "reviews": "Native r5 independently reviewed and compiled; Python/public source and full owner-chain reviewed; actual Java placement bytes validated by real Python closed consumers.",
   "verification": {
-    "portable_encoding_regressions": 6,
-    "runtime_or_native_changes": false,
-    "evidence_scope": "One T21 attack and exact cancel with independently verified saved result; original harness failure preserved",
-    "independent_original_evidence_pins": 183,
-    "independent_original_evidence_cases": 7,
-    "hand_off_sha256": "239c3cc5588930557060a5ec301c9e456422db50ba03a790c986597b77f5c244",
-    "limitations": [
-      "No actual blocked damage",
-      "No chase or multi-target acceptance",
-      "No continuous absence of motion",
-      "No causal damage or server confirmation",
-      "Portable synthetic tests do not replace full original evidence review"
-    ]
+    "broad": [
+      {
+        "name": "resident-controller",
+        "exit": 0,
+        "summary": [
+          "Ran 423 tests in 2.822s",
+          "OK"
+        ]
+      },
+      {
+        "name": "navigation-cursor",
+        "exit": 0,
+        "summary": [
+          "Ran 83 tests in 0.117s",
+          "OK"
+        ]
+      },
+      {
+        "name": "gameplay-helpers",
+        "exit": 0,
+        "summary": [
+          "Ran 64 tests in 4.428s",
+          "OK"
+        ]
+      },
+      {
+        "name": "capability-runtime",
+        "exit": 0,
+        "summary": [
+          "Ran 759 tests in 272.698s",
+          "OK"
+        ]
+      },
+      {
+        "name": "toolbox",
+        "exit": 0,
+        "summary": [
+          "Ran 57 tests in 0.082s",
+          "OK"
+        ]
+      },
+      {
+        "name": "node-portable",
+        "exit": 0,
+        "summary": [
+          "\u2139 tests 138",
+          "\u2139 pass 138",
+          "\u2139 fail 0",
+          "\u2139 skipped 0"
+        ]
+      },
+      {
+        "name": "node-framing",
+        "exit": 0,
+        "summary": [
+          "\u2139 tests 9",
+          "\u2139 pass 9",
+          "\u2139 fail 0",
+          "\u2139 skipped 0"
+        ]
+      },
+      {
+        "name": "node-platform",
+        "exit": 0,
+        "summary": [
+          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
+          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
+        ]
+      }
+    ],
+    "actual_placement_java_wire": {
+      "producer_checks": 14,
+      "python_consumers": 11,
+      "facts": "synthetic",
+      "terminal": "exact production method extraction with synthetic readers; source and method hashes verified",
+      "production_codec_classes": true
+    },
+    "native_offline": {
+      "production_sources": 136,
+      "intent_boundaries": 49,
+      "callback_fence_boundaries": 13,
+      "packet_identity_boundaries": 15,
+      "independent_gate_checks": 60,
+      "independent_children_exit_zero": 9,
+      "prior_movement_mining_collect_combat_regressions": "passed on same native source"
+    },
+    "t21_compatibility": {
+      "synthetic_tests": 6,
+      "historical_source_pins_preserved": true,
+      "current_BridgeJson_exact_single_additive_selector_line_verified": true
+    },
+    "remaining_gates": [
+      "transformed placement mixin application",
+      "live placement and saved outcome",
+      "full Gradle/NeoForge build",
+      "Windows/PowerShell platform validation"
+    ],
+    "whole_building_execution": "unavailable"
   },
-  "native_provenance": "All production Python, MCP and native source/resources unchanged. Native artifact 8048dde9 remains unchanged.",
-  "live_evidence": "See docs/MINING-COLLECT-COMBAT.md: T21 one attack and exact cancel, independent saved evidence, original harness failure preserved; no broader combat claim.",
+  "live_evidence": "Prior bounded T21 documentation preserved exactly except README additive placement link; see docs/MINING-COLLECT-COMBAT.md. Prior artifact does not establish this changed native placement candidate.",
   "excluded": [
-    "Raw worlds, GUI, account data, credentials, runtime receipts and compiled artifacts",
-    "Generated compressed synthetic test fixture"
+    "Generated compressed synthetic fixture",
+    "Raw live receipts, worlds, GUI, accounts, credentials, installed state",
+    "Compiled artifacts and external dependency binaries"
   ],
-  "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt to avoid hash cycles",
+  "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt",
   "files": [
     {
       "path": ".gitignore",
@@ -75,8 +135,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9486,
-      "sha256": "71ea5553e3b2ff07adca49ceabe48d71aca1b6e72595722b8ce6ca60401c22dd"
+      "bytes": 9755,
+      "sha256": "7f69ba2eed4c4fad914fef760c65d588af07011f28d59288a68bcb22bacc6f99"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
@@ -240,8 +300,8 @@
     },
     {
       "path": "capability-runtime/PUBLIC-FILES.txt",
-      "bytes": 3336,
-      "sha256": "555d953854f7bac7f97bb9fe778d1b22a7c0460b0dee31f7c91730bf7db38219"
+      "bytes": 3556,
+      "sha256": "9c650cdde6d6896798eb8a0ce879ffa3d6ccae083a37b008ab9aeea36750f041"
     },
     {
       "path": "capability-runtime/README.md",
@@ -287,6 +347,11 @@
       "path": "capability-runtime/docs/REACH-INVENTORY-RESOURCES.md",
       "bytes": 4713,
       "sha256": "095763a83a75d6e427ed41f95f2e01a225b5c8161da384c6a5923f94404b0f1f"
+    },
+    {
+      "path": "capability-runtime/docs/SCOPED-PLACEMENT.md",
+      "bytes": 3658,
+      "sha256": "1310e0fe5ff6fe2a8cebd48a216cd3040d16feee915bce2dcf5eaf3aa0b48de0"
     },
     {
       "path": "capability-runtime/docs/SHELTERED-ENDERMAN-LOS.md",
@@ -439,6 +504,11 @@
       "sha256": "5e11f67c41360b2e24f3c8b5b70ac8ae2841366124bedb862f10cab2df714cc2"
     },
     {
+      "path": "capability-runtime/mdc_skills/scoped_placement.py",
+      "bytes": 5597,
+      "sha256": "61ba97bd41d82afc03596bd38cbc42cf88f55beeb7c7fb77fe875ed2b7eb2b12"
+    },
+    {
       "path": "capability-runtime/mdc_skills/stack_selector.py",
       "bytes": 2710,
       "sha256": "40122c54267e2ede5b4ff4bffd8e8552737fc734021ab6f94c710e9552e48513"
@@ -470,8 +540,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/building.py",
-      "bytes": 11013,
-      "sha256": "4fe7fccd2905d966a6e819e3536e1fdf82e4bab95c1da796fda04cd491131ff5"
+      "bytes": 13132,
+      "sha256": "961ebf3a775fcb29f15e1e7031e5bd56aaac8819cf309f08dbc4ac84459c6573"
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/dimensions.py",
@@ -540,8 +610,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "bytes": 21243,
-      "sha256": "65e30dfb6b818b7e2f7c41ff0d6df2f1302c30dc81f38babfe423714d24578fc"
+      "bytes": 21546,
+      "sha256": "54dea97041dcf7dff973b340e39d331cb6bb9c8ff52ce429f41ccabba8cafe7e"
     },
     {
       "path": "capability-runtime/mdc_toolbox/serialization.py",
@@ -665,8 +735,8 @@
     },
     {
       "path": "capability-runtime/tests/mining_collect/mining/test_scoped_mining.py",
-      "bytes": 11619,
-      "sha256": "d20a52a77b8d99b6cc7f1e4b3435b35a195f28abcddb3112e80c36232b1a6821"
+      "bytes": 11646,
+      "sha256": "7fafc297b03bec31d23886955612d9531792b2c793828a9da88275ae08a4694a"
     },
     {
       "path": "capability-runtime/tests/mining_collect/references/__init__.py",
@@ -692,6 +762,26 @@
       "path": "capability-runtime/tests/mining_collect/test_native_wire.py",
       "bytes": 7952,
       "sha256": "30502b4d7cc183bbe41c6a89dc83d23a2ba6596f6fc7d13b9bc5317cf10eee02"
+    },
+    {
+      "path": "capability-runtime/tests/placement/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "capability-runtime/tests/placement/placement_fixture.py",
+      "bytes": 5752,
+      "sha256": "6fd3abc0d45f496523af906597b54f734ae9ab843fb96b1e5ca151e9791b290d"
+    },
+    {
+      "path": "capability-runtime/tests/placement/test_native_wire.py",
+      "bytes": 11343,
+      "sha256": "eb83761beb313f28cc23059d6e246e4da6639a95e51201923cd58a9459aac3f4"
+    },
+    {
+      "path": "capability-runtime/tests/placement/test_witness.py",
+      "bytes": 4736,
+      "sha256": "80afd259557fcf6b68b50b51f336d04d8aa304724136e51558555030ae7a9813"
     },
     {
       "path": "capability-runtime/tests/support_core.py",
@@ -867,6 +957,11 @@
       "path": "capability-runtime/tests/test_scoped_combat_chain.py",
       "bytes": 8631,
       "sha256": "09e46d436742f715f70513e563547de94006bbc5bf9acf16e8a09e3e32f21dbf"
+    },
+    {
+      "path": "capability-runtime/tests/test_scoped_placement.py",
+      "bytes": 5304,
+      "sha256": "de7e9de78bdeb19a83eabcade11f430527f281a50681b79126dc0c6601358670"
     },
     {
       "path": "capability-runtime/tests/test_sheltered_enderman_los.py",
@@ -1069,6 +1164,11 @@
       "sha256": "a90778bb07d5adbc275a5e1f3eeece13386b1bf69360475a313271ebf6f23a55"
     },
     {
+      "path": "client-mod/docs/scoped-placement.md",
+      "bytes": 4573,
+      "sha256": "a80b0e11ebc3b62c1896ee456be9a51165ab7e29677015282036de60111bcbb0"
+    },
+    {
       "path": "client-mod/docs/serialization-verification.md",
       "bytes": 3996,
       "sha256": "de71c3d348b8c7bb02c8afd01c4d8515c8635f94000dabe2e31f1b061e87cdf1"
@@ -1229,14 +1329,24 @@
       "sha256": "d335aaaab5f5d3939f2f1de9b414bc5d18efff0e86528b5d7f1ab45c2c09d03a"
     },
     {
+      "path": "client-mod/mcp/toolbox-placement-owner-chain-fixture.py",
+      "bytes": 8585,
+      "sha256": "7f13f684c81aeda7032e049af84afa3d90d9257988cbe973130b40f2aa54a7ee"
+    },
+    {
+      "path": "client-mod/mcp/toolbox-placement-owner-chain-test.mjs",
+      "bytes": 5871,
+      "sha256": "155b552a32ee66c67b13f064124ff112dbd0e51492a811686396c8c7ced9b6b9"
+    },
+    {
       "path": "client-mod/mcp/toolbox-schema-test.mjs",
       "bytes": 5455,
       "sha256": "479f26940e314e2aed902480f04f1e2bf3c063f40f419d6b3ade9f08b822b374"
     },
     {
       "path": "client-mod/mcp/toolbox-test.mjs",
-      "bytes": 1941,
-      "sha256": "8bb51b333f5a7e4aa236bd003ad4cecdf11db7d1d429c8b067b3e0d9644e7d66"
+      "bytes": 1993,
+      "sha256": "18e6ddc6a93ae57d0b4b3c9a80aa396d5b7d4a519470f55f8c6518b4271c03eb"
     },
     {
       "path": "client-mod/mcp/toolbox.mjs",
@@ -1375,8 +1485,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "bytes": 8666,
-      "sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15"
+      "bytes": 8778,
+      "sha256": "6ec723b524f29d7618fcfe3028a4632c52c3fb378eec9721e8b5b64376395938"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeLog.java",
@@ -1475,8 +1585,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 75677,
-      "sha256": "235baed8b68e63430206f8ce670feb6bfc6d4c1f99676b6f6333eeaa952a725f"
+      "bytes": 78110,
+      "sha256": "0873195f3a5ab7b9d5dbc455c129931639cd1a26ac99e1641691d939a539d4c8"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -1724,6 +1834,16 @@
       "sha256": "fffb8a3f2dcf701aff3b624e68b9600fcd36bcca0f423890755cc7d8a5f2b7f6"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PlacementCallbackFence.java",
+      "bytes": 1250,
+      "sha256": "70566e8bfb2deaa27efd8bfa0a4a958198585d749a68a0e454adb88e46e3996d"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PlacementPacketBinding.java",
+      "bytes": 491,
+      "sha256": "3de6c35048a8b0c8a89630bb6ea93f6c464b57ea3af6ea64ff0a6acefd2af80a"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/PositionDiscontinuityGuard.java",
       "bytes": 4739,
       "sha256": "8c3b54bbee5b8841c0365d9a57ad4937aa51a35992e84e5ca2df7685fdd3907e"
@@ -1790,13 +1910,28 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "bytes": 4451,
-      "sha256": "8b67d5049b09dcf3cc280ae59e197e5f4f6b5f69e549893f5483668e5974c01d"
+      "bytes": 4772,
+      "sha256": "260937786de65b4dd0e9668abbaeb5cb6ca389d3906dcebf6269cb152a403650"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "bytes": 27169,
-      "sha256": "108cf950dd6328ec89a7ea780425f46231c212b7065d0f8a684e84399d1aea28"
+      "bytes": 27982,
+      "sha256": "e1199bc9017835015c1217e1b0aa55cf6262b03cca2ace9d2017f386829c0527"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
+      "bytes": 27006,
+      "sha256": "ee48a41de9039740c2acd294399370060e1a8867e3f7e1dd1aa56281ccb360d7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementDispatch.java",
+      "bytes": 2173,
+      "sha256": "84d7356499dafe1472b186bdbcbb4c44cf995b257df69b63695c210055bd7e33"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementIntent.java",
+      "bytes": 3679,
+      "sha256": "367ff5bc65dfef8e3d22c0f6666e12c61145249705e5440f22246f3b419ca641"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/SprintKeyState.java",
@@ -1904,14 +2039,29 @@
       "sha256": "874cda3f72bc80af4779216c6c6ae9b0d9c99b0843e545eb56882caf2ac1e265"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedPlacementItemMixin.java",
+      "bytes": 1180,
+      "sha256": "3e7271f93ab99744bf508b6380be5f190a4945749b8dcbed7f6e4838717e05c7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedPlacementPacketMixin.java",
+      "bytes": 1795,
+      "sha256": "d75fec9601dd3f1c333bf784b8402adf402a1739404a8f725f6ea7963a42c5a4"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/ScopedPlacementSendMixin.java",
+      "bytes": 1079,
+      "sha256": "60a3c4beb0d8c67983e003d6078ef57b426fe94eb59937941fcc83880fd58903"
+    },
+    {
       "path": "client-mod/src/main/resources/META-INF/accesstransformer.cfg",
       "bytes": 2669,
       "sha256": "ffd3960447c486a61abda97b2e20f4d28ac1b5ddcc04729dae4ba8259ae4c803"
     },
     {
       "path": "client-mod/src/main/resources/mineclient_bridge.mixins.json",
-      "bytes": 514,
-      "sha256": "7c231484932e1c5a1a842dd5dac125358c9d8ae98848a9e3e4e7431f00436b1b"
+      "bytes": 612,
+      "sha256": "c75a74c507da5837847858bf3cde9243145639d4cb93b47599367705f049e40f"
     },
     {
       "path": "client-mod/src/main/resources/mineclient_bridge.png",
@@ -2425,8 +2575,8 @@
     },
     {
       "path": "client-mod/validation/combat-t21/SOURCE-PROVENANCE.json",
-      "bytes": 1382,
-      "sha256": "d9c4b5b2b55b5db5c23c70af7e07b6d77a8273246880ab2a13b8a0e2fcd5de57"
+      "bytes": 2129,
+      "sha256": "ea8e4b1347a834f52068c6fa41930bd3b86e4bb12a96bd1ed176f1c2d9ffc7fd"
     },
     {
       "path": "client-mod/validation/combat-t21/encoding_checks.py",
@@ -2435,8 +2585,8 @@
     },
     {
       "path": "client-mod/validation/combat-t21/test_encoding.py",
-      "bytes": 3712,
-      "sha256": "6064af100bccfabb7686bee115585c68094a24dfeb5ba59d86601cc040c3c0f9"
+      "bytes": 4168,
+      "sha256": "83d42f5de70f159d876c1f9485e61a89c746021118f676db01fdbf6f73b1f1e4"
     },
     {
       "path": "client-mod/validation/container-adapter/.gitignore",
@@ -2621,7 +2771,7 @@
     {
       "path": "client-mod/validation/movement-t13/expected-lifecycle-methods.json",
       "bytes": 511,
-      "sha256": "f688b551256ddb94f0e7941e121c723cb72deedd61921ab0181171541cce9424"
+      "sha256": "5e72f80b4e636f980635dd811e34c9291ec00613f1ea012edbcb6aa7bd5a85b2"
     },
     {
       "path": "client-mod/validation/movement-t13/expected-prerequisites.json",
@@ -2630,8 +2780,8 @@
     },
     {
       "path": "client-mod/validation/movement-t13/expected-production.json",
-      "bytes": 25869,
-      "sha256": "5e542d6f0b4c6a002256afc32edea1f8e857feecd01ed5a51ee6cded82c504f0"
+      "bytes": 27523,
+      "sha256": "b2344cafaa8f3257193ca6235beb1da195669664e0a631cc15425e387d12efec"
     },
     {
       "path": "client-mod/validation/movement-t13/historical-t13-lifecycle-methods.json",
@@ -2650,8 +2800,8 @@
     },
     {
       "path": "client-mod/validation/movement-t13/prepare_engine_fixtures.py",
-      "bytes": 12684,
-      "sha256": "ffb58f37b692790957e1d56cf5207a72cae37a3f2f36b11dfb8a3e553f61c5cc"
+      "bytes": 12773,
+      "sha256": "a504cde3967dca4e8070d0c8801888cf3e1cd4f0cefbe4bb385a37e3399ae290"
     },
     {
       "path": "client-mod/validation/movement-t13/run.py",
@@ -2692,6 +2842,46 @@
       "path": "client-mod/validation/scoped-combat/ScopedCombatIntentChecks.java",
       "bytes": 2170,
       "sha256": "17ff2d67550980b93cae13e26b29c42d2689f11bca88530352e4323f109fa137"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/PlacementCallbackChecks.java",
+      "bytes": 2110,
+      "sha256": "a9019e958f69bf198cf1d4a508a2d1fa975d1f646c3501f107ce64fe16aca7e3"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/PlacementIntentChecks.java",
+      "bytes": 3195,
+      "sha256": "41a4aa85e94a5bb05a5f22e989c93031f9d6aa18646d2c7735dfdc6abb476c47"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/PlacementPacketChecks.java",
+      "bytes": 2066,
+      "sha256": "477c29bbc086b8b6e20add5339849cb6034c3df49dd36391eef7620e22a58aa3"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/PlacementWireProducer.java",
+      "bytes": 11486,
+      "sha256": "5cdb8cd575d5b5c37cca419734f6f758268734255f42d9a5611bea39e5165422"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/README.md",
+      "bytes": 3285,
+      "sha256": "edb9c81f81ebafc90b37fc89050f66d897ceb0c26d8fda4d98a115e383a0b923"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/baseline-methods.json",
+      "bytes": 122,
+      "sha256": "29fd04c4c88ff48b0946ccf3d272c23287148a2144197ca6b780e97793d66f78"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/run.py",
+      "bytes": 7629,
+      "sha256": "d8754a35032da8e5f75f99eb66f7cc8cdfdf32f7773a5912c7db955c5a445e2f"
+    },
+    {
+      "path": "client-mod/validation/scoped-placement/run_wire.py",
+      "bytes": 6818,
+      "sha256": "bfb7209fd4e1c72e80c4ac62c8f0ab17e2ac35fa5d4137f9236af1546069cb5a"
     },
     {
       "path": "client-mod/validation/terrain-adapter/.gitignore",
@@ -3590,8 +3780,8 @@
     },
     {
       "path": "resident-controller/PUBLIC-FILES.txt",
-      "bytes": 3737,
-      "sha256": "780edf85a6979e1ae2b1c9e3c982f4cc72343b82b51618bd718517c84328fd6f"
+      "bytes": 3779,
+      "sha256": "0f83fbf8a6a8ba4620e8635069e9960a0ba5b3c98a903e87ab1dae50dde990e9"
     },
     {
       "path": "resident-controller/README.md",
@@ -3675,8 +3865,8 @@
     },
     {
       "path": "resident-controller/resident_controller/capability_snapshot.py",
-      "bytes": 32282,
-      "sha256": "e0a17a36ee6f9426bb4575bc3798ee16988e600d98b8672541bffa75b6ecceb8"
+      "bytes": 32535,
+      "sha256": "8f09f484a20b49f82b07eb54ad83f4c61fdce3e6f2fd8bb603c1ca3e7da090e2"
     },
     {
       "path": "resident-controller/resident_controller/collect_snapshot.py",
@@ -3690,8 +3880,8 @@
     },
     {
       "path": "resident-controller/resident_controller/controller.py",
-      "bytes": 84098,
-      "sha256": "ccf4055a6e25e3fe1f3c79232d717a658c23a4e9d687da1d57c385730110a873"
+      "bytes": 84130,
+      "sha256": "3afcef706c75979669f8ac1172d1674972e3274257734ddf044db533436535f4"
     },
     {
       "path": "resident-controller/resident_controller/coordination_contract.py",
@@ -3725,8 +3915,8 @@
     },
     {
       "path": "resident-controller/resident_controller/movement_wire.py",
-      "bytes": 9308,
-      "sha256": "d51b03569a6ef99ab2a04a4ba203414a53b1d4d044755b888f50be9700c70bfd"
+      "bytes": 9491,
+      "sha256": "3b6766c11be02a064d938aa3cf002e6635c2e4088c12d60ce8f7146b18656330"
     },
     {
       "path": "resident-controller/resident_controller/native_combat.py",
@@ -3742,6 +3932,11 @@
       "path": "resident-controller/resident_controller/pause_contract.py",
       "bytes": 5071,
       "sha256": "50948a735fa6e898c28b6a1fab25f08a857622f7c13bf062afb1e8ac15d1bffa"
+    },
+    {
+      "path": "resident-controller/resident_controller/placement_snapshot.py",
+      "bytes": 9824,
+      "sha256": "27ce59e3b6ca042592230b071e9c598969f08926cb9fcf1ca1c629cf11296a5a"
     },
     {
       "path": "resident-controller/resident_controller/prospecting.py",

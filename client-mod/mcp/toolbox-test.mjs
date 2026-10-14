@@ -14,3 +14,5 @@ test('nonfinite deeply invalid values never reach backend',async()=>{const r=awa
 import "./toolbox-schema-test.mjs";
 
 import "./toolbox-owner-chain-test.mjs";
+
+import "./toolbox-placement-owner-chain-test.mjs";

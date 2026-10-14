@@ -44,6 +44,7 @@ final class ScopedNativePreflight {
         if (ScopedMiningDispatch.ready()) {
             JsonArray mining=new JsonArray();mining.add("break_block");profiles.add(ScopedMining.PROFILE,mining);
         }
+        if(ScopedPlacementDispatch.ready()){JsonArray placement=new JsonArray();placement.add("place_block");profiles.add(ScopedPlacement.PROFILE,placement);}
         if(ScopedCombatDispatch.ready()){JsonArray combat=new JsonArray();combat.add("combat_entity");profiles.add(ScopedCombat.PROFILE,combat);}
         out.add("profiles", profiles);
         JsonArray supported = new JsonArray();
@@ -67,7 +68,8 @@ final class ScopedNativePreflight {
                 || (profile.equals(BlockMenuPreflight.PROFILE) && action.equals("interact_block"))
                 || ((profile.equals(ScopedFlatMovement.PROFILE) || profile.equals(ScopedCollectTarget.PROFILE)) && action.equals("follow_path"))
                 || (profile.equals(ScopedCombat.PROFILE) && action.equals("combat_entity") && ScopedCombatDispatch.ready())
-                || (profile.equals(ScopedMining.PROFILE) && action.equals("break_block") && ScopedMiningDispatch.ready()), "scoped_profile_unavailable_for_action");
+                || (profile.equals(ScopedMining.PROFILE) && action.equals("break_block") && ScopedMiningDispatch.ready())
+                || (profile.equals(ScopedPlacement.PROFILE) && action.equals("place_block") && ScopedPlacementDispatch.ready()), "scoped_profile_unavailable_for_action");
         require(ClientActionRequest.string(scope, "owner_id").matches("[0-9a-f]{32}"), "invalid_scoped_owner");
         require(ClientActionRequest.integer(scope, "owner_generation", -1) > 0, "invalid_scoped_owner_generation");
         require(ClientActionRequest.integer(scope, "defense_epoch", -1) >= 0, "invalid_scoped_defense_epoch");
@@ -76,6 +78,7 @@ final class ScopedNativePreflight {
         require(!intent.has("observation_clock") && !intent.has("observation_clock_profile"), "scoped_diagnostic_clock_forbidden");
         require(mc.player != null && mc.level != null && mc.gameMode != null && CapabilityGuard.privateSingleplayer(mc), "scoped_private_singleplayer_required");
         if(profile.equals(ScopedCombat.PROFILE))ScopedCombat.validateIntent(intent);
+        if(profile.equals(ScopedPlacement.PROFILE))ScopedPlacement.validateIntent(intent);
         if (profile.equals(BlockMenuPreflight.PROFILE)) {
             require(ScopedBlockMenuDispatch.ready(), "block_menu_post_hook_fence_unavailable");
             BlockMenuPreflight.validateIntent(intent);
@@ -89,8 +92,9 @@ final class ScopedNativePreflight {
             capture.mining=new ScopedMining(mc,parsed,capture.nano,capture.tick);
             capture.facts.add("mining",capture.mining.facts());
         }
+        if(profile.equals(ScopedPlacement.PROFILE)){capture.placement=new ScopedPlacement(mc,parsed,capture.nano,capture.tick);capture.facts.add("placement",capture.placement.facts());}
         capture.recheck(mc);
-        if(capture.movement!=null || capture.mining!=null) {
+        if(capture.movement!=null || capture.mining!=null || capture.placement!=null) {
             capture.requireMovementResponseBudget(parsed);
             capture.recheck(mc); // All preview/state/slot hooks precede the unchanged final admission fences.
         }
@@ -111,6 +115,7 @@ final class ScopedNativePreflight {
         final BlockMenuRawState blockMenuRawState;
         final ScopedFlatMovement movement;
         ScopedMining mining;
+        ScopedPlacement placement;
         final ScopedCombat combat;
 
         Capture(Minecraft mc, JsonObject scope, JsonObject intent) {
@@ -143,6 +148,7 @@ final class ScopedNativePreflight {
             if(combat!=null)out.add("combat",combat.facts());
             if (movement != null) out.add("movement", movement.facts());
             if (mining != null) out.add("mining", mining.facts());
+            if (placement != null) out.add("placement",placement.facts());
             return out;
         }
 
@@ -171,8 +177,10 @@ final class ScopedNativePreflight {
             }
             if(combat!=null)combat.admission(mc);
             if(mining!=null)mining.admissionBeforeFacts(mc);
+            if(placement!=null)placement.admission(mc);
             require(facts.equals(captureFacts(mc)), "scoped_profile_facts_changed");
             if(mining!=null)mining.admissionAfterFacts(mc);
+            if(placement!=null)placement.admission(mc);
             if(combat!=null)combat.admission(mc);
             // After generic permission hooks, only raw corridor/entity/pose/owner reads remain.
             if (movement != null) movement.admissionRawFence(mc);

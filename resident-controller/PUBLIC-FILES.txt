@@ -91,3 +91,4 @@ tests/combat_witness_fixture.py
 tests/test_combat_scoped_witness.py
 resident_controller/action_progress.py
 tests/test_action_progress.py
+resident_controller/placement_snapshot.py

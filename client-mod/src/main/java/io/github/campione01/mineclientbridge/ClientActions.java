@@ -53,6 +53,7 @@ final class ClientActions {
         BlockHitResult scopedPacketHit;
         ScopedFlatMovement scopedMovement;
         ScopedMining scopedMining;
+        ScopedPlacement scopedPlacement;
         ScopedCombat scopedCombat;
         boolean useHeld;
         boolean left, right;
@@ -218,6 +219,8 @@ final class ClientActions {
             if (active.scopedMovement != null) active.scopedMovement.activate(active.entry);
             active.scopedCombat=scoped.combat;
             if(active.scopedCombat!=null){active.scopedCombat.activate(active.entry);active.combat.bindScoped(active.scopedCombat);}
+            active.scopedPlacement=scoped.placement;
+            if(active.scopedPlacement!=null)active.scopedPlacement.activate(active.entry);
             active.scopedMining=scoped.mining;
             if(active.scopedMining!=null)active.scopedMining.activate(active.entry);
         }
@@ -323,6 +326,7 @@ final class ClientActions {
         RuntimeAction a=active;
         try{return contextChecked(mc,phase);}
         catch(RuntimeException failure){
+            if(a!=null && a.scopedPlacement!=null){if(active==a)finish("cancelled","placement_context_hook_failed");return false;}
             if(a!=null && a.scopedMining!=null){scopedMiningUnknown(a.scopedMining,"mining_context_hook_failed");return false;}
             throw failure;
         }
@@ -492,6 +496,12 @@ final class ClientActions {
                     throw new ScopedMining.Refused("mining_input_changed_after_hooks");
             } catch(RuntimeException failure){scopedMiningUnknown(guard,"mining_input_context_unconfirmed");return;}
         }
+        if(a.scopedPlacement!=null) {
+            try {a.scopedPlacement.check(Minecraft.getInstance(),a.dispatched,false);
+                if(active!=a||event.getInput()!=input||input!=a.player.input||!ScopedMining.neutral(input))
+                    throw new ClientActionRequest.Rejected(409,"placement_input_changed_after_hooks");
+            } catch(RuntimeException failure){if(active==a)finish("cancelled","placement_input_context_unconfirmed");return;}
+        }
         a.input = input;
         input.forwardImpulse = a.forward;
         input.leftImpulse = a.left ? 1 : a.right ? -1 : 0;
@@ -510,8 +520,9 @@ final class ClientActions {
         Minecraft mc = Minecraft.getInstance();
         MovementBudget.observe(mc,true);
         if (!context(mc,"post_tick") || mc.isPaused()) return;
+        RuntimeAction entered=active;
         try {
-            RuntimeAction a = active;
+            RuntimeAction a = entered;
             switch (a.entry.request.action()) {
                 case "break_block" -> observeBreak(mc, a);
                 case "place_block" -> { if(a.capabilityGuard!=null)placeCapability(mc,a);else place(mc,a); }
@@ -530,7 +541,7 @@ final class ClientActions {
                 default -> { }
             }
         } catch (RuntimeException failure) {
-            failException(failure);
+            if(entered.scopedPlacement==null || active==entered)failException(failure);
         }
     }
 
@@ -660,6 +671,7 @@ final class ClientActions {
         && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
     static ScopedCombat scopedCombat(BoundedCombat combat){return active!=null && active.combat==combat?active.scopedCombat:null;}
     static boolean ownsCombat(BoundedCombat combat){return active!=null && active.combat==combat;}
+    static boolean ownsScopedPlacement(ScopedPlacement g,ActionRegistry.Entry entry){return active!=null && active.scopedPlacement==g && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
     static ScopedMining scopedMining(){return active==null?null:active.scopedMining;}
     static boolean ownsScopedMining(ScopedMining g,ActionRegistry.Entry entry){return active!=null && active.scopedMining==g && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
     static boolean ownsScopedMining(ScopedMining g){return active!=null && active.scopedMining==g;}
@@ -889,6 +901,7 @@ final class ClientActions {
     }
 
     private static void placeCapability(Minecraft mc, RuntimeAction a) {
+        if(a.scopedPlacement!=null)a.scopedPlacement.check(mc,a.dispatched,false);
         BlockPos support = pos(a.entry.request.support());
         Direction face = Direction.valueOf(a.entry.request.face().toUpperCase(Locale.ROOT));
         BlockPos target = support.relative(face);
@@ -947,6 +960,7 @@ final class ClientActions {
             if(placementProblem!=null){finish("failed",placementProblem);return;}
             if(!capabilityDispatchCheck(mc,a))return;
         }
+        if(a.scopedPlacement!=null)a.scopedPlacement.beforeUse(mc,hit);
         // Exactly one ordinary client interaction. A missing response is never an excuse to replay it.
         a.dispatched = true;
         a.dispatchTick = a.entry.ticks;
@@ -955,9 +969,11 @@ final class ClientActions {
         a.entry.result.add("target", cellJson(target));
         int beforeCount = a.player.getMainHandItem().getCount();
         a.placementBeforeCount = beforeCount;
-        InteractionResult result = mc.gameMode.useItemOn(a.player, InteractionHand.MAIN_HAND, hit);
+        final BlockHitResult placementHit=hit;
+        InteractionResult result = a.scopedPlacement==null ? mc.gameMode.useItemOn(a.player, InteractionHand.MAIN_HAND, hit)
+            : ScopedPlacementDispatch.use(a.scopedPlacement,()->mc.gameMode.useItemOn(a.player,InteractionHand.MAIN_HAND,placementHit));
         a.entry.result.addProperty("interaction_result", result.name().toLowerCase(Locale.ROOT));
-        if (result.shouldSwing() && event.shouldSwingHand()) {
+        if (a.scopedPlacement==null && result.shouldSwing() && event.shouldSwingHand()) {
             a.player.swing(InteractionHand.MAIN_HAND);
             if (a.player.getMainHandItem().getCount() != beforeCount || mc.gameMode.hasInfiniteItems())
                 mc.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
@@ -1104,6 +1120,9 @@ final class ClientActions {
         if(a.scopedMining!=null && !status.equals("succeeded") && !reason.equals("cancel_requested")) {
             a.scopedMining.markUnknown();a.entry.result.addProperty("unknown_outcome",true);
         }
+        if(a.scopedPlacement!=null && !status.equals("succeeded") && a.scopedPlacement.attempted()) {
+            a.scopedPlacement.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);
+        }
         active = null;
         boolean pathAction = a.entry.request.action().equals("follow_path");
         boolean discontinuityCleanup = reason.equals("position_discontinuity_rebind_required");
@@ -1170,6 +1189,12 @@ final class ClientActions {
                     && !mc.options.keyAttack.isDown() && !ScopedMining.otherKeys(mc) && !BridgeServer.hasHeldInputs();
                 a.entry.result.add("mining",a.scopedMining.terminal(released,status.equals("succeeded")
                     && a.entry.result.has("observed_block") && a.entry.result.get("observed_block").getAsString().equals("minecraft:air")));
+            }
+            if(a.scopedPlacement!=null) {
+                Minecraft mc=Minecraft.getInstance();released &= a.scopedPlacement.cleanupState(status.equals("succeeded"))&&ScopedMining.neutral(a.input)&&ScopedMining.neutral(a.player.input)
+                    &&!mc.options.keyAttack.isDown()&&!ScopedMining.otherKeys(mc)&&!BridgeServer.hasHeldInputs();
+                if(!released&&a.scopedPlacement.attempted()){a.scopedPlacement.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);}
+                a.entry.result.add("placement",a.scopedPlacement.terminal(released,status.equals("succeeded")&&released));
             }
             ACTIONS.finishAfterCleanup(status, reason, released);
             if (a.combat != null)

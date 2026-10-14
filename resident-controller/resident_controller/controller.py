@@ -1266,7 +1266,7 @@ class Resident:
                 task.command.get('scoped_native_preflight', {}).get('profile') == 'block-menu-v1')
             definite_rejection = (sending_action and not block_menu_submission and isinstance(exc, BridgeError)
                                   and not exc.uncertain and exc.status is not None and 400 <= exc.status < 500)
-            if task.command.get('scoped_native_preflight', {}).get('profile') == 'mining-local-observed-v2':
+            if task.command.get('scoped_native_preflight', {}).get('profile') in ('mining-local-observed-v2','placement-local-observed-v1'):
                 definite_rejection = False  # No native proof that earlier hooks/input were effect-free.
             admission = {}
             if definite_rejection and exc.status == 409 and exc.code in NAVIGATION_REJECTIONS:

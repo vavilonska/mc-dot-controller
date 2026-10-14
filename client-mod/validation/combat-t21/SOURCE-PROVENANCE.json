@@ -22,5 +22,17 @@
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatHealthEvidence.java",
       "sha256": "b342a631dbc0bd6e0fc19f1f7430fe97c62053505a6d7424afea9c804325ee66"
     }
-  ]
+  ],
+  "current_compatibility": {
+    "historical_files_unchanged": true,
+    "note": "Historical T21 source pins above are preserved. Current BridgeJson differs only by the exact additive placement selector line; the test reverses that one line and checks the historical hash.",
+    "files": [
+      {
+        "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
+        "sha256": "6ec723b524f29d7618fcfe3028a4632c52c3fb378eec9721e8b5b64376395938",
+        "historical_sha256": "52c48f4bf8e536aec4f8ab808c7034a697651c27d5fc60267c4cfe208d802d15",
+        "exact_additive_line": "                        || value.getAsJsonObject().get(\"profile\").getAsString().equals(ScopedPlacement.PROFILE)\n"
+      }
+    ]
+  }
 }

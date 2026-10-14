@@ -10,9 +10,16 @@ import hashlib
 import json
 from pathlib import Path
 
-from mdc_skills import building_v3 as skills, construction
+from mdc_skills import building_v3 as skills, construction, scoped_placement
+from .inventory import _definition
+from .interaction import COORDINATE
 from mdc_skills.core import Observation, Survey, Outcome, SkillError
 from mdc_toolbox.contracts import ToolboxError, obj, integer, validate_schema, json_data
+
+_PLACE_SCHEMA = obj({'support': COORDINATE, 'face': {'enum': sorted(scoped_placement.reach.FACES)},
+    'expected_support_id': {'enum': list(scoped_placement.BLOCKS)}, 'expected_support_properties': obj(),
+    'expected_block_id': {'const': scoped_placement.BLOCK}, 'expected_block_properties': obj()},
+    ('support','face','expected_support_id','expected_support_properties','expected_block_id','expected_block_properties'))
 
 MAX_CELLS = 512
 MAX_REGION_VOLUME = 8192
@@ -82,7 +89,19 @@ def _sources():
 
 
 def definitions():
-    return [{
+    local = _definition('place_local', _PLACE_SCHEMA, group='building', level='primitive', profile='player',
+        description='Place one selected plain cobblestone against an explicit full-cube support face while stationary.',
+        source='scoped_placement.py', actions=['place_block'], bounds={'placement_items':1,'native_timeout_ms':2000,
+            'maximum_action_ticks':40,'max_mutations':1},
+        limits=['Requires request_only and negotiated placement-local-observed-v1; no legacy fallback.',
+            'Exact support, face and empty target; selected plain cobblestone only, no hotbar switch or procurement.',
+            'No movement, bridge/pillar jump, retries, blueprint automation or whole-building execution.',
+            'Exact one-item decrement and protected other inventory plus stable native target-state proof.'])
+    local['native_features'] += ['scoped-native-preflight/1','profile:placement-local-observed-v1']
+    local['cancel_granularity'] = 'exact_native_action'
+    local['source_fingerprints'].append({'path':'capability-runtime/mdc_toolbox/bindings/building.py',
+        'sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()})
+    return [local] + [{
         'capability': name, 'capability_version': 1, 'group': 'building',
         'level': 'bounded_composite', 'input_schema': deepcopy(schema),
         'result_schema': deepcopy(_RESULT), 'observation_profile': 'local_terrain',
@@ -138,6 +157,13 @@ def _parse(capability, arguments):
 
 def invoke(capability, runtime, arguments, control):
     """Fail closed even when called outside the central availability allowlist."""
+    if capability == 'place_local':
+        validate_schema(arguments, _PLACE_SCHEMA)
+        control.checkpoint()
+        result = scoped_placement.place_local(runtime, **deepcopy(arguments))
+        control.emit('capability_result', {'capability':capability,'status':result.status,
+                                          'reason':result.reason,'request_ids':list(result.request_ids)})
+        return result
     blueprint, _ = _parse(capability, arguments)
     control.checkpoint()
     result = Outcome('blocked', 'building_scoped_execution_unavailable', evidence={

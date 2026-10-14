@@ -50,6 +50,14 @@ class EncodingTests(unittest.TestCase):
   with self.assertRaises(ValueError):v.same_target_health(combat,[row,row])
  def test_source_provenance_pins(self):
   here=Path(__file__).resolve().parent;root=here.parents[2]
-  for record in json.loads((here/'SOURCE-PROVENANCE.json').read_text())['files']:
-   self.assertEqual(hashlib.sha256((root/record['path']).read_bytes()).hexdigest(),record['sha256'],record['path'])
+  provenance=json.loads((here/'SOURCE-PROVENANCE.json').read_text())
+  compatible={r['path']:r for r in provenance.get('current_compatibility',{}).get('files',[])}
+  for record in provenance['files']:
+   raw=(root/record['path']).read_bytes()
+   if record['path'] in compatible:
+    current=compatible[record['path']];self.assertEqual(current['historical_sha256'],record['sha256'])
+    self.assertEqual(hashlib.sha256(raw).hexdigest(),current['sha256'])
+    line=current['exact_additive_line'].encode();self.assertEqual(raw.count(line),1)
+    raw=raw.replace(line,b'')
+   self.assertEqual(hashlib.sha256(raw).hexdigest(),record['sha256'],record['path'])
 if __name__=='__main__':unittest.main(verbosity=2)
