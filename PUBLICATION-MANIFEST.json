@@ -1,47 +1,42 @@
 {
-  "schema": "mdc-mainline-source-integration-v9",
-  "repository_parent_commit": "c9f5247c91d321d6df09f9d210f6f936a3a488a2",
-  "repository_parent_tree": "dd813ae4ba1c00aa9e00d14a3c66c9fca9fa23c6",
-  "source_stage": "T23 bounded placement acceptance documentation",
-  "scope": "Three documentation updates only; production and tests unchanged.",
+  "schema": "mdc-mainline-source-integration-v10",
+  "repository_parent_commit": "98ad27a0fe7f1001c4e5cbf49786a73e60cca7fa",
+  "repository_parent_tree": "383cd5f89d3e2d46ce143fa9f0ddb5d99524954e",
+  "source_stage": "T24 qualified crafting functional and saved acceptance documentation",
+  "scope": "Two documentation updates only; production and tests unchanged.",
   "verification": {
-    "scope": "Documentation only; all production and test source bytes match the verified parent publication. No tests rerun for unchanged code.",
-    "prior_source_verification": {
-      "capability_tests": 759,
-      "all_passed": true,
-      "current_placement_java_wire_consumers": 11,
-      "legacy_java_wire_consumers": 8
-    },
-    "T23": {
-      "original_complete_live_verifier": "PASS",
-      "independent_live_and_saved_review": "PASS",
-      "native_action_ticks": 6,
-      "native_stable_ticks": 5,
-      "effect_count": 1,
-      "packet_count": 1,
-      "selected_count_before": 5,
-      "selected_count_after": 4,
-      "menu_revision_before": 1,
-      "menu_revision_after": 2,
-      "physical_neutral": true,
-      "release_binding_confirmed": true,
-      "semantic_context_confirmed": true,
-      "other_compared_cells_unchanged": 74,
+    "scope": "Documentation only; production and test source bytes unchanged. No tests rerun.",
+    "T24": {
+      "functional_and_saved": "independently verified",
+      "original_unique_click_chains": 6,
+      "oak_planks_consumed": 2,
+      "sticks_added": 4,
+      "observed_output_slot": 35,
+      "grid_cursor_empty_live": true,
+      "saved_grid_cursor_proven": false,
       "typed_inventory_representations": 4,
+      "compared_terrain_cells_unchanged": 75,
       "health": 20,
-      "position_conserved": true,
-      "automated_closure_seconds": 63.215,
+      "sampled_position_conserved": true,
+      "automation": "HOLD_NO_REPLAY preserved",
+      "full_report_bytes": 2465305,
+      "inherited_input_limit_bytes": 2097152,
+      "manual_closure_seconds": 147.410904,
+      "original_limit_seconds": 180,
+      "original_process_identities_absent": 9,
+      "tracked_owner_exit_codes": 0,
       "mcp_exit_code": 0,
       "java_numeric_exit": null,
-      "handoff_sha256": "ba136f519660a94dd9003dd5b577064bfab1084c9034e5aec64dc854324b0664",
-      "tested_artifact_sha256": "925f179a03dc6ede3b9e6a0aa014f9d9f73c201203e5ce5bbf0e8ebb7b3abc11"
+      "handoff_sha256": "db98f89e24d3abf934f2725bd505ad3b8d4787e7ea1457fd8608759a6bc8fad9",
+      "product_changed_for_craft": false
     },
     "limits": [
-      "One stationary cobblestone placement only",
-      "No whole-world unchanged claim",
-      "No multi-cell building workflow claim",
-      "No additional server acknowledgement or future-dynamics claim",
-      "T22 original unknown outcome preserved; no retry or reclassification"
+      "Qualified functional and saved pass, not full automation",
+      "No full-world or full-player unchanged claim",
+      "No causal attribution for entity changes",
+      "No general recipes, procurement or building workflow claim",
+      "No T24 replay; later offline adapter correction was not live-integrated",
+      "T22 unknown and T23 bounded result preserved"
     ]
   },
   "excluded": [
@@ -73,8 +68,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9818,
-      "sha256": "9ffacb93235e93029c494204f8f86c9daf5e8464777740f91634cbfc0097689d"
+      "bytes": 10064,
+      "sha256": "f9646c2b116e92a2dfbc12e95d4e0122852cb161c2fdcb71f99b190848965d77"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
@@ -3105,6 +3100,11 @@
       "path": "defense-watchdog/watchdog.py",
       "bytes": 24064,
       "sha256": "a133a9e4a781169092db2bc8957379adb19c6e8502d1734b6fc7357458edf475"
+    },
+    {
+      "path": "docs/CRAFT-T24.md",
+      "bytes": 2848,
+      "sha256": "203716ed98a449ec93e523c936d031e92cc29fa00fd24afe4329a16ad88554c9"
     },
     {
       "path": "docs/MINING-COLLECT-COMBAT.md",
