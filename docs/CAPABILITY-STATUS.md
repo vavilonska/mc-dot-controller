@@ -1,8 +1,11 @@
 # Capability evidence and outstanding acceptance
 
-This matrix records the bounded evidence available through T31 on 2026-10-15.
-It combines the existing public checkpoint documents with the exact T29–T31
-final handoffs summarized in [Bounded acceptance](T29-T31-ACCEPTANCE.md).
+This matrix records the bounded evidence available through T32 on 2026-10-15.
+It preserves the published r2 checkpoint, including T17 qualified collection,
+and the exact T29–T31 handoffs summarized in
+[Bounded acceptance](T29-T31-ACCEPTANCE.md). It adds the separately verified
+[T32 barrel withdrawal](T32-CONTAINER-ACCEPTANCE.md), whose final-window closure
+was manual and whose original automatic HOLD remains preserved.
 It is a capability-level overview, not a declaration that every toolbox case
 passed. In particular, the complete 49-case toolbox has not been live-accepted.
 
@@ -27,7 +30,8 @@ rebuild or new runtime artifact. Unlisted variants remain unaccepted here.
 | Smelting | T29 bounded live and saved: one sand plus one oak plank produced one collected glass; automatic closure passed. | Other recipes/fuels, multiple outputs, blast furnace/smoker, partial-output recovery and automatic material acquisition. |
 | Equipment | T30 bounded live and saved: one torch/offhand shield swap with exact inventory/component conservation; automatic closure passed. | Armor destinations, different components/items, other displacement rules and repeated loadout changes. |
 | Consumption | T31 bounded live and saved: one water-breathing potion, one returned bottle and observed amplifier-0 effect; automatic closure passed. | Food, milk, other potions, stack/container cases, interrupted use and broader terminal-ordering behavior. Exact effect decay/expiry is not proven. |
-| Bounded container observations | Source/offline snapshot work and a documented real-platform acceptance checklist. | The checklist's genuine-loader, read-only inventory/container gate remains unmet by the cited public checkpoint; T29–T31 do not close it. |
+| Barrel withdrawal | T32 qualified live/saved acceptance: three public jobs and four native mutations transferred one cobblestone from one ordinary barrel to inventory, with confirmed input/owner release. Ordinary completion took 135.015 seconds with manual final-window closure; automatic `HOLD_NO_REPLAY` remains. | Fresh fully automatic lifecycle acceptance, deposits, other quantities/containers, full-inventory handling, interruptions and composed storage workflows. Saved position was conserved but rotation and broader world records changed. |
+| Bounded container observations | Source/offline snapshot work and a documented real-platform acceptance checklist. | The checklist's seven genuine-loader tests and designated read-only metadata/budget/container fixtures remain a separate unmet gate in the cited checkpoint. T32's single barrel withdrawal does not supply that coverage. |
 | Broader navigation and transport | Guarded source and offline/synthetic evidence described by the capability package. | Ordinary-world route diversity, steps/stairs, boats and their full movement/cleanup chains on the target runtime. |
 | Resource production and long goals | Bounded recipe/resource/scheduler implementations with explicit prerequisites and offline tests. | Composed ordinary-world acquisition, reservations, production, interruption and safe resumption. Individual T29–T31 successes do not validate composition. |
 | Blueprint building | Planning/source evidence; the public scoped-placement contract keeps `build` and `build_with_materials` unavailable for runtime execution. | Supported front-door execution, material staging, multi-cell placement, access/support handling and final physical audit. One placed block is insufficient. |
@@ -39,6 +43,7 @@ The source documents remain authoritative for the detailed contracts:
 [Mining collect and combat](MINING-COLLECT-COMBAT.md),
 [Scoped placement](../capability-runtime/docs/SCOPED-PLACEMENT.md),
 [Crafting](CRAFT-T24.md),
+[T32 barrel withdrawal](T32-CONTAINER-ACCEPTANCE.md),
 [Container platform acceptance](container-platform-acceptance.md),
 [Reusable capabilities](../capability-runtime/README.md), and
 [Source checkpoint](../SOURCE-CHECKPOINT.md).
@@ -73,7 +78,7 @@ the later additive, exact-original stable-state reconciliation.
 - T17 final completion seal SHA-256: `be6c19e703085fd73e68867478e684a771b1610cf5a3130a8cf3fc35516c6324`.
 - T17 installed runtime artifact SHA-256: `8048dde926387954edd47028703da0c2b3c8b97a1b441f85de77d670e741b3e7`.
 
-This historical runtime identity is separate from T29–T31 artifacts and from this
+This historical runtime identity is separate from T29–T32 artifacts and from this
 public-source manifest. No raw receipt, world coordinate or runtime identifier
 is distributed here. No action was retried or replayed for this correction.
 
@@ -93,6 +98,7 @@ is distributed here. No action was retried or replayed for this correction.
 | T26 | Original interact remains unknown; smelt and close jobs were not submitted. Process exit does not by itself release a paused semantic lease. |
 | T27 | Pre-play startup abort; no world load or public job. It is not a failed or passed smelting action. |
 | T28 | Original interact remains unknown; smelt/close did not start. Later ray evidence makes the precision cause an inference, not an observed failing-instant fact. |
+| T32 | Known withdrawal effects and saved persistence are independently accepted. A later read-only focus query left automatic `HOLD_NO_REPLAY`; known manual closure of the final windows did not erase it. Java's numeric exit remains unknown. |
 
 Later passing cases do not authorize replay, restocking, resuming a paused owner
 or relabeling earlier evidence. Unknown outcomes require the original read-only
@@ -100,9 +106,14 @@ reconciliation contract; they are never a retry instruction.
 
 ## Remaining integration gates
 
-1. Bind any consolidated source tree to its own reviewed manifest and fresh
-   offline build/test evidence. T29–T30's runtime artifact and T31's later artifact
-   are distinct, and neither runtime manifest is a publication manifest.
+1. Preserve the exact published r2 source commit
+   `f09382b4fd1a3e7324ad3af466b3a8b082de59a3` and its separate offline evidence.
+   Any follow-on revision needs its own reviewed manifest and applicable checks.
+   T29–T30's runtime artifact differs from the later artifact used by T31–T32;
+   neither runtime manifest is a publication manifest. The published r2
+   [CodeQL run](https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001)
+   passed all three language jobs; this is not a full Gradle/NeoForge build,
+   deployment or live acceptance of a rebuilt artifact.
 2. Keep source, synthetic-wire/policy, native/platform, live, closure and saved
    acceptance separate. A successful source merge or offline suite cannot stand
    in for live validation of the resulting artifact.
@@ -115,6 +126,6 @@ reconciliation contract; they are never a retry instruction.
    selected-field equality is not whole-world equality; Java's unknown numeric
    exit is not an observed zero.
 
-These are outstanding gates, not authorization to run them. T31's live work is
+These are outstanding gates, not authorization to run them. T32's live work is
 stopped pending review of the next scope. The original worlds and paused tasks
 remain protected, and multiplayer is outside this evidence.

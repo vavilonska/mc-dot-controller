@@ -1,9 +1,9 @@
 {
-  "schema": "mdc-mainline-source-integration-v12",
-  "repository_parent_commit": "5bcb80338277e3e32a909226e86bae170c4b4cea",
-  "repository_parent_tree": "e96652c4080014597a635faf689a3f86eb6bd3da",
-  "source_stage": "Reviewed diagnostics, representable intended ray and consume completion; bounded T29-T31 acceptance documentation",
-  "scope": "Local publication-ready source consolidation; no new deployment or GitHub publication claimed",
+  "schema": "mdc-mainline-source-integration-v13",
+  "repository_parent_commit": "f09382b4fd1a3e7324ad3af466b3a8b082de59a3",
+  "repository_parent_tree": "0a8bdd9e4702d8ab32628003df30605c0aaa76c1",
+  "source_stage": "Documentation-only bounded T32 container acceptance and publication status update",
+  "scope": "Documentation-only follow-up to published r2; production and test bytes unchanged",
   "verification": {
     "fresh_production_compile": {
       "java_sources": 138,
@@ -140,9 +140,10 @@
       "Unknown and HOLD outcomes preserved; no replay",
       "Client-observed evidence, not independent server confirmation",
       "Synthetic Windows platform checks do not validate Windows/PowerShell",
-      "GitHub publication blocked pending assured approved noreply identity route"
+      "The r2 source consolidation was published as commit f09382b4fd1a3e7324ad3af466b3a8b082de59a3. CodeQL analysis completed successfully for Python, JavaScript/TypeScript and Java/Kotlin: https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001. The earlier publication hold is historical. This establishes source publication and that CodeQL run only, not deployment, a full Gradle/NeoForge build or new live acceptance."
     ],
-    "documentation_correction": "T17 collect_local independently qualified live/saved acceptance restored in capability matrix; original harness failure, missing separate after-public observation, unknown Java exit and original runtime identity preserved. Production and tests unchanged; prior fresh gate results retained by exact byte equality."
+    "documentation_correction": "T17 collect_local independently qualified live/saved acceptance restored in capability matrix; original harness failure, missing separate after-public observation, unknown Java exit and original runtime identity preserved. Production and tests unchanged; prior fresh gate results retained by exact byte equality.",
+    "documentation_only_followup": "T32 bounded barrel withdrawal and saved result independently accepted on its separately pinned runtime; original automatic HOLD retained with manual final-window closure. Case-only functional-first timing did not relax production guards. Production and tests byte-identical to published r2; prior regression evidence retained by equality, not rerun."
   },
   "excluded": [
     "Private runtime receipts, logs, world coordinates, action and job identities, accounts and worlds",
@@ -173,13 +174,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 10894,
-      "sha256": "062f440ee736037103cb5eca7f800b824e3eb3adee388503c19f68229b1afefb"
+      "bytes": 11291,
+      "sha256": "5fa11ee4589cf5b96e0f688d105b3f94772657d2214e00e1b828d9cb17b9b007"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
-      "bytes": 11025,
-      "sha256": "48292591309679d338bb36ce41f02e8509e401a5b4638c78f213d7d0ceae3b3b"
+      "bytes": 11535,
+      "sha256": "ee9fadc61c44a9e91151415d8c8a29087fd132091b98474ac70bb8aae2056596"
     },
     {
       "path": "building-controller/.gitignore",
@@ -3278,8 +3279,8 @@
     },
     {
       "path": "docs/CAPABILITY-STATUS.md",
-      "bytes": 11805,
-      "sha256": "3c9d31b9773e1b1dc55ea8335b7eab6ecc51066e59bb6997b4dd1fdc2affecd7"
+      "bytes": 13284,
+      "sha256": "16507524e5283d968e11b2470fbae08a3050068f8dc8e1aadd511cce847f74d9"
     },
     {
       "path": "docs/CRAFT-T24.md",
@@ -3300,6 +3301,11 @@
       "path": "docs/T29-T31-ACCEPTANCE.md",
       "bytes": 8373,
       "sha256": "aa3862b3760c37d1f49bf3220805903237e36dadc6890a75e520c9d74ea997d7"
+    },
+    {
+      "path": "docs/T32-CONTAINER-ACCEPTANCE.md",
+      "bytes": 7464,
+      "sha256": "acd4d3ab92a38a97025f9a8109382a528eda34ec021f7ef080327ff89782db1c"
     },
     {
       "path": "docs/THREE-ZOMBIE-STAGE.md",

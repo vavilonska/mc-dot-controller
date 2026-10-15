@@ -1,6 +1,6 @@
-# Current local consolidation through T31
+# Published source consolidation through T31
 
-This local source checkpoint preserves published main
+The r2 source checkpoint preserves the prior published main
 `5bcb80338277e3e32a909226e86bae170c4b4cea` and the reviewed diagnostic delta,
 then adds the reviewed representable-ray pair and consume-completion ordering.
 Runtime-only version metadata and private trial artifacts are not imported.
@@ -8,13 +8,19 @@ The final Java production sources match the separately bound T31 runtime source;
 this publication inventory includes additional public-safe tests and documentation.
 
 See [bounded fixes](docs/BOUNDED-RAY-AND-CONSUME-FIXES.md),
-[T29–T31 acceptance](docs/T29-T31-ACCEPTANCE.md), and
+[T29–T31 acceptance](docs/T29-T31-ACCEPTANCE.md), the later
+[T32 barrel withdrawal](docs/T32-CONTAINER-ACCEPTANCE.md), and
 [capability status](docs/CAPABILITY-STATUS.md) for current evidence and limits.
 `PUBLICATION-MANIFEST.json` and `SOURCE_SHA256SUMS.txt` enumerate this tree.
-This checkpoint is locally prepared, not a claim of a new GitHub publication or
-installed release. GitHub publication is held pending a verified route that
-preserves the approved noreply commit identity. No credential or access expansion
-is part of this checkpoint.
+The r2 source consolidation was published as commit
+`f09382b4fd1a3e7324ad3af466b3a8b082de59a3`. The earlier publication hold is
+historical. Its [CodeQL analysis run](https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001)
+completed successfully for Python, JavaScript/TypeScript and Java/Kotlin. This
+establishes that analysis result, not a full Gradle/NeoForge build, deployment or
+live acceptance of a rebuilt artifact. This later documentation adds T32's
+qualified functional/saved result while retaining its automatic HOLD and manual
+final-window closure. Runtime bindings remain separate from public source
+identity; no credential or access expansion is part of this update.
 
 The sections below describe historical integrations; their file counts and
 NOT_RUN statements belong to those historical checkpoints.
