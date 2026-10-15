@@ -1,26 +1,45 @@
-# Published source consolidation through T31
+# Source consolidation with bounded descent
 
-The r2 source checkpoint preserves the prior published main
-`5bcb80338277e3e32a909226e86bae170c4b4cea` and the reviewed diagnostic delta,
-then adds the reviewed representable-ray pair and consume-completion ordering.
-Runtime-only version metadata and private trial artifacts are not imported.
-The final Java production sources match the separately bound T31 runtime source;
-this publication inventory includes additional public-safe tests and documentation.
+This update preserves the published T32 documentation baseline
+`ade1df19b661701c96c6ffa088bc1df709fd3979` and starts from the reviewed 25-file
+descent source, tests and contract-documentation delta. Final public integration
+and test-portability edits are separately identified in the publication record.
+Earlier diagnostic, representable-ray and consume-completion fixes, public
+portable tests, and T17 and T32 acceptance qualifications are retained.
+Runtime-only version metadata, raw private trial artifacts and installed game
+state are not imported.
 
-See [bounded fixes](docs/BOUNDED-RAY-AND-CONSUME-FIXES.md),
-[T29–T31 acceptance](docs/T29-T31-ACCEPTANCE.md), the later
+The explicit `navigate_step_down` capability selects
+`movement-step-down-observed-v1`; existing flat movement, collection and legacy
+navigation contracts retain their own scope. See
+[scoped descent source](docs/SCOPED-STEP-DOWN.md),
+[T34 qualified acceptance](docs/T34-DESCENT-ACCEPTANCE.md),
+[earlier bounded fixes](docs/BOUNDED-RAY-AND-CONSUME-FIXES.md),
+[T29–T31 acceptance](docs/T29-T31-ACCEPTANCE.md),
 [T32 barrel withdrawal](docs/T32-CONTAINER-ACCEPTANCE.md), and
-[capability status](docs/CAPABILITY-STATUS.md) for current evidence and limits.
-`PUBLICATION-MANIFEST.json` and `SOURCE_SHA256SUMS.txt` enumerate this tree.
+[capability status](docs/CAPABILITY-STATUS.md).
+
+T34 acceptance belongs to its separately bound descent runtime. The original
+case report failed its constant bbox/roof-height comparison; independent narrow
+source-derived geometry review and saved endpoint verification support the
+qualified result without changing that report or replaying gameplay. The source
+integration does not claim deployment or live acceptance of a newly rebuilt
+integrated artifact. Source, offline checks, live evidence, closure and saved
+results remain distinct. `PUBLICATION-MANIFEST.json` and `SOURCE_SHA256SUMS.txt`
+enumerate the reviewed public tree; runtime-source manifests are separate.
+
+## Published predecessor evidence
+
 The r2 source consolidation was published as commit
-`f09382b4fd1a3e7324ad3af466b3a8b082de59a3`. The earlier publication hold is
-historical. Its [CodeQL analysis run](https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001)
-completed successfully for Python, JavaScript/TypeScript and Java/Kotlin. This
-establishes that analysis result, not a full Gradle/NeoForge build, deployment or
-live acceptance of a rebuilt artifact. This later documentation adds T32's
-qualified functional/saved result while retaining its automatic HOLD and manual
-final-window closure. Runtime bindings remain separate from public source
-identity; no credential or access expansion is part of this update.
+`f09382b4fd1a3e7324ad3af466b3a8b082de59a3`, with successful
+[three-language CodeQL analysis](https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001).
+The later documentation-only T32 commit
+`ade1df19b661701c96c6ffa088bc1df709fd3979` preserved production/test source and also
+passed its [CodeQL analysis](https://github.com/vavilonska/mc-dot-controller/actions/runs/38706299826).
+Those results concern the named published predecessors, not this later source
+integration. They are not full Gradle/NeoForge builds or new gameplay acceptance.
+The earlier publication hold is historical. No credential/access expansion,
+paused-task resumption or unknown-action replay is part of this update.
 
 The sections below describe historical integrations; their file counts and
 NOT_RUN statements belong to those historical checkpoints.

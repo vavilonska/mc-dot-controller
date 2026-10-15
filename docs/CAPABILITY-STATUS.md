@@ -1,11 +1,14 @@
 # Capability evidence and outstanding acceptance
 
-This matrix records the bounded evidence available through T32 on 2026-10-15.
+This matrix records the bounded evidence available through T34 on 2026-10-15.
 It preserves the published r2 checkpoint, including T17 qualified collection,
 and the exact T29–T31 handoffs summarized in
 [Bounded acceptance](T29-T31-ACCEPTANCE.md). It adds the separately verified
 [T32 barrel withdrawal](T32-CONTAINER-ACCEPTANCE.md), whose final-window closure
-was manual and whose original automatic HOLD remains preserved.
+was manual and whose original automatic HOLD remains preserved. It also adds
+[T34 qualified single-block descent](T34-DESCENT-ACCEPTANCE.md), accepted by
+separate review of the original live evidence and saved endpoint while retaining
+the original geometry-comparator failure.
 It is a capability-level overview, not a declaration that every toolbox case
 passed. In particular, the complete 49-case toolbox has not been live-accepted.
 
@@ -20,7 +23,8 @@ rebuild or new runtime artifact. Unlisted variants remain unaccepted here.
 | Capability | Evidence accepted or retained | Outstanding acceptance |
 | --- | --- | --- |
 | Hotbar and inventory transfer | Earlier public cases are recorded as accepted in the source checkpoint. | Broader item/menu combinations and acceptance on a newly consolidated artifact; no additional coverage is inferred from this summary. |
-| Local movement | T13 bounded live and saved: one cardinal flat-block movement with conserved health/inventory and ordinary closure. | Elevation, obstacles, long routes, unknown/unloaded terrain, dynamic hazards and generalized pathfinding. |
+| Local flat movement | T13 bounded live and saved: one cardinal flat-block movement with conserved health/inventory and ordinary closure. | Obstacles, long routes, unknown/unloaded terrain, dynamic hazards and generalized pathfinding. The separate T34 result does not expand the flat-movement contract. |
+| Single-block descent | Reviewed `navigate_step_down` source is integrated. T34 qualified live/saved acceptance: one ordinary-input cardinal descent, native `path_reached` after 21 ticks, 0.194367-block horizontal error inside the unchanged 0.23 radius, conserved health/food/gear and ordinary closure. Original case failure remains; narrow source-derived bbox/roof geometry review accepted the original evidence separately. | A newly rebuilt integrated artifact still needs its own live acceptance. Terraces, obstacles, step-up, jumping, continuous trajectories and multi-step/chained routes remain outside this case. An accepted landing need not meet the next segment's tighter source-centering requirement. |
 | Mining | T15/T16 functional and saved results retained. T16 saved target was air and inventory gained one ordinary oak plank. T15 missed its closure bound; T16 automatic HOLD remains despite manual closure. | A fresh fully automatic accepted mining case, broader targets/tools and independently scoped collection. Mining does not prove which drop caused the gain. |
 | `collect_local` | T17 qualified independent live/saved acceptance: one plain oak-plank pickup, known public effect and confirmed cleanup, plus automatic closure in 57.553 seconds. Native `cancelled:scoped_collect_target_absent` is retained; the original success-only harness failed. | Other items, quantities, moving targets, interruptions and generalized collection. No separate after-public observation or causal drop attribution was established; acceptance is tied to the original T17 runtime, not this new consolidation. |
 | Combat | T21 independently accepted one single-target attack and exact cancellation with saved target/player checks. Original harness encoding-comparison failure remains retained. | General engagement, chase, multiple targets, kill/loot, effective damage blocking, ranged use and unattended survival. No causal attribution of all target damage. |
@@ -40,6 +44,8 @@ rebuild or new runtime artifact. Unlisted variants remain unaccepted here.
 
 The source documents remain authoritative for the detailed contracts:
 [Movement](MOVEMENT-T13.md),
+[T34 qualified descent](T34-DESCENT-ACCEPTANCE.md),
+[Scoped descent source](SCOPED-STEP-DOWN.md),
 [Mining collect and combat](MINING-COLLECT-COMBAT.md),
 [Scoped placement](../capability-runtime/docs/SCOPED-PLACEMENT.md),
 [Crafting](CRAFT-T24.md),
@@ -99,6 +105,8 @@ is distributed here. No action was retried or replayed for this correction.
 | T27 | Pre-play startup abort; no world load or public job. It is not a failed or passed smelting action. |
 | T28 | Original interact remains unknown; smelt/close did not start. Later ray evidence makes the precision cause an inference, not an observed failing-instant fact. |
 | T32 | Known withdrawal effects and saved persistence are independently accepted. A later read-only focus query left automatic `HOLD_NO_REPLAY`; known manual closure of the final windows did not erase it. Java's numeric exit remains unknown. |
+| T33 | Known pre-Play harness abort: `t33Origin` was undefined before `pressKey` could be called. The input latch was set, but no origin, Play, public job or descent action occurred; original `HOLD_NO_REPLAY` remains. Known window closure completed within the original deadline, Java/launcher/Resident exited 0, six original process identities were absent and all 31 prepared-world files were unchanged. T34 corrected only case-harness App binding and pre-latch checks, leaving the product unchanged. This was not an unknown mutation or a descent action failure. |
+| T34 | The original case report still fails `protected_player_inventory_health_food`. A separately reviewed additive verifier checks pose-derived bounding-box translation and shelter `roof_y`, then reruns every other frozen check. Known native success, saved endpoint and ordinary closure do not rewrite the original report or establish a composable route. |
 
 Later passing cases do not authorize replay, restocking, resuming a paused owner
 or relabeling earlier evidence. Unknown outcomes require the original read-only
@@ -112,8 +120,12 @@ reconciliation contract; they are never a retry instruction.
    T29–T30's runtime artifact differs from the later artifact used by T31–T32;
    neither runtime manifest is a publication manifest. The published r2
    [CodeQL run](https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001)
-   passed all three language jobs; this is not a full Gradle/NeoForge build,
-   deployment or live acceptance of a rebuilt artifact.
+   passed all three language jobs. The subsequent T32 documentation was published
+   as `ade1df19b661701c96c6ffa088bc1df709fd3979`, also with successful
+   [three-language CodeQL analysis](https://github.com/vavilonska/mc-dot-controller/actions/runs/38706299826).
+   This T34 source integration and its distinct tested runtime require separate
+   bindings; previous publication/analysis results do not establish a full
+   Gradle/NeoForge build, deployment or live acceptance of its rebuilt artifact.
 2. Keep source, synthetic-wire/policy, native/platform, live, closure and saved
    acceptance separate. A successful source merge or offline suite cannot stand
    in for live validation of the resulting artifact.
@@ -126,6 +138,6 @@ reconciliation contract; they are never a retry instruction.
    selected-field equality is not whole-world equality; Java's unknown numeric
    exit is not an observed zero.
 
-These are outstanding gates, not authorization to run them. T32's live work is
-stopped pending review of the next scope. The original worlds and paused tasks
+These are outstanding gates, not authorization to run them. No further live
+tests were started by the T34 handoff. The original worlds and paused tasks
 remain protected, and multiplayer is outside this evidence.

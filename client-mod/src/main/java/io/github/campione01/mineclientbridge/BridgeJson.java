@@ -88,6 +88,7 @@ final class BridgeJson {
                     && value.getAsJsonObject().get("profile").isJsonPrimitive()
                     && value.getAsJsonObject().get("profile").getAsJsonPrimitive().isString()
                     && (value.getAsJsonObject().get("profile").getAsString().equals(ScopedFlatMovement.PROFILE)
+                        || value.getAsJsonObject().get("profile").getAsString().equals(ScopedStepDownMovement.PROFILE)
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedPlacement.PROFILE)
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedMining.PROFILE)
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedCollectTarget.PROFILE));

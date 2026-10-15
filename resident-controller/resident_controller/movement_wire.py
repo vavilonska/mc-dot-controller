@@ -64,7 +64,7 @@ def decode(bundle):
     result = action['result']
     authority = result.get(WITNESS)
     require(REFERENCE not in result and type(authority) is dict, 'authority_missing_or_chained')
-    require(authority.get('profile') in ('movement-flat-observed-v2','mining-local-observed-v2','collect-local-observed-v1','placement-local-observed-v1')
+    require(authority.get('profile') in ('movement-flat-observed-v2','movement-step-down-observed-v1','mining-local-observed-v2','collect-local-observed-v1','placement-local-observed-v1')
             and authority.get('version') == 'scoped-native-preflight/1'
             and type(authority.get('schema_version')) is int and authority['schema_version'] == 1
             and authority.get('coverage_complete') is True and authority.get('admitted') is True
@@ -158,13 +158,14 @@ def valid_size_diagnostic(value):
         return False
     mining = value.get('schema_version') == 2 and value.get('profile') == 'mining-local-observed-v2'
     placement = value.get('schema_version') == 3 and value.get('profile') == 'placement-local-observed-v1'
-    if set(value) != (keys | {'profile'} if mining or placement else keys):
+    descent = value.get('schema_version') == 4 and value.get('profile') == 'movement-step-down-observed-v1'
+    if set(value) != (keys | {'profile'} if mining or placement or descent else keys):
         return False
     if not all(type(value[k]) is int and 0 <= value[k] <= 2147483647 for k in keys):
         return False
-    return (value['schema_version'] == (3 if placement else 2 if mining else 1) and value['response_limit'] == WIRE_LIMIT
+    return (value['schema_version'] == (4 if descent else 3 if placement else 2 if mining else 1) and value['response_limit'] == WIRE_LIMIT
             and value['standalone_reserve_bytes'] == 8192 and value['capability_reserve_bytes'] == 24576
-            and (1 <= value['cell_count'] <= 512 if mining or placement else value['cell_count'] == 150)
+            and (value['cell_count'] == 180 if descent else 1 <= value['cell_count'] <= 512 if mining or placement else value['cell_count'] == 150)
             and 1 <= value['enumerated_count'] <= 1024
             and value['entity_frame_bytes'] <= 192 * 1024
             and value['entity_frame_bytes'] <= value['witness_bytes'] <= value['standalone_bytes']

@@ -52,6 +52,7 @@ final class ClientActions {
         boolean scopedPacketPending;
         BlockHitResult scopedPacketHit;
         ScopedFlatMovement scopedMovement;
+        ScopedStepDownMovement scopedStepDown;
         ScopedMining scopedMining;
         ScopedPlacement scopedPlacement;
         ScopedCombat scopedCombat;
@@ -217,6 +218,8 @@ final class ClientActions {
             active.entry.result.add("scoped_native_preflight", scoped.witness(request.id()));
             active.scopedMovement = scoped.movement;
             if (active.scopedMovement != null) active.scopedMovement.activate(active.entry);
+            active.scopedStepDown=scoped.stepDown;
+            if(active.scopedStepDown!=null)active.scopedStepDown.activate(active.entry);
             active.scopedCombat=scoped.combat;
             if(active.scopedCombat!=null){active.scopedCombat.activate(active.entry);active.combat.bindScoped(active.scopedCombat);}
             active.scopedPlacement=scoped.placement;
@@ -292,6 +295,10 @@ final class ClientActions {
     }
     static boolean ownsScopedMovement(ScopedFlatMovement movement,ActionRegistry.Entry entry) {
         return active!=null && active.scopedMovement==movement && active.entry==entry
+                && ACTIONS.active()==entry && entry!=null && entry.running();
+    }
+    static boolean ownsScopedStepDown(ScopedStepDownMovement descent,ActionRegistry.Entry entry) {
+        return active!=null && active.scopedStepDown==descent && active.entry==entry
                 && ACTIONS.active()==entry && entry!=null && entry.running();
     }
     static boolean ownsCapabilityTarget(CapabilityTargetAction target) { return active!=null && active.capabilityTarget==target; }
@@ -499,6 +506,17 @@ final class ClientActions {
                 a.dispatched=true; a.scopedMovement.markAttempted();
             } catch(RuntimeException failed) { if(active==a)finish("cancelled",ScopedFlatMovement.rejection(failed));return; }
         }
+        if(a.scopedStepDown!=null) {
+            try {
+                if(input!=a.player.input || event.getInput()!=input || !ScopedFlatMovement.neutral(input))
+                    throw new ClientActionRequest.Rejected(409,"step_down_external_input");
+                a.scopedStepDown.beforeEffect(Minecraft.getInstance());
+                if(active!=a)return;
+                if(input!=a.player.input || event.getInput()!=input || !ScopedFlatMovement.neutral(input))
+                    throw new ClientActionRequest.Rejected(409,"step_down_input_changed_after_hooks");
+                a.dispatched=true;a.scopedStepDown.markAttempted();
+            } catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedStepDownMovement.rejection(failed));return;}
+        }
         if(a.scopedMining!=null) {
             ScopedMining guard=a.scopedMining;
             try {
@@ -559,6 +577,11 @@ final class ClientActions {
     }
 
     private static void followPath(Minecraft mc, RuntimeAction a) {
+        if(a.scopedStepDown!=null){
+            try {a.scopedStepDown.beforeEffect(mc);}
+            catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedStepDownMovement.rejection(failed));return;}
+            if(active!=a)return;
+        }
         if(a.scopedMovement!=null) {
             try { a.scopedMovement.beforeEffect(mc); }
             catch(RuntimeException failed) { if(active==a)finish("cancelled",ScopedFlatMovement.rejection(failed));return; }
@@ -566,7 +589,7 @@ final class ClientActions {
         }
         var points = a.entry.request.waypoints();
         while (a.waypoint < points.size()) {
-            String routeProblem=a.scopedMovement==null ? CapabilityPath.check(mc,a.entry.request,a.waypoint) : null;
+            String routeProblem=a.scopedMovement==null && a.scopedStepDown==null ? CapabilityPath.check(mc,a.entry.request,a.waypoint) : null;
             if(routeProblem!=null){finish("cancelled",routeProblem);return;}
             var goal = points.get(a.waypoint);
             var effectiveGoal = new ClientActionRequest.Point(goal.x(),goal.y(),goal.z(),goal.jump() && !a.waypointJumped);
@@ -579,7 +602,7 @@ final class ClientActions {
                     a.entry.result.addProperty("phase","settling_at_endpoint");
                     a.entry.result.addProperty("distance_to_waypoint",step.distance());
                     Vec3 velocity=a.player.getDeltaMovement();
-                    if (PathSteering.settledAt(a.player.getX(),a.player.getY(),a.player.getZ(),
+                    if (a.scopedStepDown!=null ? a.scopedStepDown.settled() : PathSteering.settledAt(a.player.getX(),a.player.getY(),a.player.getZ(),
                             velocity.x,velocity.z,a.player.onGround(),goal)) a.settledTicks++;
                     else a.settledTicks=0;
                     if (a.settledTicks < 2) return;
@@ -603,9 +626,18 @@ final class ClientActions {
                     a.player.setYRot(current.yaw()); // Sole view write after the final fact fence.
                 } catch(RuntimeException failed) { if(active==a)finish("cancelled",ScopedFlatMovement.rejection(failed));return; }
                 if(active!=a)return;
+            } else if(a.scopedStepDown!=null) {
+                try {
+                    a.scopedStepDown.beforeEffect(mc);
+                    if(active!=a)return;
+                    step=PathSteering.toward(a.player.getX(),a.player.getY(),a.player.getZ(),a.player.getYRot(),a.player.onGround(),false,effectiveGoal,true);
+                    a.dispatched=true;a.scopedStepDown.markAttempted();
+                    a.player.setYRot(step.yaw());
+                } catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedStepDownMovement.rejection(failed));return;}
             } else look(mc, step.yaw(), a.entry.request.original().has("capability_route")?60:a.player.getXRot());
-            a.forward = a.scopedMovement==null ? step.forward() : Math.min(.5F,step.forward());
-            a.jump = a.scopedMovement==null && step.jump();
+            if(a.scopedStepDown!=null && active!=a)return;
+            a.forward = a.scopedMovement==null && a.scopedStepDown==null ? step.forward() : Math.min(.5F,step.forward());
+            a.jump = a.scopedMovement==null && a.scopedStepDown==null && step.jump();
             if (a.jump) a.waypointJumped=true;
             sprint(mc,a,ClientActionRequest.bool(a.entry.request.original(),"sprint",false) && a.forward > .8);
             a.entry.result.addProperty("sprinting_observed",a.player.isSprinting());
@@ -1209,6 +1241,13 @@ final class ClientActions {
                         && !ScopedFlatMovement.keysDown(Minecraft.getInstance()) && !BridgeServer.hasHeldInputs();
                 released &= neutral;
                 a.entry.result.add("scoped_movement",a.scopedMovement.terminal(neutral));
+            }
+            if(a.scopedStepDown!=null) {
+                boolean neutral=ScopedFlatMovement.neutral(a.input) && ScopedFlatMovement.neutral(a.player.input)
+                        && !ScopedFlatMovement.keysDown(Minecraft.getInstance()) && !BridgeServer.hasHeldInputs();
+                released &= neutral;
+                a.entry.result.add("step_down",a.scopedStepDown.terminal(neutral));
+                if(status.equals("succeeded") && !a.scopedStepDown.settled()){status="failed";reason="step_down_landing_unconfirmed";}
             }
             // Keep encounter evidence aligned with the terminal cleanup outcome.
             if(a.combat!=null) a.combat.terminal(released?status:"failed",released?reason:"input_release_unconfirmed");

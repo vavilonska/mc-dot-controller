@@ -1,39 +1,48 @@
 {
-  "schema": "mdc-mainline-source-integration-v13",
-  "repository_parent_commit": "f09382b4fd1a3e7324ad3af466b3a8b082de59a3",
-  "repository_parent_tree": "0a8bdd9e4702d8ab32628003df30605c0aaa76c1",
-  "source_stage": "Documentation-only bounded T32 container acceptance and publication status update",
-  "scope": "Documentation-only follow-up to published r2; production and test bytes unchanged",
+  "schema": "mdc-mainline-source-integration-v14",
+  "repository_parent_commit": "ade1df19b661701c96c6ffa088bc1df709fd3979",
+  "repository_parent_tree": "8c17facc0ead0422598afb057f1252ab7f577257",
+  "source_stage": "Reviewed bounded single-block descent source and portable tests; qualified T34 acceptance",
+  "scope": "Reviewed navigation descent integration preserving previously published fixes, tests and acceptance; runtime and publication inventories remain separate",
   "verification": {
     "fresh_production_compile": {
-      "java_sources": 138,
-      "project_classes": 334
+      "java_sources": 140,
+      "production_classes": 340,
+      "additional_serializer_test_helpers": 3
     },
     "diagnostic_java_assertions": 3018,
-    "portable_tests": {
+    "retained_consolidation_suite": {
+      "stages_passed": 7,
       "java_ray_assertions": 1807,
       "geometry_rows": 360,
       "python_assertions": 65907,
       "additional_wire_checks": 7,
       "consume_assertions": 137,
       "consume_scenarios": 20,
-      "stages_passed": 7
+      "harness_unchanged": true
     },
-    "actual_mixin_bytecode_gate": "PASS final consolidated production; three real targets, seven applicable mixins, four seam-order checks and negative missing-target rejection; no game initialization",
+    "descent_portable_tests": {
+      "controller_assertions": 69,
+      "controller_scenarios": 15,
+      "source_relation_assertions": 20,
+      "contract_frontdoor_native_wire_tests": 24,
+      "fresh_synthetic_native_wire": true
+    },
+    "actual_mixin_bytecode_gate": "PASS exact integrated production classes; three genuine targets, seven applicable mixins, four seam-order checks and expected negative rejection; no game initialization",
     "repository_regression": [
       {
         "component": "capability-runtime",
         "exit_code": 0,
         "summary": [
-          "Ran 740 tests in 261.342s",
-          "OK (skipped=2)"
+          "Ran 764 tests in 280.337s",
+          "OK (skipped=8)"
         ]
       },
       {
         "component": "resident-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 423 tests in 2.448s",
+          "Ran 423 tests in 2.519s",
           "OK"
         ]
       },
@@ -41,7 +50,7 @@
         "component": "navigation-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 254 tests in 1.039s",
+          "Ran 254 tests in 1.040s",
           "OK"
         ]
       },
@@ -49,7 +58,7 @@
         "component": "navigation-cursor",
         "exit_code": 0,
         "summary": [
-          "Ran 83 tests in 0.108s",
+          "Ran 83 tests in 0.115s",
           "OK"
         ]
       },
@@ -57,7 +66,7 @@
         "component": "defense-watchdog",
         "exit_code": 0,
         "summary": [
-          "Ran 161 tests in 0.182s",
+          "Ran 161 tests in 0.186s",
           "OK (skipped=1)"
         ]
       },
@@ -65,7 +74,7 @@
         "component": "gameplay-helpers",
         "exit_code": 0,
         "summary": [
-          "Ran 64 tests in 4.346s",
+          "Ran 64 tests in 4.398s",
           "OK"
         ]
       },
@@ -73,7 +82,7 @@
         "component": "building-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 119 tests in 1.278s",
+          "Ran 119 tests in 1.291s",
           "OK"
         ]
       },
@@ -89,7 +98,7 @@
         "component": "multiagent-coordination",
         "exit_code": 0,
         "summary": [
-          "Ran 322 tests in 2.169s",
+          "Ran 322 tests in 2.214s",
           "OK (skipped=1)"
         ]
       },
@@ -97,7 +106,7 @@
         "component": "python-toolbox",
         "exit_code": 0,
         "summary": [
-          "Ran 57 tests in 0.074s",
+          "Ran 57 tests in 0.087s",
           "OK"
         ]
       },
@@ -130,20 +139,27 @@
         ]
       }
     ],
-    "prior_test_attempts": "Initial180-second timeout and unsupported bare-unittest environment failures retained; supported runner supplies nine-module import paths and generated synthetic fixture in a disposable copy; no production code altered to hide failures",
-    "live_saved_acceptance": "T29 smelt, T30 offhand swap and T31 potion each independently accepted only on their separately pinned runtime artifacts; see docs/T29-T31-ACCEPTANCE.md",
-    "runtime_source_manifest_sha256": "da84a430ac2ae8b715540df1edc760692eb2844546c2b44ba52b338d212cae05",
+    "repository_regression_totals": {
+      "python_discovered": 2362,
+      "python_skips": 10,
+      "node_counted_tests": 147,
+      "node_platform_separate_self_test": true
+    },
+    "skip_qualification": "Six descent native-wire tests skipped in broad runner without explicit wire directory; all six passed separately within the 24-test fresh synthetic-wire suite. Four pre-existing skips remain.",
+    "source_binding": "All production and executable test bytes match the fresh regression snapshot; four documentation files changed after snapshot and publication metadata was regenerated afterward. Mixin snapshot subsequently differs only by matrix and publication metadata.",
+    "fixture_scope": "Existing synthetic crystal fixture generated only in disposable regression copy; no generated fixtures or raw trial evidence published",
+    "runtime_source_manifest_sha256": "3a8003993f31015e668e4bbcb98d0403b64e120c5bb2f9abfb623d0a65c02b47",
+    "runtime_artifact_sha256": "9a85846eb2ad73b2e18ea054b2d58d0034320bd3ac219d5146ccce2a41836bda",
     "public_runtime_inventory_separate": true,
+    "live_saved_acceptance": "T34 qualified original live and saved descent on its separately pinned runtime; original case comparator failure preserved, narrow additive source-derived geometry review accepted separately. T33 pre-Play abort, T32 automatic HOLD/manual closure and earlier qualifications remain.",
     "limits": [
-      "No newly consolidated runtime artifact deployed or live tested",
-      "Not a full Gradle/NeoForge build or general capability acceptance",
+      "No newly rebuilt integrated artifact deployed or live tested",
+      "Not a full Gradle/NeoForge build or general navigation acceptance",
+      "Synthetic engine readers and prescribed gravity recurrence are not live Minecraft physics",
+      "Client-observed evidence is not independent server confirmation or continuous trajectory proof",
       "Unknown and HOLD outcomes preserved; no replay",
-      "Client-observed evidence, not independent server confirmation",
-      "Synthetic Windows platform checks do not validate Windows/PowerShell",
-      "The r2 source consolidation was published as commit f09382b4fd1a3e7324ad3af466b3a8b082de59a3. CodeQL analysis completed successfully for Python, JavaScript/TypeScript and Java/Kotlin: https://github.com/vavilonska/mc-dot-controller/actions/runs/38704084001. The earlier publication hold is historical. This establishes source publication and that CodeQL run only, not deployment, a full Gradle/NeoForge build or new live acceptance."
-    ],
-    "documentation_correction": "T17 collect_local independently qualified live/saved acceptance restored in capability matrix; original harness failure, missing separate after-public observation, unknown Java exit and original runtime identity preserved. Production and tests unchanged; prior fresh gate results retained by exact byte equality.",
-    "documentation_only_followup": "T32 bounded barrel withdrawal and saved result independently accepted on its separately pinned runtime; original automatic HOLD retained with manual final-window closure. Case-only functional-first timing did not relax production guards. Production and tests byte-identical to published r2; prior regression evidence retained by equality, not rerun."
+      "Synthetic Windows platform checks do not validate Windows/PowerShell"
+    ]
   },
   "excluded": [
     "Private runtime receipts, logs, world coordinates, action and job identities, accounts and worlds",
@@ -174,13 +190,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 11291,
-      "sha256": "5fa11ee4589cf5b96e0f688d105b3f94772657d2214e00e1b828d9cb17b9b007"
+      "bytes": 11805,
+      "sha256": "dfd74d04b2e44ce9ec17a732150a490f124c2257373ca9449412fa5aa8b04fb7"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
-      "bytes": 11535,
-      "sha256": "ee9fadc61c44a9e91151415d8c8a29087fd132091b98474ac70bb8aae2056596"
+      "bytes": 12525,
+      "sha256": "d3e517d72a0056dc9daadb063fe2e49443bf6a4681156ca8db601a66523fabb4"
     },
     {
       "path": "building-controller/.gitignore",
@@ -383,6 +399,11 @@
       "sha256": "343be75eee36c3fcebd909313f6bfe74e9a9a7c41073fa5cf68f9627336cff40"
     },
     {
+      "path": "capability-runtime/docs/NAVIGATE-STEP-DOWN.md",
+      "bytes": 4213,
+      "sha256": "99f926f9e26c76779ab8575294052f40471eaa25de066144daffc855a325b1da"
+    },
+    {
       "path": "capability-runtime/docs/REACH-INVENTORY-RESOURCES.md",
       "bytes": 4713,
       "sha256": "095763a83a75d6e427ed41f95f2e01a225b5c8161da384c6a5923f94404b0f1f"
@@ -548,6 +569,11 @@
       "sha256": "61ba97bd41d82afc03596bd38cbc42cf88f55beeb7c7fb77fe875ed2b7eb2b12"
     },
     {
+      "path": "capability-runtime/mdc_skills/scoped_step_down.py",
+      "bytes": 4593,
+      "sha256": "82b8db625bbb5a21b942f65167364b9a277b2732d43fb7b30b46ef9aaf351998"
+    },
+    {
       "path": "capability-runtime/mdc_skills/stack_selector.py",
       "bytes": 2710,
       "sha256": "40122c54267e2ede5b4ff4bffd8e8552737fc734021ab6f94c710e9552e48513"
@@ -604,8 +630,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/mobility.py",
-      "bytes": 6130,
-      "sha256": "a0512d5c0615843d719c4aa3fe6e3a033a734f4c87b37d201ae78d22067f37ff"
+      "bytes": 7895,
+      "sha256": "1d93621d17a17c9e22c7344276fc5610306b835ebe0fa038b0802a8b206953d5"
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/production.py",
@@ -649,8 +675,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "bytes": 21546,
-      "sha256": "54dea97041dcf7dff973b340e39d331cb6bb9c8ff52ce429f41ccabba8cafe7e"
+      "bytes": 21966,
+      "sha256": "b3ce0866b9749c21aa45cc54099d875d6f91b5135e6423186d8ed4832aede95f"
     },
     {
       "path": "capability-runtime/mdc_toolbox/serialization.py",
@@ -821,6 +847,11 @@
       "path": "capability-runtime/tests/placement/test_witness.py",
       "bytes": 4736,
       "sha256": "80afd259557fcf6b68b50b51f336d04d8aa304724136e51558555030ae7a9813"
+    },
+    {
+      "path": "capability-runtime/tests/step_down_fixture.py",
+      "bytes": 3916,
+      "sha256": "55f056b3a0e821690650f45d51edc3fdc4669e5d67080df80ff46e8e9e4b159f"
     },
     {
       "path": "capability-runtime/tests/support_core.py",
@@ -1006,6 +1037,21 @@
       "path": "capability-runtime/tests/test_sheltered_enderman_los.py",
       "bytes": 28200,
       "sha256": "36fa014a4401c787811640dfae144ce08bdd4b28e4857841a0374017a23cd618"
+    },
+    {
+      "path": "capability-runtime/tests/test_step_down_contract.py",
+      "bytes": 8884,
+      "sha256": "1d1479c4d497979986ad76f9c2a5223b7fc0da8938ea9b1fa7980c8ff7f2689e"
+    },
+    {
+      "path": "capability-runtime/tests/test_step_down_frontdoor.py",
+      "bytes": 13722,
+      "sha256": "8c94fcd2c698a723b3413bde97c5c6f269cb9e73c6a9ac3b57e93b5bf0319305"
+    },
+    {
+      "path": "capability-runtime/tests/test_step_down_native_wire.py",
+      "bytes": 4563,
+      "sha256": "3c299375d5679cb4251685fb79963784ddf7271ff7028f4efd938a0405362529"
     },
     {
       "path": "capability-runtime/tests/test_supply_goals.py",
@@ -1529,8 +1575,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "bytes": 8778,
-      "sha256": "6ec723b524f29d7618fcfe3028a4632c52c3fb378eec9721e8b5b64376395938"
+      "bytes": 8897,
+      "sha256": "cb5300695973d2f1615d63cb22f9c08db7d96ecf9e400052de69abff65938128"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeLog.java",
@@ -1629,8 +1675,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 81952,
-      "sha256": "3c9ca9c4e07e3a0826802e661e53c0c3bf1bf0ef593f11d8fb981e4767e09808"
+      "bytes": 84754,
+      "sha256": "5f5d7f5a23a71fc7039e5dbdecc9fa1c58ded3b7a5a3971f7b8b9f495af99bdf"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -1959,13 +2005,13 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "bytes": 4772,
-      "sha256": "260937786de65b4dd0e9668abbaeb5cb6ca389d3906dcebf6269cb152a403650"
+      "bytes": 5108,
+      "sha256": "881b3a7fd71cf73ccfcf9508b132b1294c1fec10b4db12f056c97b1bd7af4c27"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "bytes": 29484,
-      "sha256": "429cb5729c177d2b13dea9623ae7130437ba49d3159beb649b3563aff4cb020b"
+      "bytes": 30403,
+      "sha256": "ec7a180327015e0c14d4df47743b2de235582a34512659a1e40e389035c02c40"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
@@ -1981,6 +2027,16 @@
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementIntent.java",
       "bytes": 3679,
       "sha256": "367ff5bc65dfef8e3d22c0f6666e12c61145249705e5440f22246f3b419ca641"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedStepDownMovement.java",
+      "bytes": 26417,
+      "sha256": "1e1c1081cc2c66e52c17e05ce7120070b3569f52b9a537d61a83e9951c8382a7"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedStepDownPolicy.java",
+      "bytes": 3447,
+      "sha256": "47ad585f6218e724ec26566a8513cf1f4440ba50957030767e8c655e0a165809"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/SprintKeyState.java",
@@ -3013,6 +3069,51 @@
       "sha256": "3634cc90b5f05e30179c47cb9635ed969123d387d4458f747815aaaba65f7a53"
     },
     {
+      "path": "client-mod/validation/step-down/README.md",
+      "bytes": 7569,
+      "sha256": "1873205817b52f70abb7e9853636bd24dbe447c58c00546e19510d3192a633a9"
+    },
+    {
+      "path": "client-mod/validation/step-down/StepDownEngineChecks.java",
+      "bytes": 9975,
+      "sha256": "d2312a77c83389974bc648ee7834c3f04d11b93e9b61e6292cb9655861b3d085"
+    },
+    {
+      "path": "client-mod/validation/step-down/StepDownWireProducer.java",
+      "bytes": 7042,
+      "sha256": "7b15dad4ba971ce03d27faf37d01756eb1baeb77e74560190f5660993514b9fd"
+    },
+    {
+      "path": "client-mod/validation/step-down/check_source_relation.py",
+      "bytes": 2624,
+      "sha256": "9bb13743c30fa7e23851939bbdbb7dc7c0074fad630553c41adef4b2092b0d19"
+    },
+    {
+      "path": "client-mod/validation/step-down/prepare_engine.py",
+      "bytes": 4578,
+      "sha256": "7d6bcab499822921fb3eff7225fea66c2396c37ed2923f7d62a18647d89a984e"
+    },
+    {
+      "path": "client-mod/validation/step-down/run_all.py",
+      "bytes": 3255,
+      "sha256": "8ee7452da81c36cc690035f11977ddd377c1e45e0ed145b096286002927275fa"
+    },
+    {
+      "path": "client-mod/validation/step-down/run_engine.py",
+      "bytes": 3733,
+      "sha256": "33a2a132229f42d1bb1be1be620aa15667476d1f2ab02c73decdac70d422da10"
+    },
+    {
+      "path": "client-mod/validation/step-down/run_native.py",
+      "bytes": 3134,
+      "sha256": "0ed11a38b69ed8fbfa1433e6ff045515b575796cf3f8b9925d604885004f88c4"
+    },
+    {
+      "path": "client-mod/validation/step-down/runner_common.py",
+      "bytes": 1752,
+      "sha256": "9e4dab58682fb53d62dc53eec5db0dd69cf85ed78895ad95d49aa1872524a978"
+    },
+    {
       "path": "client-mod/validation/terrain-adapter/.gitignore",
       "bytes": 8,
       "sha256": "99921edb369e12a35a87d768ae481f8c944573626abd4b8f3a1fe78846f30ba7"
@@ -3279,8 +3380,8 @@
     },
     {
       "path": "docs/CAPABILITY-STATUS.md",
-      "bytes": 13284,
-      "sha256": "16507524e5283d968e11b2470fbae08a3050068f8dc8e1aadd511cce847f74d9"
+      "bytes": 15657,
+      "sha256": "5fbb5f9f8dc8ce45d31308407444c0aac9a8bee86065e97df20def6411658e15"
     },
     {
       "path": "docs/CRAFT-T24.md",
@@ -3298,6 +3399,11 @@
       "sha256": "ad44ca0206adf44fee5b9793effa26fdcc3045e529aa04d2be4f10ca38abe882"
     },
     {
+      "path": "docs/SCOPED-STEP-DOWN.md",
+      "bytes": 2028,
+      "sha256": "edaaa400d05b1ed703daa99ab214eed67f3b105eda09f9dc9746f452eeeb1a7f"
+    },
+    {
       "path": "docs/T29-T31-ACCEPTANCE.md",
       "bytes": 8373,
       "sha256": "aa3862b3760c37d1f49bf3220805903237e36dadc6890a75e520c9d74ea997d7"
@@ -3306,6 +3412,11 @@
       "path": "docs/T32-CONTAINER-ACCEPTANCE.md",
       "bytes": 7464,
       "sha256": "acd4d3ab92a38a97025f9a8109382a528eda34ec021f7ef080327ff89782db1c"
+    },
+    {
+      "path": "docs/T34-DESCENT-ACCEPTANCE.md",
+      "bytes": 8011,
+      "sha256": "8c2b5474e74f7c6899a4279fc726de9ee2c167d040e9b71bd9c7b8c7a93aae2e"
     },
     {
       "path": "docs/THREE-ZOMBIE-STAGE.md",
@@ -4024,8 +4135,8 @@
     },
     {
       "path": "resident-controller/resident_controller/capability_snapshot.py",
-      "bytes": 32535,
-      "sha256": "8f09f484a20b49f82b07eb54ad83f4c61fdce3e6f2fd8bb603c1ca3e7da090e2"
+      "bytes": 32797,
+      "sha256": "1a717b45c395c804b7ef3aa2b88a0505449642404db436089ed2f1254aedfbd0"
     },
     {
       "path": "resident-controller/resident_controller/collect_snapshot.py",
@@ -4074,8 +4185,8 @@
     },
     {
       "path": "resident-controller/resident_controller/movement_wire.py",
-      "bytes": 9491,
-      "sha256": "3b6766c11be02a064d938aa3cf002e6635c2e4088c12d60ce8f7146b18656330"
+      "bytes": 9704,
+      "sha256": "3bbc091bb12731db1bbe73673ac3082ff5eec05c85d558580c5502a171a846ab"
     },
     {
       "path": "resident-controller/resident_controller/native_combat.py",
@@ -4101,6 +4212,11 @@
       "path": "resident-controller/resident_controller/prospecting.py",
       "bytes": 7581,
       "sha256": "45904b96acc1984031cf32f175f6477f590f5024459a621d7ae3e99a324b57d2"
+    },
+    {
+      "path": "resident-controller/resident_controller/step_down_snapshot.py",
+      "bytes": 7916,
+      "sha256": "abe237649f6b52e268c8f6bddc033b004be3bebc953aa3b3022990ed7699589a"
     },
     {
       "path": "resident-controller/resident_controller/tasks.py",

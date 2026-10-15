@@ -1,6 +1,6 @@
 """Closed reusable navigation/traversal bindings over the same guarded Runtime."""
 from copy import deepcopy
-from mdc_skills import mobility as skills, reach, scoped_mobility
+from mdc_skills import mobility as skills, reach, scoped_mobility, scoped_step_down
 from .production import (_object, _integer, _number, _enum, _COORD,
                          _definition, _invoke, _validate)
 
@@ -64,10 +64,27 @@ def definitions():
     local.update(adapter_status='implemented',observation_profile='player',cancel_granularity='exact_native_action',
                  known_limits=list(local['known_limits'][:-1]))
     result.append(local)
+    descent = _definition('navigate_step_down','mobility','primitive',_LOCAL_SCHEMA,(scoped_step_down,),
+        prerequisites=('Negotiated movement-step-down-observed-v1 native admission and original owner/context.',
+            'Request-only private Overworld survival, closed inventory, centered stationary origin, unarmed MovementBudget.'),
+        limits=('Exactly one cardinal block with destination feet Y one block lower; no jump, sprint, sneak, obstacle bypass or chaining.',
+            'Complete native 180-cell dry ordinary full-cube two-level ledge and complete loaded-entity exclusion.',
+            'Source centered within .10; endpoint within .23 plus exact grounded height and later stopped-motion samples does not guarantee another segment can start.',
+            'No replay or resume after refusal, cancellation, failure or uncertainty.',
+            'Native sampled horizontal displacement is diagnostic, not a global physical-distance accounting guarantee.'),
+        features=('scoped-native-preflight/1','profile:movement-step-down-observed-v1','action:follow_path'),
+        bounds={'route_steps':1,'descent_blocks':1,'footprint_cells':180,'native_timeout_ms':8000,
+            'maximum_action_ticks':160,'entity_limit':1024})
+    descent.update(adapter_status='implemented',observation_profile='player',cancel_granularity='exact_native_action',
+        known_limits=list(descent['known_limits'][:-1]))
+    result.append(descent)
     return result
 
 
 def invoke(capability, runtime, arguments, control):
+    if capability == 'navigate_step_down':
+        return _invoke(capability,runtime,arguments,control,{'navigate_step_down':_LOCAL_SCHEMA},
+                       {'navigate_step_down':scoped_step_down.navigate_step_down},skill_kwargs={'control':control})
     if capability == 'navigate_local':
         return _invoke(capability,runtime,arguments,control,{'navigate_local':_LOCAL_SCHEMA},
                        {'navigate_local':scoped_mobility.navigate_local},skill_kwargs={'control':control})
@@ -76,7 +93,7 @@ def invoke(capability, runtime, arguments, control):
 
 
 def plan(capability, arguments, observation=None):
-    _validate(capability, arguments, {**_SCHEMAS,'navigate_local':_LOCAL_SCHEMA})
+    _validate(capability, arguments, {**_SCHEMAS,'navigate_local':_LOCAL_SCHEMA,'navigate_step_down':_LOCAL_SCHEMA})
     return {'capability': capability, 'status': 'unavailable', 'execution_authority': False,
             'reason': 'route_selection_requires_fresh_runtime_local_facts',
             'bounds': deepcopy({key: value for key, value in arguments.items() if key.startswith('max_')}),

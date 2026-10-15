@@ -28,13 +28,14 @@ def _public_context(context):
 
 class OwnerRuntimeBackend:
     INITIAL_CAPABILITIES = frozenset({'select_hotbar','ensure_hotbar','equip','consume','close_menu',
-        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','mine_local','collect_local','place_local','engage'})
+        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','navigate_step_down','mine_local','collect_local','place_local','engage'})
     REQUIRED_ACTIONS = {
         'mine_local': {'break_block'},
         'place_local': {'place_block'},
         'collect_local': {'follow_path'},
         'engage': {'combat_entity'},
         'navigate_local': {'follow_path'},
+        'navigate_step_down': {'follow_path'},
         'select_hotbar': {'select_hotbar'}, 'ensure_hotbar': {'select_hotbar','click_slot'},
         'equip': {'select_hotbar','click_slot'}, 'consume': {'select_hotbar','click_slot','use_item'},
         'interact': {'interact_block'}, 'close_menu': {'close_menu'}, 'craft': {'click_slot'}, 'smelt': {'click_slot'},
@@ -74,9 +75,11 @@ class OwnerRuntimeBackend:
             features.extend('action:' + name for name in scoped.get('guarded_actions', []))
         negotiated_actions = set(self._profile_actions({'scoped_profiles': scoped.get('profiles', {}) if isinstance(scoped, dict) else {}}))
         supported = sorted(name for name in self._plugins() if name in self.INITIAL_CAPABILITIES
-                           and ((name == 'collect_local' and isinstance(scoped,dict) and scoped.get('profiles',{}).get('collect-local-observed-v1') == ['follow_path'])
-                                or (name != 'collect_local' and self.REQUIRED_ACTIONS[name] <= negotiated_actions))
-                           and (name != 'place_local' or session.get('execution_policy') == 'request_only')
+                           and ((name in ('collect_local','navigate_step_down') and isinstance(scoped,dict)
+                                 and scoped.get('profiles',{}).get({'collect_local':'collect-local-observed-v1',
+                                     'navigate_step_down':'movement-step-down-observed-v1'}[name]) == ['follow_path'])
+                                or (name not in ('collect_local','navigate_step_down') and self.REQUIRED_ACTIONS[name] <= negotiated_actions))
+                           and (name not in ('place_local','navigate_step_down') or session.get('execution_policy') == 'request_only')
                            and 'scoped-native-preflight/1' in features)
         known = isinstance(session.get('capability_context'), dict) and all(
             isinstance(session['capability_context'].get(k), str) for k in ('world_generation','dimension','player_uuid','action_session'))
@@ -144,6 +147,8 @@ class OwnerRuntimeBackend:
             profiles = self._profile_actions(description)
             if capability == 'collect_local':
                 profiles['follow_path'] = 'collect-local-observed-v1'
+            if capability == 'navigate_step_down':
+                profiles['follow_path'] = 'movement-step-down-observed-v1'
             self.runtime.begin_job(control, scoped_profiles=profiles)
             begun = True
             self._active['owner_context'] = self.runtime.owner_context()

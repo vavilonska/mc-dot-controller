@@ -24,6 +24,7 @@ final class ScopedMovementWire {
         if(witness==null || !witness.has("profile") || !witness.get("profile").isJsonPrimitive()
                 || !witness.getAsJsonPrimitive("profile").isString()
                 || !(witness.get("profile").getAsString().equals(ScopedFlatMovement.PROFILE)
+                    || witness.get("profile").getAsString().equals(ScopedStepDownMovement.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedPlacement.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedMining.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedCollectTarget.PROFILE)))
@@ -47,12 +48,14 @@ final class ScopedMovementWire {
     static JsonObject sizeDiagnostic(JsonObject action,int standalone,int capability,int limit) {
         JsonObject witness=action.getAsJsonObject("result").getAsJsonObject(WITNESS);
         boolean mining=witness.get("profile").getAsString().equals(ScopedMining.PROFILE);
+        boolean descent=witness.get("profile").getAsString().equals(ScopedStepDownMovement.PROFILE);
         boolean placement=witness.get("profile").getAsString().equals(ScopedPlacement.PROFILE);
-        JsonObject footprint=witness.getAsJsonObject("facts").getAsJsonObject(placement?"placement":mining?"mining":"movement");
+        JsonObject footprint=witness.getAsJsonObject("facts").getAsJsonObject(descent?"step_down":placement?"placement":mining?"mining":"movement");
         JsonObject entities=footprint.getAsJsonObject("entity_guard");
         JsonObject out=new JsonObject();out.addProperty("schema_version",mining?2:1);
         if(mining)out.addProperty("profile",ScopedMining.PROFILE);
         if(placement){out.addProperty("schema_version",3);out.addProperty("profile",ScopedPlacement.PROFILE);}
+        if(descent){out.addProperty("schema_version",4);out.addProperty("profile",ScopedStepDownMovement.PROFILE);}
         out.addProperty("standalone_bytes",standalone);out.addProperty("capability_bytes",capability);
         out.addProperty("response_limit",limit);
         out.addProperty("standalone_reserve_bytes",ScopedEntityPolicy.TERMINAL_GROWTH_BYTES);
