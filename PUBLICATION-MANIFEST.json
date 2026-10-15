@@ -1,48 +1,153 @@
 {
-  "schema": "mdc-mainline-source-integration-v10",
-  "repository_parent_commit": "98ad27a0fe7f1001c4e5cbf49786a73e60cca7fa",
-  "repository_parent_tree": "383cd5f89d3e2d46ce143fa9f0ddb5d99524954e",
-  "source_stage": "T24 qualified crafting functional and saved acceptance documentation",
-  "scope": "Two documentation updates only; production and tests unchanged.",
+  "schema": "mdc-mainline-source-integration-v12",
+  "repository_parent_commit": "5bcb80338277e3e32a909226e86bae170c4b4cea",
+  "repository_parent_tree": "e96652c4080014597a635faf689a3f86eb6bd3da",
+  "source_stage": "Reviewed diagnostics, representable intended ray and consume completion; bounded T29-T31 acceptance documentation",
+  "scope": "Local publication-ready source consolidation; no new deployment or GitHub publication claimed",
   "verification": {
-    "scope": "Documentation only; production and test source bytes unchanged. No tests rerun.",
-    "T24": {
-      "functional_and_saved": "independently verified",
-      "original_unique_click_chains": 6,
-      "oak_planks_consumed": 2,
-      "sticks_added": 4,
-      "observed_output_slot": 35,
-      "grid_cursor_empty_live": true,
-      "saved_grid_cursor_proven": false,
-      "typed_inventory_representations": 4,
-      "compared_terrain_cells_unchanged": 75,
-      "health": 20,
-      "sampled_position_conserved": true,
-      "automation": "HOLD_NO_REPLAY preserved",
-      "full_report_bytes": 2465305,
-      "inherited_input_limit_bytes": 2097152,
-      "manual_closure_seconds": 147.410904,
-      "original_limit_seconds": 180,
-      "original_process_identities_absent": 9,
-      "tracked_owner_exit_codes": 0,
-      "mcp_exit_code": 0,
-      "java_numeric_exit": null,
-      "handoff_sha256": "db98f89e24d3abf934f2725bd505ad3b8d4787e7ea1457fd8608759a6bc8fad9",
-      "product_changed_for_craft": false
+    "fresh_production_compile": {
+      "java_sources": 138,
+      "project_classes": 334
     },
+    "diagnostic_java_assertions": 3018,
+    "portable_tests": {
+      "java_ray_assertions": 1807,
+      "geometry_rows": 360,
+      "python_assertions": 65907,
+      "additional_wire_checks": 7,
+      "consume_assertions": 137,
+      "consume_scenarios": 20,
+      "stages_passed": 7
+    },
+    "actual_mixin_bytecode_gate": "PASS final consolidated production; three real targets, seven applicable mixins, four seam-order checks and negative missing-target rejection; no game initialization",
+    "repository_regression": [
+      {
+        "component": "capability-runtime",
+        "exit_code": 0,
+        "summary": [
+          "Ran 740 tests in 261.342s",
+          "OK (skipped=2)"
+        ]
+      },
+      {
+        "component": "resident-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 423 tests in 2.448s",
+          "OK"
+        ]
+      },
+      {
+        "component": "navigation-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 254 tests in 1.039s",
+          "OK"
+        ]
+      },
+      {
+        "component": "navigation-cursor",
+        "exit_code": 0,
+        "summary": [
+          "Ran 83 tests in 0.108s",
+          "OK"
+        ]
+      },
+      {
+        "component": "defense-watchdog",
+        "exit_code": 0,
+        "summary": [
+          "Ran 161 tests in 0.182s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "component": "gameplay-helpers",
+        "exit_code": 0,
+        "summary": [
+          "Ran 64 tests in 4.346s",
+          "OK"
+        ]
+      },
+      {
+        "component": "building-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 119 tests in 1.278s",
+          "OK"
+        ]
+      },
+      {
+        "component": "external-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 115 tests in 0.103s",
+          "OK"
+        ]
+      },
+      {
+        "component": "multiagent-coordination",
+        "exit_code": 0,
+        "summary": [
+          "Ran 322 tests in 2.169s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "component": "python-toolbox",
+        "exit_code": 0,
+        "summary": [
+          "Ran 57 tests in 0.074s",
+          "OK"
+        ]
+      },
+      {
+        "component": "node-portable",
+        "exit_code": 0,
+        "summary": [
+          "\u2139 tests 138",
+          "\u2139 pass 138",
+          "\u2139 fail 0",
+          "\u2139 skipped 0"
+        ]
+      },
+      {
+        "component": "node-framing",
+        "exit_code": 0,
+        "summary": [
+          "\u2139 tests 9",
+          "\u2139 pass 9",
+          "\u2139 fail 0",
+          "\u2139 skipped 0"
+        ]
+      },
+      {
+        "component": "node-platform",
+        "exit_code": 0,
+        "summary": [
+          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
+          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
+        ]
+      }
+    ],
+    "prior_test_attempts": "Initial180-second timeout and unsupported bare-unittest environment failures retained; supported runner supplies nine-module import paths and generated synthetic fixture in a disposable copy; no production code altered to hide failures",
+    "live_saved_acceptance": "T29 smelt, T30 offhand swap and T31 potion each independently accepted only on their separately pinned runtime artifacts; see docs/T29-T31-ACCEPTANCE.md",
+    "runtime_source_manifest_sha256": "da84a430ac2ae8b715540df1edc760692eb2844546c2b44ba52b338d212cae05",
+    "public_runtime_inventory_separate": true,
     "limits": [
-      "Qualified functional and saved pass, not full automation",
-      "No full-world or full-player unchanged claim",
-      "No causal attribution for entity changes",
-      "No general recipes, procurement or building workflow claim",
-      "No T24 replay; later offline adapter correction was not live-integrated",
-      "T22 unknown and T23 bounded result preserved"
-    ]
+      "No newly consolidated runtime artifact deployed or live tested",
+      "Not a full Gradle/NeoForge build or general capability acceptance",
+      "Unknown and HOLD outcomes preserved; no replay",
+      "Client-observed evidence, not independent server confirmation",
+      "Synthetic Windows platform checks do not validate Windows/PowerShell",
+      "GitHub publication blocked pending assured approved noreply identity route"
+    ],
+    "documentation_correction": "T17 collect_local independently qualified live/saved acceptance restored in capability matrix; original harness failure, missing separate after-public observation, unknown Java exit and original runtime identity preserved. Production and tests unchanged; prior fresh gate results retained by exact byte equality."
   },
   "excluded": [
-    "Private live receipts, runtime identities, worlds, GUI and accounts",
-    "Credentials, compiled artifacts, installed state and external dependencies",
-    "Generated synthetic fixtures and caches"
+    "Private runtime receipts, logs, world coordinates, action and job identities, accounts and worlds",
+    "Credentials, built artifacts, dependencies and generated fixtures",
+    "Runtime-only version metadata and runtime source inventory"
   ],
   "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt",
   "files": [
@@ -68,13 +173,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 10064,
-      "sha256": "f9646c2b116e92a2dfbc12e95d4e0122852cb161c2fdcb71f99b190848965d77"
+      "bytes": 10894,
+      "sha256": "062f440ee736037103cb5eca7f800b824e3eb3adee388503c19f68229b1afefb"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
-      "bytes": 9849,
-      "sha256": "ca71a41dff76013d4fdc5e1a550a0544b2f32f81c36be649bf608f92596b2d1d"
+      "bytes": 11025,
+      "sha256": "48292591309679d338bb36ce41f02e8509e401a5b4638c78f213d7d0ceae3b3b"
     },
     {
       "path": "building-controller/.gitignore",
@@ -1322,9 +1427,14 @@
       "sha256": "40daab176c0c8f4d4e7e763f134f50d27f2b206979db46dba91dfbce559aed35"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BlockMenuDiagnostics.java",
+      "bytes": 6852,
+      "sha256": "986ff0f1215e2d398b89d145a19e7c0c4fce8a937848391028d55e76e070c43e"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BlockMenuPreflight.java",
-      "bytes": 17970,
-      "sha256": "58062d87b6e2eb450b604fcc2934a5ff5af88d7ce32c920d6233b8cb4706fcca"
+      "bytes": 20342,
+      "sha256": "46e4cd90c6e55f23dddbad01084a40923300e3746c13ee8b6eefa90d31cba670"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoatCollision.java",
@@ -1518,8 +1628,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 79008,
-      "sha256": "be417201f1d40b176b713a689af45dab7c708a3bffead22b03144a255bca23c4"
+      "bytes": 81952,
+      "sha256": "3c9ca9c4e07e3a0826802e661e53c0c3bf1bf0ef593f11d8fb981e4767e09808"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -1853,8 +1963,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "bytes": 27982,
-      "sha256": "e1199bc9017835015c1217e1b0aa55cf6262b03cca2ace9d2017f386829c0527"
+      "bytes": 29484,
+      "sha256": "429cb5729c177d2b13dea9623ae7130437ba49d3159beb649b3563aff4cb020b"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
@@ -2497,6 +2607,16 @@
       "sha256": "d3bc059d377c364e4e39a2eb840861dd7391326867f044ed1ba366108efb2c00"
     },
     {
+      "path": "client-mod/validation/block-menu-diagnostics/BlockMenuDiagnosticsChecks.java",
+      "bytes": 7191,
+      "sha256": "24f0f694624be0eb159fdf3129efcb257993354deea12e9184f411bed0081bc3"
+    },
+    {
+      "path": "client-mod/validation/block-menu-diagnostics/README.md",
+      "bytes": 3470,
+      "sha256": "6f878ccaf20c7bae4cbb7fdcb86878b307531e28b7d77432e8ae95dc2cd7f59c"
+    },
+    {
       "path": "client-mod/validation/capability-snapshot-wire/CapabilitySnapshotWire.java",
       "bytes": 13046,
       "sha256": "d417582854fca0ce530192bf25eb81cbf922203cb3dfeacda4a57d7652084138"
@@ -2525,6 +2645,51 @@
       "path": "client-mod/validation/combat-t21/test_encoding.py",
       "bytes": 4168,
       "sha256": "83d42f5de70f159d876c1f9485e61a89c746021118f676db01fdbf6f73b1f1e4"
+    },
+    {
+      "path": "client-mod/validation/consolidation/README.md",
+      "bytes": 6082,
+      "sha256": "bb09f3a879d140cab1d61a6c4e870a7af50e03b67e0441099469c6e14efa4b02"
+    },
+    {
+      "path": "client-mod/validation/consolidation/check_block_menu.py",
+      "bytes": 6501,
+      "sha256": "8b62ebcf5beb7d0869baf23f42262b541f7066b2620137623f8370ce60db1eb5"
+    },
+    {
+      "path": "client-mod/validation/consolidation/fixtures/consume_baseline_replacements.json",
+      "bytes": 2223,
+      "sha256": "c54b0d490c16b20dd430b25ee73a39f0cdcb1f8eac8cbe434df3a4bd1562d77c"
+    },
+    {
+      "path": "client-mod/validation/consolidation/fixtures/geometry_resource_sha256.json",
+      "bytes": 332,
+      "sha256": "e520f8dc42a0aa8dcc2954e743761e2f4b375c96db98f816c2a39644abae0d71"
+    },
+    {
+      "path": "client-mod/validation/consolidation/java/ConsumeCompletionChecks.java",
+      "bytes": 19495,
+      "sha256": "5a8a1e5e130f4186b4d98f064b31df35fa97eed2ad8d5053657ed7c710ee694f"
+    },
+    {
+      "path": "client-mod/validation/consolidation/java/FurnaceBlockMenuWire.java",
+      "bytes": 7253,
+      "sha256": "b16a983eeaaf2628f69596e6f5ae44e5dbbdd8de3c0cfc9c4ad90c958b886a73"
+    },
+    {
+      "path": "client-mod/validation/consolidation/java/QuantizedRayChecks.java",
+      "bytes": 5106,
+      "sha256": "5a687576c6142312817ef3ac8488f086737e745262fe29df3ba5c427122cc483"
+    },
+    {
+      "path": "client-mod/validation/consolidation/java/SyntheticBlockMenuFixture.java",
+      "bytes": 8587,
+      "sha256": "4f64c367aef13164fd9f289c23ccdccc123de7009b9c50c72e22ea7cd3d6aad4"
+    },
+    {
+      "path": "client-mod/validation/consolidation/run.py",
+      "bytes": 8519,
+      "sha256": "602384ae8ba31ed5fe80e4b694eed2aa40cf8141a9ce72579475bb52f187d001"
     },
     {
       "path": "client-mod/validation/container-adapter/.gitignore",
@@ -3102,6 +3267,21 @@
       "sha256": "a133a9e4a781169092db2bc8957379adb19c6e8502d1734b6fc7357458edf475"
     },
     {
+      "path": "docs/BLOCK-MENU-DIAGNOSTICS.md",
+      "bytes": 4045,
+      "sha256": "561643cbd998383dad11bb1886323e70ecea54540599ed6632653d38d8b6054c"
+    },
+    {
+      "path": "docs/BOUNDED-RAY-AND-CONSUME-FIXES.md",
+      "bytes": 3558,
+      "sha256": "0e151f61a1657912820bb55865f62e2c663f961ef16bebf135546eb02ece68b3"
+    },
+    {
+      "path": "docs/CAPABILITY-STATUS.md",
+      "bytes": 11805,
+      "sha256": "3c9d31b9773e1b1dc55ea8335b7eab6ecc51066e59bb6997b4dd1fdc2affecd7"
+    },
+    {
       "path": "docs/CRAFT-T24.md",
       "bytes": 2848,
       "sha256": "203716ed98a449ec93e523c936d031e92cc29fa00fd24afe4329a16ad88554c9"
@@ -3115,6 +3295,11 @@
       "path": "docs/MOVEMENT-T13.md",
       "bytes": 5541,
       "sha256": "ad44ca0206adf44fee5b9793effa26fdcc3045e529aa04d2be4f10ca38abe882"
+    },
+    {
+      "path": "docs/T29-T31-ACCEPTANCE.md",
+      "bytes": 8373,
+      "sha256": "aa3862b3760c37d1f49bf3220805903237e36dadc6890a75e520c9d74ea997d7"
     },
     {
       "path": "docs/THREE-ZOMBIE-STAGE.md",
@@ -3828,8 +4013,8 @@
     },
     {
       "path": "resident-controller/resident_controller/block_menu_snapshot.py",
-      "bytes": 8111,
-      "sha256": "bf242e0b584990f49e4746350bb29eb15c1f45ddbd3ab988c9310850398898e4"
+      "bytes": 9965,
+      "sha256": "58cbc466de25928fe3aa639e2b222938c56d30ea875411e8002a4a8a216e7d1e"
     },
     {
       "path": "resident-controller/resident_controller/capability_snapshot.py",

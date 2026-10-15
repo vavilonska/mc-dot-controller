@@ -1,5 +1,6 @@
 """Strict block-menu-v1 wire validation, never an alternate admission authority."""
-from math import dist, floor, hypot, isfinite
+from math import atan2, degrees, dist, floor, hypot, isfinite, pi, sin
+from struct import pack, unpack
 
 FAMILIES = {'minecraft:crafting_table': ('CraftingMenu', '', set()),
     'minecraft:furnace': ('FurnaceMenu', 'FurnaceBlockEntity', {'facing','lit'}),
@@ -28,6 +29,33 @@ def vector(v):
 
 def xyz(v):
     return tuple(v[k] for k in ('x','y','z'))
+
+def f32(v):
+    return unpack('!f', pack('!f', v))[0]
+
+def representable_ray(eye, center, target, face):
+    """Entity.calculateViewVector binary32/LUT contract, not Vec3.directionFromRotation."""
+    d = tuple(center[i]-eye[i] for i in range(3))
+    yaw = f32(degrees(atan2(-d[0], d[2])))
+    pitch = f32(-degrees(atan2(d[1], hypot(d[0], d[2]))))
+    p, y = f32(pitch*f32(0.017453292)), f32(-yaw*f32(0.017453292))
+    def lut(angle, cosine=False):
+        index = f32(angle*f32(10430.378))
+        if cosine:
+            index = f32(index+16384.0)
+        return f32(sin((int(index) & 65535)*pi*2.0/65536.0))
+    direction = (f32(lut(y)*lut(p, True)), -lut(p), f32(lut(y, True)*lut(p, True)))
+    axis = next(i for i, v in enumerate(FACES[face]) if v)
+    require(direction[axis]*FACES[face][axis] < 0, 'unrepresentable_ray')
+    t = (center[axis]-eye[axis])/direction[axis]
+    require(isfinite(t) and t > 0, 'unrepresentable_ray')
+    hit = tuple(center[i] if i == axis else eye[i]+t*direction[i] for i in range(3))
+    require(all(isfinite(hit[i]) and (i == axis or target[i] < hit[i] < target[i]+1) for i in range(3))
+        and in_certified_prism(eye, center, hit), 'unrepresentable_ray')
+    return yaw, pitch, hit
+
+def in_certified_prism(eye, center, hit):
+    return all(isfinite(hit[i]) and floor(min(eye[i],center[i])) <= hit[i] < floor(max(eye[i],center[i]))+1 for i in range(3))
 
 def cell(v):
     if type(v) is not dict or set(v) != {'x','y','z','id','properties','loaded','fluid','collision','outline'}:
@@ -94,12 +122,17 @@ def validate(value, native, intent):
     require(result.get('local_use_started') is not True or native.get('status') == 'succeeded', 'late_native_rejection_unknown')
     if result.get('dispatched') is True:
         ray = value.get('final_ray')
+        yaw, pitch, representable = representable_ray(xyz(b['eye']), expected, xyz(target), b['face'])
         require(value.get('dispatch_fence_confirmed') is True and type(ray) is dict
             and set(ray) == {'target','face','hit','eye','reach','yaw','pitch','line_of_sight_clear'}
             and ray['target'] == intent['target'] and ray['face'] == intent['face'] and vector(ray['hit'])
             and vector(ray['eye']) and ray['eye'] == b['eye'] and ray['reach'] == b['reach']
-            and dist(xyz(ray['hit']),expected) <= .0001 and number(ray['yaw']) and number(ray['pitch'])
-            and -90 <= ray['pitch'] <= 90 and ray['line_of_sight_clear'] is True, 'final_actual_ray')
+            and dist(xyz(ray['hit']),representable) <= .0001
+            and dist(xyz(b['eye']),representable) <= b['reach'] and dist(xyz(b['eye']),xyz(ray['hit'])) <= b['reach']
+            and in_certified_prism(xyz(b['eye']),expected,xyz(ray['hit']))
+            and number(ray['yaw']) and number(ray['pitch']) and -180 <= ray['yaw'] <= 180 and -90 <= ray['pitch'] <= 90
+            and ray['yaw'] == yaw and ray['pitch'] == pitch
+            and ray['line_of_sight_clear'] is True, 'final_actual_ray')
     else:
         # Native local hooks may already have side effects even if its packet was withheld.
         require(native.get('status') in ('failed','cancelled') and result.get('dispatched') is False

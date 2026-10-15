@@ -1,3 +1,26 @@
+# Current local consolidation through T31
+
+This local source checkpoint preserves published main
+`5bcb80338277e3e32a909226e86bae170c4b4cea` and the reviewed diagnostic delta,
+then adds the reviewed representable-ray pair and consume-completion ordering.
+Runtime-only version metadata and private trial artifacts are not imported.
+The final Java production sources match the separately bound T31 runtime source;
+this publication inventory includes additional public-safe tests and documentation.
+
+See [bounded fixes](docs/BOUNDED-RAY-AND-CONSUME-FIXES.md),
+[T29–T31 acceptance](docs/T29-T31-ACCEPTANCE.md), and
+[capability status](docs/CAPABILITY-STATUS.md) for current evidence and limits.
+`PUBLICATION-MANIFEST.json` and `SOURCE_SHA256SUMS.txt` enumerate this tree.
+This checkpoint is locally prepared, not a claim of a new GitHub publication or
+installed release. GitHub publication is held pending a verified route that
+preserves the approved noreply commit identity. No credential or access expansion
+is part of this checkpoint.
+
+The sections below describe historical integrations; their file counts and
+NOT_RUN statements belong to those historical checkpoints.
+
+---
+
 # Mainline integration: scoped mining, collect and combat source
 
 This integration starts from published commit

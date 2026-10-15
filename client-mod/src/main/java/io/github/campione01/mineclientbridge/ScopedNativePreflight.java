@@ -111,6 +111,7 @@ final class ScopedNativePreflight {
         String commandDigest;
         final JsonObject scope, facts, planningGuard, originalIntent;
         JsonObject finalRay;
+        final BlockMenuDiagnostics blockMenuDiagnostics;
         final Object blockMenuEntity;
         final BlockMenuRawState blockMenuRawState;
         final ScopedFlatMovement movement;
@@ -125,6 +126,7 @@ final class ScopedNativePreflight {
             integratedServerIdentity = IntegratedServerIdentity.current(integratedServer, CapabilityGuard.privateSingleplayer(mc));
             require(integratedServer != null && integratedServerIdentity != null, "scoped_integrated_server_missing");
             this.scope = scope.deepCopy(); this.planningGuard = intent.getAsJsonObject("capability_guard").deepCopy();
+            blockMenuDiagnostics = blockMenu() ? new BlockMenuDiagnostics() : null;
             originalIntent = intent.deepCopy();
             submittedDigest = digest(intent);
             String profile=ClientActionRequest.string(scope,"profile");
@@ -169,6 +171,7 @@ final class ScopedNativePreflight {
         }
 
         private void recheck(Minecraft mc, String actionId) {
+            if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.OWNER_BEFORE);
             fence(mc, actionId);
             // Movement geometry/attribute hooks precede the final generic inventory/menu facts.
             if (movement != null) {
@@ -178,6 +181,7 @@ final class ScopedNativePreflight {
             if(combat!=null)combat.admission(mc);
             if(mining!=null)mining.admissionBeforeFacts(mc);
             if(placement!=null)placement.admission(mc);
+            if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.FACTS);
             require(facts.equals(captureFacts(mc)), "scoped_profile_facts_changed");
             if(mining!=null)mining.admissionAfterFacts(mc);
             if(placement!=null)placement.admission(mc);
@@ -185,33 +189,46 @@ final class ScopedNativePreflight {
             // After generic permission hooks, only raw corridor/entity/pose/owner reads remain.
             if (movement != null) movement.admissionRawFence(mc);
             // Fact/slot/shape hooks are not assumed pure. Fence the original owner after them.
+            if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.OWNER_AFTER);
             fence(mc, actionId);
             if (blockMenu()) {
+                if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.RAW_SNAPSHOT);
                 BlockMenuPreflight.assertRawSnapshot(mc, facts.getAsJsonObject("block_menu"));
+                if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.RAW_PLAYER);
                 BlockMenuPreflight.assertRawPlayer(mc, facts);
+                if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.BLOCK_ENTITY);
                 require(mc.level.getBlockEntity(BlockMenuPreflight.target(originalIntent)) == blockMenuEntity,
                     "block_menu_block_entity_replaced");
             }
         }
 
         net.minecraft.world.phys.BlockHitResult beforeLocalBlockUse(Minecraft mc, String actionId) {
+            if (blockMenuDiagnostics != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.PROFILE);
             require(blockMenu(), "block_menu_profile_required");
             recheck(mc, actionId); // All slot-permission and shape callbacks precede the final pick.
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.ACTUAL_RAY);
             var hit = BlockMenuPreflight.actualRay(mc, originalIntent);
             // No overridable Slot or shape callbacks may run after this pick. Vanilla
             // container data and copied stacks are checked directly, without resampling permissions.
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.RAW_MENU);
             blockMenuRawState.check(mc, facts);
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.RAW_SNAPSHOT);
             BlockMenuPreflight.assertRawSnapshot(mc, facts.getAsJsonObject("block_menu"));
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.RAW_PLAYER);
             BlockMenuPreflight.assertRawPlayer(mc, facts);
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.BLOCK_ENTITY);
             require(mc.level.getBlockEntity(BlockMenuPreflight.target(originalIntent)) == blockMenuEntity,
                 "block_menu_block_entity_replaced");
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.FINAL_RAY);
             BlockMenuPreflight.requireActualRay(mc, originalIntent, hit);
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.OWNER_FINAL);
             fence(mc, actionId);
             return hit;
         }
 
         net.minecraft.world.phys.BlockHitResult beforeBlockMenuEffect(Minecraft mc, String actionId) {
             var hit = beforeLocalBlockUse(mc, actionId);
+            blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.WITNESS);
             finalRay = BlockMenuPreflight.rayFacts(mc, hit);
             return hit;
         }

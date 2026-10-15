@@ -250,7 +250,11 @@ final class ClientActions {
             RuntimeAction admitted = active;
             try { interactBlock(mc, admitted); }
             catch (RuntimeException failure) {
-                if (active == admitted) failException(failure);
+                if (active == admitted) {
+                    var capture = admitted.scopedBlockMenu;
+                    capture.blockMenuDiagnostics.record(admitted.entry, failure, System.nanoTime() - capture.nano);
+                    failException(failure);
+                }
             }
         }
         return status(request.id());
@@ -263,16 +267,20 @@ final class ClientActions {
     static void scopedBlockMenuPacketFence(LocalPlayer player, InteractionHand hand, BlockHitResult hit) {
         RuntimeAction a = scopedDispatchInFlight;
         if (a == null) return; // Legacy/manual calls outside a scoped dispatch remain unchanged.
+        a.scopedBlockMenu.blockMenuDiagnostics.mark(BlockMenuDiagnostics.Stage.PACKET_FENCE, BlockMenuDiagnostics.Phase.PACKET_OWNER);
         if (active != a || !a.scopedPacketPending || a.dispatched || player != a.player || hand != InteractionHand.MAIN_HAND
                 || hit != a.scopedPacketHit || !ScopedBlockMenuDispatch.ready())
             throw new ClientActionRequest.Rejected(409, "block_menu_packet_owner_mismatch");
         Minecraft mc = Minecraft.getInstance();
         // Forge right-click, item-first, sneak-bypass and block-use hooks have returned.
         // This cannot undo arbitrary hook effects. A late failure is an unknown outcome.
+        a.scopedBlockMenu.blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.PACKET_GUARD);
         if (!capabilityDispatchCheck(mc, a)) throw new ClientActionRequest.Rejected(409, "block_menu_packet_guard_changed");
         BlockHitResult finalHit = a.scopedBlockMenu.beforeBlockMenuEffect(mc, a.entry.request.id());
+        a.scopedBlockMenu.blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.PACKET_HIT);
         if (!BlockMenuPreflight.hitMatches(hit, finalHit.getBlockPos(), finalHit.getDirection(), finalHit.getLocation()))
             throw new ClientActionRequest.Rejected(409, "block_menu_packet_hit_changed");
+        a.scopedBlockMenu.blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.WITNESS);
         a.entry.result.add("scoped_native_preflight", a.scopedBlockMenu.witness(a.entry.request.id()));
         a.dispatched = true; a.entry.result.addProperty("dispatched", true);
         a.scopedPacketPending = false;
@@ -432,7 +440,11 @@ final class ClientActions {
                 }
                 case "break_block" -> mine(mc, a);
                 case "place_block" -> { if(a.capabilityGuard!=null)prepareCapabilityPlacement(mc,a);else preparePlacement(mc,a); }
-                case "click_slot", "interact_block", "use_item", "select_hotbar", "close_menu", "gateway_pearl", "movement_budget_start", "movement_budget_finish" -> { }
+                // A server stop-use update can precede Pre. Release the completed hold
+                // before vanilla handleKeybinds can start another main/offhand use.
+                // Admission/context guards above still run before this observation.
+                case "use_item" -> finishUseItemIfObserved(mc, a);
+                case "click_slot", "interact_block", "select_hotbar", "close_menu", "gateway_pearl", "movement_budget_start", "movement_budget_finish" -> { }
                 case "attack_entity", "shoot_entity" -> {
                     CapabilityTargetAction.Step step;
                     try { step=a.capabilityTarget.tick(mc); }
@@ -996,23 +1008,30 @@ final class ClientActions {
         if(a.dispatched){finish("succeeded","interaction_dispatched");return;}
         BlockPos target=pos(a.entry.request.target());
         Direction face=Direction.valueOf(a.entry.request.face().toUpperCase(Locale.ROOT));
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.CLICK, BlockMenuDiagnostics.Phase.AIM);
         aim(mc,Vec3.atCenterOf(target).add(face.getStepX()*.5,face.getStepY()*.5,face.getStepZ()*.5));
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.CLICK, BlockMenuDiagnostics.Phase.INITIAL_PICK);
         BlockHitResult hit=pick(mc,target,face);
         if(hit==null){finish("failed","target_face_not_in_reach_or_visible");return;}
         if (a.scopedBlockMenu != null) a.entry.result.addProperty("local_click_hooks_started", true);
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.CLICK, BlockMenuDiagnostics.Phase.CLICK_HOOKS);
         var event=ClientHooks.onClickInput(1,mc.options.keyUse,InteractionHand.MAIN_HAND);
         if(event.isCanceled()){finish("failed","use_cancelled_by_mod");return;}
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.CLICK, BlockMenuDiagnostics.Phase.REPEAT_PICK);
         hit=pick(mc,target,face);
         if(hit==null){finish("failed","target_face_not_in_reach_or_visible");return;}
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.CLICK, BlockMenuDiagnostics.Phase.CAPABILITY_CHECK);
         if(!capabilityDispatchCheck(mc,a))return;
         if (a.scopedBlockMenu != null) {
             // Admission before native use is mandatory; the packet fence is a second check.
             // Any refusal after entry may have local or slot-sync effects and remains unknown.
+            blockMenuPhase(a, BlockMenuDiagnostics.Stage.PRE_LOCAL_USE, BlockMenuDiagnostics.Phase.READINESS);
             if (!ScopedBlockMenuDispatch.ready()) throw new ClientActionRequest.Rejected(409, "block_menu_post_hook_fence_unavailable");
             hit = a.scopedBlockMenu.beforeLocalBlockUse(mc, a.entry.request.id());
             a.scopedPacketPending = true; a.scopedPacketHit = hit;
             a.entry.result.addProperty("local_use_started", true);
         } else { a.dispatched=true;a.entry.result.addProperty("dispatched",true); }
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.NATIVE_USE, BlockMenuDiagnostics.Phase.NATIVE_USE);
         InteractionResult result;
         if (a.scopedBlockMenu == null) result=mc.gameMode.useItemOn(a.player,InteractionHand.MAIN_HAND,hit);
         else {
@@ -1027,9 +1046,14 @@ final class ClientActions {
         }
         if(active!=a)return;
         a.entry.result.addProperty("interaction_result",result.name().toLowerCase(Locale.ROOT));
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.NATIVE_USE, BlockMenuDiagnostics.Phase.SWING);
         if(result.shouldSwing() && event.shouldSwingHand())a.player.swing(InteractionHand.MAIN_HAND);
         if(active!=a)return;
+        blockMenuPhase(a, BlockMenuDiagnostics.Stage.NATIVE_USE, BlockMenuDiagnostics.Phase.TERMINAL);
         finish(result==InteractionResult.FAIL?"failed":"succeeded",result==InteractionResult.FAIL?"interaction_rejected":"interaction_dispatched");
+    }
+    private static void blockMenuPhase(RuntimeAction a, BlockMenuDiagnostics.Stage stage, BlockMenuDiagnostics.Phase phase) {
+        if (a.scopedBlockMenu != null) a.scopedBlockMenu.blockMenuDiagnostics.mark(stage, phase);
     }
     private static void gatewayPearl(Minecraft mc,RuntimeAction a) {
         if(a.dispatched){finish("failed","gateway_pearl_already_dispatched");return;}
@@ -1078,8 +1102,23 @@ final class ClientActions {
             a.entry.result.addProperty("interaction_result",result.name().toLowerCase(Locale.ROOT));
             if(result==InteractionResult.FAIL){finish("failed","item_use_rejected");return;}
         }
-        if(a.player.getMainHandItem().getCount()!=a.useBeforeCount || a.entry.ticks>a.dispatchTick && !a.player.isUsingItem())finish("succeeded","item_use_finished_observed");
-        else if(a.entry.ticks-a.dispatchTick>=maxTicks)finish("failed","item_use_budget_exhausted");
+        if (finishUseItemIfObserved(mc, a) || !useItemOwnerContext(mc, a)) return;
+        if(a.entry.ticks-a.dispatchTick>=maxTicks)finish("failed","item_use_budget_exhausted");
+    }
+    private static boolean finishUseItemIfObserved(Minecraft mc, RuntimeAction a) {
+        if (!a.dispatched || !useItemOwnerContext(mc, a)) return false;
+        // Keep the existing Post completion predicate, including its later-tick
+        // requirement. Pre only observes completion; it never starts item use.
+        boolean finished = a.player.getMainHandItem().getCount()!=a.useBeforeCount
+                || a.entry.ticks>a.dispatchTick && !a.player.isUsingItem();
+        // Observations may run mod code. Never finish a replacement owner or a
+        // stale player/world after such a callback.
+        if (!finished || !useItemOwnerContext(mc, a)) return false;
+        finish("succeeded", "item_use_finished_observed");
+        return true;
+    }
+    private static boolean useItemOwnerContext(Minecraft mc, RuntimeAction a) {
+        return active == a && mc.player == a.player && mc.level == a.level && mc.gameMode != null;
     }
     private static void closeMenu(Minecraft mc,RuntimeAction a) {
         if(!capabilityDispatchCheck(mc,a))return;

@@ -143,15 +143,51 @@ final class BlockMenuPreflight {
         return hit;
     }
     static void requireActualRay(Minecraft mc, JsonObject intent, BlockHitResult hit) {
-        require(mc.hitResult == hit && hitMatches(hit, target(intent), face(intent), faceCenter(target(intent), face(intent)))
-            && !hit.isInside() && mc.player.getEyePosition().distanceTo(hit.getLocation()) <= mc.player.blockInteractionRange(),
+        BlockPos target = target(intent); Direction face = face(intent);
+        Vec3 eye = mc.player.getEyePosition(), center = faceCenter(target, face);
+        float[] aim = intendedAim(eye, center);
+        // Entity's final implementation uses the game's quantized sine table. An ideal
+        // double-precision face center is not necessarily a representable view ray.
+        Vec3 direction = mc.player.calculateViewVector(aim[1], aim[0]);
+        Vec3 expected = representableHit(eye, center, target, face, direction);
+        require(expected != null && mc.player.getYRot() == aim[0] && mc.player.getXRot() == aim[1]
+            && mc.hitResult == hit && hitMatches(hit, target, face, expected)
+            && inCertifiedPrism(eye, center, hit.getLocation()) && !hit.isInside()
+            && eye.distanceTo(expected) <= mc.player.blockInteractionRange()
+            && eye.distanceTo(hit.getLocation()) <= mc.player.blockInteractionRange(),
             "block_menu_actual_ray_changed");
+    }
+    static float[] intendedAim(Vec3 eye, Vec3 center) {
+        Vec3 d = center.subtract(eye);
+        return new float[]{(float)Math.toDegrees(Math.atan2(-d.x, d.z)),
+            (float)-Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z)))};
+    }
+    static Vec3 representableHit(Vec3 eye, Vec3 center, BlockPos target, Direction face, Vec3 direction) {
+        int axis = face.getAxis().ordinal();
+        double[] e = {eye.x, eye.y, eye.z}, c = {center.x, center.y, center.z};
+        double[] v = {direction.x, direction.y, direction.z};
+        double t = (c[axis] - e[axis]) / v[axis];
+        if (!Double.isFinite(t) || t <= 0 || v[axis] * (face.getStepX()+face.getStepY()+face.getStepZ()) >= 0) return null;
+        double[] h = {e[0] + t*v[0], e[1] + t*v[1], e[2] + t*v[2]};
+        h[axis] = c[axis];
+        int[] b = {target.getX(), target.getY(), target.getZ()};
+        for (int i=0; i<3; i++) if (!Double.isFinite(h[i]) || i != axis && !(h[i] > b[i] && h[i] < b[i]+1)) return null;
+        Vec3 hit = new Vec3(h[0], h[1], h[2]);
+        // Both endpoints inside this convex prism imply the entire actual segment
+        // stays in the cells certified by capture(). Never extend the footprint silently.
+        return inCertifiedPrism(eye, center, hit) ? hit : null;
+    }
+    static boolean inCertifiedPrism(Vec3 eye, Vec3 center, Vec3 point) {
+        double[] e={eye.x,eye.y,eye.z}, c={center.x,center.y,center.z}, h={point.x,point.y,point.z};
+        for(int i=0;i<3;i++) if(!Double.isFinite(h[i]) || h[i] < Math.floor(Math.min(e[i],c[i]))
+            || h[i] >= Math.floor(Math.max(e[i],c[i]))+1) return false;
+        return true;
     }
     static JsonObject rayFacts(Minecraft mc, BlockHitResult hit) {
         JsonObject out = new JsonObject(); out.add("target", pos(hit.getBlockPos()));
         out.addProperty("face", hit.getDirection().getName()); out.add("hit", vector(hit.getLocation()));
         out.add("eye", vector(mc.player.getEyePosition())); out.addProperty("reach", mc.player.blockInteractionRange());
-        out.addProperty("yaw", mc.player.getYRot()); out.addProperty("pitch", mc.player.getXRot());
+        out.addProperty("yaw", (double)mc.player.getYRot()); out.addProperty("pitch", (double)mc.player.getXRot());
         out.addProperty("line_of_sight_clear", true); return out;
     }
     static boolean hitMatches(BlockHitResult hit, BlockPos target, Direction face, Vec3 point) {
