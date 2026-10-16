@@ -97,12 +97,17 @@ final class NativeLivingObservation {
             beeState = new NativeLivingSnapshot.BeeState(bee.isAngry(), bee.getRemainingPersistentAngerTime(),
                     angerTarget == null ? null : angerTarget.toString());
         }
-        return new NativeLivingSnapshot.Row(mob.getUUID().toString(), mob.getId(),
+        return NativeLivingSnapshot.observedRow(mob.getUUID().toString(), mob.getId(),
                 BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).toString(), tick, nano,
-                mob.isAlive() && !mob.isRemoved(), mob.isAggressive(), targetState, beeState, NativeRabbitObservation.read(mob));
+                mob.isAlive() && !mob.isRemoved(), mob.isAggressive(), targetState, beeState, NativeRabbitObservation.read(mob), NativeBeeRouteObservation.observe(mob));
     }
 
     record Frame(Object context, NativeLivingSnapshot.Batch batch) { }
+    static NativeLivingSnapshot.BeeFence equivalentBeeBatch(Frame frame,java.util.List<String> uuids,long tick){
+        return frame==null?NativeLivingSnapshot.BeeFence.CONTEXT_CHANGED:STORE.equivalentBeeBatch(frame.context(),frame.batch(),uuids,tick);
+    }
+    static boolean currentBatch(Frame frame){return frame!=null&&STORE.current(frame.context(),frame.batch());}
+    static boolean current(Frame frame){return frame!=null&&frame.context()!=null&&frame.context()==STORE.context();}
     static Frame capture(Minecraft mc) {
         Context request = refresh(mc);
         return new Frame(request, STORE.snapshot());
@@ -112,6 +117,14 @@ final class NativeLivingObservation {
         return NativeLivingSnapshot.knownCalmTargetless(frame.batch(),request,mc.level.dimension().location().toString(),
                 entity.getUUID().toString(),entity.getId(),BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString(),
                 mc.level.getGameTime(),System.nanoTime());
+    }
+    /** Additional evidence is deliberately route-v2 only; legacy native_living JSON is unchanged. */
+    static void appendRouteBee(Minecraft mc, Entity entity, JsonObject row, Frame frame) {
+        append(mc,entity,row,frame);
+        JsonObject n=row.getAsJsonObject("native_living");
+        if(n==null||!n.has("known")||!n.get("known").getAsBoolean())return;
+        NativeLivingSnapshot.Row value=frame.batch().rows().get(entity.getUUID().toString());
+        if(value!=null&&value.beeRoute()!=null)n.add("bee_route",NativeBeeRouteObservation.json(value.beeRoute()));
     }
     static void append(Minecraft mc, Entity entity, JsonObject row, Frame frame) {
         if (!(entity instanceof Mob)) return;

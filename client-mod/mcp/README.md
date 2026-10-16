@@ -34,6 +34,14 @@ PowerShell 7 (`pwsh.exe`) is recommended when a prepared launcher references non
 
 ## Tools
 
+The server advertises **12 tools**: the eight legacy tools below and
+`mdc_catalog`, `mdc_observe`, `mdc_plan`, `mdc_job`. The four toolbox tools need
+an operator-bound Python service for live use. See the
+[toolbox installation and playing-AI call guide](../../docs/TOOLBOX-QUICKSTART.md)
+for `MINECLIENT_TOOLBOX_CONFIG`, platform requirements and current limitations.
+A listed capability is not a promise of runtime availability.
+
+
 - `minecraft_client_action`
 - `minecraft_client_launch`
 - `minecraft_client_register`
@@ -43,7 +51,8 @@ PowerShell 7 (`pwsh.exe`) is recommended when a prepared launcher references non
 - `minecraft_client_input`
 - `minecraft_client_close`
 
-Every tool declares a plain object input schema with no top-level `oneOf`, `anyOf` or `allOf`, so MCP clients that validate `tools/list` strictly load all eight tools. The original seven tools and their identities remain available. `minecraft_client_query` and `minecraft_client_input` select their operation with `kind`, and the server rejects any field that does not belong to that kind.
+Every tool declares a plain object input schema with no top-level `oneOf`, `anyOf` or `allOf`, so MCP clients that validate `tools/list` strictly can load the eight legacy tools.
+The four additive toolbox schemas use the same plain-object top-level convention. The original seven tools and their identities remain available. `minecraft_client_query` and `minecraft_client_input` select their operation with `kind`, and the server rejects any field that does not belong to that kind.
 
 `minecraft_client_action` accepts `submit`, `status`, or `cancel`. Submit requires
 an explicit immutable action ID, finite timeout, and expected native world,
@@ -78,9 +87,13 @@ Production descriptors are stored outside the repository. They contain the sessi
 npm test
 ```
 
-The self-test keeps the original seven tool contracts: launch and registration identity, PNG transport, bounded queries and inputs including commands and raw keys, release-before-close behavior, exact PID exit, and secret redaction. The listed surface now contains eight tools. The portable action tests exercise actual adapter parsing/execution with synthetic hook responses; the framing test also calls the new route through real stdio.
+The self-test keeps the original seven tool contracts: launch and registration identity, PNG transport, bounded queries and inputs including commands and raw keys, release-before-close behavior, exact PID exit, and secret redaction. The total listed surface now contains twelve tools. The portable action tests exercise actual adapter parsing/execution with synthetic hook responses; the framing test also calls the new route through real stdio.
 
-On Windows, `npm test` runs the original self-test directly. On Linux (Node.js
+The aggregate `npm test` additionally runs `test:toolbox`, which requires Python
+3.10+ with POSIX `fcntl` for the synthetic owner chain. Native Windows Python
+does not provide that runtime. On Windows, use `npm run test:windows` for the
+original legacy platform gate; that gate does not test the toolbox owner chain.
+The original self-test is run directly on Windows. On Linux (Node.js
 20.6 or newer), it runs the same unmodified server and assertions in a private
 temporary directory with a test-only Windows-path mapping and fixed Node fixture
 launcher. The mapping rejects paths outside that directory, symlinks, and unknown

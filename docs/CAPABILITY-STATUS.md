@@ -1,4 +1,10 @@
+> 历史源码记录：本文各项结论仅适用于其原始截点。2026-10-16 当前交付、安装入口和验证边界见[工具箱交付说明](toolbox-2026-10-16/README.md)。本次 Git 发布不改产品代码或继承旧 JAR 的实机验收。
+
 # Capability evidence and outstanding acceptance
+
+Current combined source adds bounded local routes and explicit terminal defense.
+Both require their own combined runtime/live acceptance; the historical cases
+below are unchanged. See [quickstart](TOOLBOX-QUICKSTART.md).
 
 This matrix records the bounded evidence available through T34 on 2026-10-15.
 It preserves the published r2 checkpoint, including T17 qualified collection,
@@ -36,6 +42,8 @@ rebuild or new runtime artifact. Unlisted variants remain unaccepted here.
 | Consumption | T31 bounded live and saved: one water-breathing potion, one returned bottle and observed amplifier-0 effect; automatic closure passed. | Food, milk, other potions, stack/container cases, interrupted use and broader terminal-ordering behavior. Exact effect decay/expiry is not proven. |
 | Barrel withdrawal | T32 qualified live/saved acceptance: three public jobs and four native mutations transferred one cobblestone from one ordinary barrel to inventory, with confirmed input/owner release. Ordinary completion took 135.015 seconds with manual final-window closure; automatic `HOLD_NO_REPLAY` remains. | Fresh fully automatic lifecycle acceptance, deposits, other quantities/containers, full-inventory handling, interruptions and composed storage workflows. Saved position was conserved but rotation and broader world records changed. |
 | Bounded container observations | Source/offline snapshot work and a documented real-platform acceptance checklist. | The checklist's seven genuine-loader tests and designated read-only metadata/budget/container fixtures remain a separate unmet gate in the cited checkpoint. T32's single barrel withdrawal does not supply that coverage. |
+| Bounded local route | Source and offline evidence for `navigate_route_local`: loaded cardinal flat/up-one/down-one segments, physical endpoint centering, bounded detours and original-owner budgets. | Combined artifact/FML lifecycle and sustained ordinary-world route acceptance remain pending. No unloaded/global navigation claim. |
+| Explicit terminal defense | Source and offline production-entry evidence for caller-selected `defend_once` after known damage interruption and native input release, retaining the same owner. Default remains stop. | Combined ordinary-world reaction acceptance remains pending. No arbitrary target acquisition, unknown retry, ordinary-task resume or general survival guarantee. |
 | Broader navigation and transport | Guarded source and offline/synthetic evidence described by the capability package. | Ordinary-world route diversity, steps/stairs, boats and their full movement/cleanup chains on the target runtime. |
 | Resource production and long goals | Bounded recipe/resource/scheduler implementations with explicit prerequisites and offline tests. | Composed ordinary-world acquisition, reservations, production, interruption and safe resumption. Individual T29–T31 successes do not validate composition. |
 | Blueprint building | Planning/source evidence; the public scoped-placement contract keeps `build` and `build_with_materials` unavailable for runtime execution. | Supported front-door execution, material staging, multi-cell placement, access/support handling and final physical audit. One placed block is insufficient. |

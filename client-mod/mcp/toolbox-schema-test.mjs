@@ -50,3 +50,9 @@ test('check mode detects drift without modifying files and regeneration is deter
   const fix=spawnSync(python,['-B',path.join(mc,'sync-toolbox-schema.py')],{encoding:'utf8'});assert.equal(fix.status,0,fix.stderr);assert.equal(fs.readFileSync(target,'utf8'),original);
  } finally {fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('additive local route capability uses generic schema and forwards bounded closed intent once',async()=>{
+ const route={...request,request_id:'route-local-once',capability:'navigate_route_local',arguments:{goal:{x:4,y:64,z:0},radius:6,max_segments:16,min_health:12},budgets:{deadline_seconds:120,max_actions:17,max_observations:256,cleanup_reserve_actions:1,reflex_reserve_actions:0}};
+ let calls=0;const result=await executeToolbox('mdc_job',route,{backend:{call(name,args){calls++;assert.equal(name,'mdc_job');assert.deepEqual(args,route);return {forwarded:true};}}});
+ assert.equal(calls,1);assert.deepEqual(result,{forwarded:true});
+});

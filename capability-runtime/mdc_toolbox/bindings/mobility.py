@@ -1,6 +1,6 @@
 """Closed reusable navigation/traversal bindings over the same guarded Runtime."""
 from copy import deepcopy
-from mdc_skills import mobility as skills, reach, scoped_mobility, scoped_step_down
+from mdc_skills import mobility as skills, reach, scoped_mobility, scoped_step_down, scoped_route_local
 from .production import (_object, _integer, _number, _enum, _COORD,
                          _definition, _invoke, _validate)
 
@@ -12,6 +12,8 @@ _DIRECTION = {'type': 'object', 'properties': {'x': _integer(-1, 1), 'z': _integ
                        ({'x': 1, 'z': 0}, {'x': -1, 'z': 0}, {'x': 0, 'z': 1}, {'x': 0, 'z': -1})]}
 _MATERIAL = _enum(skills.BUILD_BLOCKS)
 _LOCAL_SCHEMA = _object({'goal':_COORD,'min_health':_HEALTH}, ('goal',))
+_ROUTE_LOCAL_SCHEMA = _object({'goal':_COORD,'min_health':_HEALTH,
+    'radius':_integer(2,8),'max_segments':_integer(1,16)}, ('goal',))
 _SCHEMAS = {
     'navigate': _object({'goal': _COORD, 'max_steps': _integer(1, 128)}, ('goal',)),
     'navigate_loaded': _object({'goal': _COORD, 'max_segments': _integer(1, 128),
@@ -78,10 +80,29 @@ def definitions():
     descent.update(adapter_status='implemented',observation_profile='player',cancel_granularity='exact_native_action',
         known_limits=list(descent['known_limits'][:-1]))
     result.append(descent)
+    route = _definition('navigate_route_local','mobility','local_controller',_ROUTE_LOCAL_SCHEMA,(scoped_route_local,),
+        prerequisites=('Negotiated native local-segment admission and original owner/context; default stop prefers spatial-stop-v2, then v1, only when advertised.',
+            'Request-only private Overworld survival, closed inventory, centered stationary origin, unarmed MovementBudget.'),
+        limits=('Finite loaded local goal route; cardinal flat and one-block up/down edges only.',
+            'Original-origin horizontal radius at most 8 and feet elevation plus/minus 2; at most 16 native segments.',
+            'A complete known route is required before dispatch; no frontier exploration, teleport, block edits or automatic unstuck.',
+            'Each segment uses fresh native geometry/entity admission and later centered stopped-motion proof before another segment.',
+            'Spatial-stop retains complete typed entities; added audited passive classes require projected exclusion from the full local context; unknown types still refuse.',
+            'One original owner and shared deadline/actions/observations; any refusal, failure, cancellation or unknown stops without replay.',
+            'Client-observed outcomes do not certify future entity motion or global physical-distance accounting.'),
+        features=('scoped-native-preflight/1','profile:movement-local-segment-observed-v1','action:follow_path'),
+        bounds={'radius':8,'vertical_feet':2,'native_segments':16,'planner_expansions':2048,
+            'native_timeout_ms':8000,'maximum_action_ticks':160,'entity_limit':1024,'endpoint_radius':.08})
+    route.update(adapter_status='implemented',observation_profile='local_terrain',cancel_granularity='exact_native_action',
+        known_limits=list(route['known_limits'][:-1]))
+    result.append(route)
     return result
 
 
 def invoke(capability, runtime, arguments, control):
+    if capability == 'navigate_route_local':
+        return _invoke(capability,runtime,arguments,control,{'navigate_route_local':_ROUTE_LOCAL_SCHEMA},
+                       {'navigate_route_local':scoped_route_local.navigate_route_local},skill_kwargs={'control':control})
     if capability == 'navigate_step_down':
         return _invoke(capability,runtime,arguments,control,{'navigate_step_down':_LOCAL_SCHEMA},
                        {'navigate_step_down':scoped_step_down.navigate_step_down},skill_kwargs={'control':control})
@@ -93,7 +114,7 @@ def invoke(capability, runtime, arguments, control):
 
 
 def plan(capability, arguments, observation=None):
-    _validate(capability, arguments, {**_SCHEMAS,'navigate_local':_LOCAL_SCHEMA,'navigate_step_down':_LOCAL_SCHEMA})
+    _validate(capability, arguments, {**_SCHEMAS,'navigate_local':_LOCAL_SCHEMA,'navigate_step_down':_LOCAL_SCHEMA,'navigate_route_local':_ROUTE_LOCAL_SCHEMA})
     return {'capability': capability, 'status': 'unavailable', 'execution_authority': False,
             'reason': 'route_selection_requires_fresh_runtime_local_facts',
             'bounds': deepcopy({key: value for key, value in arguments.items() if key.startswith('max_')}),

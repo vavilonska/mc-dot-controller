@@ -1,3 +1,7 @@
+## Current public integration
+
+The combined public backend allowlists 20 capabilities, including `navigate_route_local`; negotiated availability is authoritative. Explicit `defend_once` is available only with its supported combat profile and original reserves; default remains stop and interrupted jobs never resume. See [quickstart](../docs/TOOLBOX-QUICKSTART.md). Route/reflex combined live acceptance remains pending. Broad source/catalog capabilities below are not automatically enabled runtime capabilities.
+
 # MDC reusable capabilities
 
 This package adds actual guarded execution and reusable bounded skills to the verified diagnostic baseline. It is separate from any prewritten validation scenario. No import, catalog command or test starts Minecraft, a resident process, a connection, a planner service, a backup or an action.
@@ -76,7 +80,13 @@ A failed semantic postcondition is not authorization to replay a mutation. Unkno
 
 `python3 capability-runtime/run_checks.py` runs the final capability suite, all eight existing Python components and the retained Node suites. It writes evidence outside the source directory and never touches a live mailbox. Native default build and true-loader checks are run separately with the pinned restored development dependencies; see the delivery validation report. Original failures and superseded-test diffs are retained for review.
 
-The native MCP remains the existing eight-tool interface; these capabilities use the actual resident/gateway API, not fictional new MCP tools. Existing runtime setup and security boundaries remain unchanged.
+The MCP server advertises the existing eight native/legacy tools plus four additive
+toolbox tools: `mdc_catalog`, `mdc_observe`, `mdc_plan`, and `mdc_job`. A configured
+long-lived Python backend uses the actual existing resident/gateway owner chain.
+Catalog entries without a negotiated executable binding remain unavailable. See
+[toolbox setup and call examples](../docs/TOOLBOX-QUICKSTART.md); the Python owner
+stack requires POSIX `fcntl`, and no turnkey native-Windows toolbox runtime is
+claimed. Existing authentication and ownership boundaries remain unchanged.
 
 ## Longer goals and historical surveys
 

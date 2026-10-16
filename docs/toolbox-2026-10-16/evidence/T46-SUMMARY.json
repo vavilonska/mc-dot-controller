@@ -1,0 +1,28 @@
+{
+  "case": "T46",
+  "status": "CORE_DEFENSE_LIVE_PASS_SAVED_WITH_EXPLICIT_COVERAGE_LIMITS",
+  "jar_sha256": "59523ef1a2e6c9c1a738c13958d60c506ff526033ae21af6023140bd6f0b2694",
+  "all_requested_defense_goals_verified": false,
+  "verified": {
+    "movement_preempted_before_motion": true,
+    "same_owner_attack_dispatches": 3,
+    "target_health_before": 20,
+    "target_health_after": 0,
+    "is_blocking_ticks": 14,
+    "player_health": 20,
+    "player_displacement": 0,
+    "normal_close": true,
+    "saved_copy_files": 33,
+    "route_terminal_state": "interrupted",
+    "route_resumed": false
+  },
+  "not_verified": [
+    "actual shield damage blocking",
+    "health observation recovery",
+    "low-health retreat",
+    "freeze/pause lifecycle",
+    "complex-world reliability",
+    "real refusal reproduction for new diagnostic"
+  ],
+  "evidence_scope": "Reviewed client observations and scoped saved-state checks; no server-finality claim. Raw evidence and worlds are private and are not published."
+}

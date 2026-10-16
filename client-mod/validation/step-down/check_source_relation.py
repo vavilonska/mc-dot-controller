@@ -8,7 +8,7 @@ def check(ok,why):
  assert ok,why;n+=1
 for text in ['active.scopedStepDown=scoped.stepDown','active.scopedStepDown.activate(active.entry)','a.scopedStepDown.beforeEffect(Minecraft.getInstance())','a.scopedStepDown!=null ? a.scopedStepDown.settled()','a.entry.result.add("step_down",a.scopedStepDown.terminal(neutral))','if(status.equals("succeeded") && !a.scopedStepDown.settled())','a.jump = a.scopedMovement==null && a.scopedStepDown==null && step.jump()','if(a.scopedStepDown!=null && active!=a)return;']:
  check(text in a,text)
-branch=a[a.index('        if(a.scopedStepDown!=null) {'):a.index('        if(a.scopedMining!=null) {\n            ScopedMining guard=a.scopedMining;')]
+branch=a[a.index('        if(a.scopedStepDown!=null) {'):a.index('        if(a.scopedLocalSegment!=null) {', a.index('        if(a.scopedStepDown!=null) {'))]
 check(branch.index('beforeEffect')<branch.index('a.dispatched=true'),'input beforeEffect precedes direct input assignment')
 check('event.getInput()!=input' in branch and branch.count('!ScopedFlatMovement.neutral(input)')==2,'input identity and neutrality before and after hooks')
 for text in ['stepDown.admissionRecheck(mc)','stepDown.admissionRawFence(mc)','out.add("step_down", stepDown.facts())','if(capture.stepDown!=null){capture.requireMovementResponseBudget(parsed);capture.recheck(mc);}']:

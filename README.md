@@ -1,3 +1,23 @@
+# MDC：Linux 单机工具箱（限定可用候选）
+
+本次保存 2026-10-16 已交付工具箱的配套源码和文档。先读[安装/API/24 项能力矩阵与验收说明](docs/toolbox-2026-10-16/README.md)。仓库只含源码、测试和公开文档；JAR 与完整 ZIP 另行交付。
+
+当前同版 T46 已验证：路线移动前抢占、同一 owner 三次攻击、僵尸血量 20→0、盾牌 `isBlocking` 14 ticks；玩家保持 20 血、位移 0，并正常关闭保存。路线保持中断，不自动恢复。盾牌实际挡伤、健康观测恢复、低血撤离、复杂世界可靠性仍未验收。旧 T42 工坊成功仅属于旧 JAR；历史 unknown/失败不被覆盖。
+
+仅用于授权的独立普通单人副本，保留原世界，不连接多人、不擅自恢复暂停任务、不重试未知动作。以下保留的历史架构与验证记录描述各自截点；当前产物身份与结论以上述交付说明为准。Git 发布不启动游戏，也不新增实机验收。
+
+## 保留的历史源码说明
+
+> Defense-continuity r2: source-world-tick-bound recovery; r1 is blocked by the frozen-source finding. This is an offline candidate, not an installed release.
+
+## 当前组合工具箱源码
+
+本独立候选新增[防御健康观测恢复与完整退路执行校验](DEFENSE-CONTINUITY-CONTRACT.md)，仅离线验证、未部署。T44 已实机验证大于16KiB的[typed stop-proof](DEFENSE-STOP-PROOF-CONTRACT.md)可被消费并触发防御，但完整防御功能验收仍失败；T43 原 unknown 不改写、不重试。
+
+当前源码加入有界本地多段路线 `navigate_route_local`、显式 `defend_once` 和部署/调用说明。MCP 共提供 12 个工具；Owner 后端允许列表包含 20 项能力，实际可用性仍以 `mdc_catalog` 协商结果为准。默认受伤即停，显式防御也不会恢复被中断的普通任务。组合版本的实际安装、连续工作流和防御遭遇验收尚待完成，不能把旧微型试验当成本版本已通过。
+
+操作方与调用 AI 请先读[工具箱快速开始](docs/TOOLBOX-QUICKSTART.md)和[能力边界](docs/CAPABILITY-STATUS.md)。以下历史功能说明保留各自范围。
+
 # Minecraft Dot Controller
 
 真实 Minecraft 客户端与常驻 Python 执行链。当前主线整合了 toolbox v1、T13 观测式移动、限定采集，以及拾取和战斗候选源码。T21 已独立验证一次单目标攻击后精确取消及保存结果；原测试脚本的编码比较失败仍保留，不代表完整战斗能力验收。新增能力边界见 [采集、拾取与战斗验证说明](docs/MINING-COLLECT-COMBAT.md)。请先阅读 [当前整合与验证边界](SOURCE-CHECKPOINT.md)。本轮用途是私有单人测试；T13 已完成一次公开接口的一格平地移动，保存验证结论见上述文档，尚未完成全部实机验收；下文早期 v6 版本及其测试数字保留为历史记录，不代表当前源码全部通过。模型决定下一步，客户端逐刻执行普通动作。
@@ -48,6 +68,11 @@ T32 又独立验证了从一个普通木桶取出 1 块圆石及保存结果。�
 制作结果要求两个后续递增游戏刻中背包、合成格和光标均符合预期；放块要求连续五刻观察到目标方块，并观察到材料消耗或创造模式。挖掉方块不等于已经拾取掉落物。这些仍是客户端证据，不是服务端最终确认；直接控制返回只证明已分发输入。挖掘现含保留真实 pick/目标/距离检查的可见面回退。完整契约见[客户端动作](client-mod/docs/client-actions.md)、[已加载世界扫描](client-mod/docs/loaded-world-scans.md)和[常驻控制器指南](resident-controller/README.md)。
 
 ## 使用方式
+
+面向游玩 AI 的四工具入口、当前 12 个 MCP 工具清单、操作者配置及调用示例，见
+[Toolbox 安装与调用指南](docs/TOOLBOX-QUICKSTART.md)。目录可见不等于当前运行环境可执行；
+该指南明确区分普通单人运行约束、POSIX Python 要求、单步移动和尚未接通的反应策略。
+
 
 操作者在实际运行 Java 客户端的桌面终端中启动一次常驻进程，明确提供本次验证过的回环 URL 和共享队列目录。令牌通过隐藏提示或操作者明确选择的既有文件提供，不放进模型命令、队列或仓库。
 

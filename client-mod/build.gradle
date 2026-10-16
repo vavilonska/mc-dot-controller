@@ -37,6 +37,7 @@ def realLoaderTests = providers.gradleProperty('bridge.realLoaderTests').map { i
 if (!realLoaderTests) {
     sourceSets.test.java.exclude '**/PlacementVanillaSemanticsTest.java'
     sourceSets.test.java.exclude '**/MovementBudgetLoaderTest.java'
+    sourceSets.test.java.exclude '**/ScopedLocalSegmentLoaderTest.java'
     sourceSets.test.java.exclude '**/NativeLivingObservationLoaderTest.java'
     sourceSets.test.java.exclude '**/TerrainCapabilityLoaderTest.java'
 }

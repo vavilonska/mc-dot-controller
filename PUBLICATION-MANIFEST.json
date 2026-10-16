@@ -1,48 +1,64 @@
 {
-  "schema": "mdc-mainline-source-integration-v14",
-  "repository_parent_commit": "ade1df19b661701c96c6ffa088bc1df709fd3979",
-  "repository_parent_tree": "8c17facc0ead0422598afb057f1252ab7f577257",
-  "source_stage": "Reviewed bounded single-block descent source and portable tests; qualified T34 acceptance",
-  "scope": "Reviewed navigation descent integration preserving previously published fixes, tests and acceptance; runtime and publication inventories remain separate",
-  "verification": {
+  "schema": "mdc-public-toolbox-source-delivery-20261016",
+  "repository_parent_commit": "d06a085baa2fbe315db84f8c26905c2c1d6316cf",
+  "repository_parent_tree": "cbc157d118a908a8c711936eecef397bdb6a693d",
+  "scope": "Delivered implementation and tests, public installation/API docs and explicitly qualified T46 evidence; no game operations or binary release.",
+  "current_delivery_summary": "docs/toolbox-2026-10-16/evidence/PUBLIC-DELIVERY-SUMMARY.json",
+  "historical_source_verification": {
     "fresh_production_compile": {
-      "java_sources": 140,
-      "production_classes": 340,
-      "additional_serializer_test_helpers": 3
+      "java_sources": 144,
+      "production_classes": 352,
+      "additional_serializer_helpers": 3
     },
-    "diagnostic_java_assertions": 3018,
-    "retained_consolidation_suite": {
-      "stages_passed": 7,
-      "java_ray_assertions": 1807,
-      "geometry_rows": 360,
-      "python_assertions": 65907,
-      "additional_wire_checks": 7,
+    "local_route": {
+      "controller_assertions": 157,
+      "controller_scenarios": 21,
+      "source_relation_assertions": 29,
+      "frontdoor_planner_native_wire_tests": 66
+    },
+    "combined_defense": {
+      "route_defense_transition_and_late_stop_tests": 12,
+      "route_default_defense_entry_regressions": 25,
+      "toolbox_tests": 89,
+      "mcp_schema_ndjson_tests": 10
+    },
+    "retained_regressions": {
+      "diagnostic_assertions": 3018,
+      "consolidation_stages": 7,
       "consume_assertions": 137,
-      "consume_scenarios": 20,
-      "harness_unchanged": true
+      "descent_controller_assertions": 69,
+      "descent_scenarios": 15,
+      "descent_source_relation_assertions": 20,
+      "descent_frontdoor_native_wire_tests": 24
     },
-    "descent_portable_tests": {
-      "controller_assertions": 69,
-      "controller_scenarios": 15,
-      "source_relation_assertions": 20,
-      "contract_frontdoor_native_wire_tests": 24,
-      "fresh_synthetic_native_wire": true
-    },
-    "actual_mixin_bytecode_gate": "PASS exact integrated production classes; three genuine targets, seven applicable mixins, four seam-order checks and expected negative rejection; no game initialization",
+    "actual_mixin_bytecode_gate": "PASS all fourteen exact registered mixins across all nine targets from installed runtime bytes; Entity cancellable HEAD control flow and missing-move negative verified, alongside retained block-menu/placement seams; no game or production class initialization",
     "repository_regression": [
+      {
+        "component": "toolbox-doc-examples",
+        "exit_code": 0,
+        "summary": []
+      },
+      {
+        "component": "toolbox-package-integrity",
+        "exit_code": 0,
+        "summary": [
+          "Ran 3 tests in 0.003s",
+          "OK"
+        ]
+      },
       {
         "component": "capability-runtime",
         "exit_code": 0,
         "summary": [
-          "Ran 764 tests in 280.337s",
-          "OK (skipped=8)"
+          "Ran 854 tests in 387.665s",
+          "OK (skipped=15)"
         ]
       },
       {
         "component": "resident-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 423 tests in 2.519s",
+          "Ran 423 tests in 2.830s",
           "OK"
         ]
       },
@@ -50,7 +66,7 @@
         "component": "navigation-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 254 tests in 1.040s",
+          "Ran 254 tests in 1.182s",
           "OK"
         ]
       },
@@ -58,7 +74,7 @@
         "component": "navigation-cursor",
         "exit_code": 0,
         "summary": [
-          "Ran 83 tests in 0.115s",
+          "Ran 83 tests in 0.109s",
           "OK"
         ]
       },
@@ -66,7 +82,7 @@
         "component": "defense-watchdog",
         "exit_code": 0,
         "summary": [
-          "Ran 161 tests in 0.186s",
+          "Ran 161 tests in 0.179s",
           "OK (skipped=1)"
         ]
       },
@@ -74,7 +90,7 @@
         "component": "gameplay-helpers",
         "exit_code": 0,
         "summary": [
-          "Ran 64 tests in 4.398s",
+          "Ran 64 tests in 4.395s",
           "OK"
         ]
       },
@@ -82,7 +98,7 @@
         "component": "building-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 119 tests in 1.291s",
+          "Ran 119 tests in 1.390s",
           "OK"
         ]
       },
@@ -90,7 +106,7 @@
         "component": "external-controller",
         "exit_code": 0,
         "summary": [
-          "Ran 115 tests in 0.103s",
+          "Ran 115 tests in 0.104s",
           "OK"
         ]
       },
@@ -98,7 +114,7 @@
         "component": "multiagent-coordination",
         "exit_code": 0,
         "summary": [
-          "Ran 322 tests in 2.214s",
+          "Ran 322 tests in 2.550s",
           "OK (skipped=1)"
         ]
       },
@@ -106,7 +122,7 @@
         "component": "python-toolbox",
         "exit_code": 0,
         "summary": [
-          "Ran 57 tests in 0.087s",
+          "Ran 89 tests in 0.691s",
           "OK"
         ]
       },
@@ -114,20 +130,20 @@
         "component": "node-portable",
         "exit_code": 0,
         "summary": [
-          "\u2139 tests 138",
-          "\u2139 pass 138",
-          "\u2139 fail 0",
-          "\u2139 skipped 0"
+          "ℹ tests 159",
+          "ℹ pass 159",
+          "ℹ fail 0",
+          "ℹ skipped 0"
         ]
       },
       {
         "component": "node-framing",
         "exit_code": 0,
         "summary": [
-          "\u2139 tests 9",
-          "\u2139 pass 9",
-          "\u2139 fail 0",
-          "\u2139 skipped 0"
+          "ℹ tests 9",
+          "ℹ pass 9",
+          "ℹ fail 0",
+          "ℹ skipped 0"
         ]
       },
       {
@@ -140,31 +156,49 @@
       }
     ],
     "repository_regression_totals": {
-      "python_discovered": 2362,
-      "python_skips": 10,
-      "node_counted_tests": 147,
+      "components": 15,
+      "python_discovered_including_packager": 2487,
+      "python_skips": 17,
+      "node_counted_tests": 168,
       "node_platform_separate_self_test": true
     },
-    "skip_qualification": "Six descent native-wire tests skipped in broad runner without explicit wire directory; all six passed separately within the 24-test fresh synthetic-wire suite. Four pre-existing skips remain.",
-    "source_binding": "All production and executable test bytes match the fresh regression snapshot; four documentation files changed after snapshot and publication metadata was regenerated afterward. Mixin snapshot subsequently differs only by matrix and publication metadata.",
-    "fixture_scope": "Existing synthetic crystal fixture generated only in disposable regression copy; no generated fixtures or raw trial evidence published",
-    "runtime_source_manifest_sha256": "3a8003993f31015e668e4bbcb98d0403b64e120c5bb2f9abfb623d0a65c02b47",
-    "runtime_artifact_sha256": "9a85846eb2ad73b2e18ea054b2d58d0034320bd3ac219d5146ccce2a41836bda",
+    "skip_qualification": "Broad native-wire tests without explicit generated wire directories are skipped; dedicated fresh local-route and descent serializer suites pass their original-byte consumers. Platform/legacy skips remain explicit.",
+    "retained_test_repairs": "Original failed runs preserved. Consume Action double gained only nullable scopedLocalSegment field. Descent source-relation slice now stops before the new sibling segment branch. Existing watchdog test publication race reproduced identically on baseline and combined source; test waits published paused state and separately verifies deterministic stale-publication safe daemon refusal. No production changes made for these test repairs.",
+    "source_binding": "Full final broad aggregate snapshots final runtime production and tests except the later independently reviewed delivery-only packager fix: exact two existing public binary assets now require path+SHA pins, with expanded tests and guide clarification. Focused packager four tests, nine call-example checks and deterministic full948-source in-memory bundling pass. Native production is unchanged; publication metadata regenerated afterward.",
+    "delivery": {
+      "mcp_tools": 12,
+      "owner_allowlisted_capabilities": 20,
+      "example_call_shapes": 9,
+      "default_reaction": "stop",
+      "explicit_defense": "same owner, explicit target and original reserves; ordinary task remains interrupted; no unknown retry"
+    },
     "public_runtime_inventory_separate": true,
-    "live_saved_acceptance": "T34 qualified original live and saved descent on its separately pinned runtime; original case comparator failure preserved, narrow additive source-derived geometry review accepted separately. T33 pre-Play abort, T32 automatic HOLD/manual closure and earlier qualifications remain.",
+    "new_live_acceptance": "NOT_RUN: combined local routes, explicit terminal defense and composed delivery workflow require their own final artifact and ordinary-world acceptance. Historical T17/T32/T34 qualifications are retained.",
     "limits": [
-      "No newly rebuilt integrated artifact deployed or live tested",
-      "Not a full Gradle/NeoForge build or general navigation acceptance",
-      "Synthetic engine readers and prescribed gravity recurrence are not live Minecraft physics",
-      "Client-observed evidence is not independent server confirmation or continuous trajectory proof",
-      "Unknown and HOLD outcomes preserved; no replay",
-      "Synthetic Windows platform checks do not validate Windows/PowerShell"
-    ]
+      "Offline synthetic readers and prescribed trajectories are not live Minecraft physics",
+      "Bytecode-only Mixin transformation is not full FML/NeoForge client startup",
+      "No newly combined artifact built, installed or live tested by this source verification",
+      "Client-observed evidence is not independent server confirmation",
+      "Synthetic Windows checks do not validate Windows/PowerShell",
+      "Unknown/HOLD originals preserved; no replay"
+    ],
+    "post_aggregate_delivery_fix": {
+      "package_tests": 4,
+      "call_shape_examples": 9,
+      "full_inventory_files": 948,
+      "deterministic_all_checksums_verified": true,
+      "test_jar": "Synthetic nonexecutable in-memory fixture only; not an artifact build",
+      "allowed_existing_assets": "Exact pinned Gradle wrapper JAR and mod icon PNG only; arbitrary or modified binaries/symlinks refused"
+    }
   },
+  "historical_verification_note": "Retained from the frozen source checkpoint; not a new complete regression on current source.",
   "excluded": [
-    "Private runtime receipts, logs, world coordinates, action and job identities, accounts and worlds",
-    "Credentials, built artifacts, dependencies and generated fixtures",
-    "Runtime-only version metadata and runtime source inventory"
+    "Credentials/accounts",
+    "private queues and journals",
+    "raw live logs and screenshots",
+    "world saves and player data",
+    "built mod JAR, dependencies and build caches",
+    "internal operational evidence paths and receipts"
   ],
   "files_scope": "All published files except this manifest and SOURCE_SHA256SUMS.txt",
   "files": [
@@ -174,9 +208,29 @@
       "sha256": "f49441a604bca9cb2c684cc6bbcf62b96f27cb25657ea5c736bd746db3248556"
     },
     {
+      "path": "BEE-BATCH-EQUIVALENCE-CONTRACT.md",
+      "bytes": 2462,
+      "sha256": "d6cee2850d8b721fc74c43efa0f0b3723db3177ffc80e821fce64b8ded9f88ac"
+    },
+    {
+      "path": "BEE-REFUSAL-DIAGNOSTIC-CONTRACT.md",
+      "bytes": 2852,
+      "sha256": "10faf504632dcac6f4190acb6c1dcff770102d8a1cfd29747997b21a9756b733"
+    },
+    {
       "path": "COORDINATION-INTEGRATION.md",
       "bytes": 4477,
       "sha256": "9fe8f3bbee307acaf4633986c003b5b7fef87f47ae4e1c5fa2b95370c639589f"
+    },
+    {
+      "path": "DEFENSE-CONTINUITY-CONTRACT.md",
+      "bytes": 7431,
+      "sha256": "188d2b374a49ad43d04dc5597030e643cf0a319581db98e8c744402a63749adc"
+    },
+    {
+      "path": "DEFENSE-STOP-PROOF-CONTRACT.md",
+      "bytes": 4854,
+      "sha256": "e81c0b4ce39c3aac3fad114510cb6800ff1de0b56bb3a52b7ac2eaf98a8ec1d6"
     },
     {
       "path": "NOTICE.md",
@@ -190,13 +244,43 @@
     },
     {
       "path": "README.md",
-      "bytes": 11805,
-      "sha256": "dfd74d04b2e44ce9ec17a732150a490f124c2257373ca9449412fa5aa8b04fb7"
+      "bytes": 14338,
+      "sha256": "320082d6f835d98c516d9e1030bf9e36045deb9fd2e5cf8e451f70cb92316c46"
+    },
+    {
+      "path": "ROUTE-BEE-CONTRACT.md",
+      "bytes": 3186,
+      "sha256": "a751bd574a94746cca500ea57a50b72ed11d163281864a473e82662a76b50c59"
+    },
+    {
+      "path": "ROUTE-BEE-V2-CONTRACT.md",
+      "bytes": 2730,
+      "sha256": "df0ca4f68c1ec7a58f0969d05fc7e49e080b3aa4f68df0f026582cef31c3734a"
+    },
+    {
+      "path": "ROUTE-SPATIAL-STOP-CONTRACT.md",
+      "bytes": 2624,
+      "sha256": "2ac2f48af56d2bd0bdb889f18e6062b7924995c3c8b529b5735a5785e745ecc4"
+    },
+    {
+      "path": "ROUTE-TERRAIN-EQUIVALENCE-CONTRACT.md",
+      "bytes": 2738,
+      "sha256": "c1c927dc0d6aebe3a5c3ed0c6425bae6aa63036df5b68e68e372bc6edf774ad4"
+    },
+    {
+      "path": "ROUTE-THREAT-REFUSAL-DIAGNOSTIC-CONTRACT.md",
+      "bytes": 4256,
+      "sha256": "ddea062b2e21ec5c9c4ae25f3bf185d3dee3951afb4c6fce469733949d6abf70"
     },
     {
       "path": "SOURCE-CHECKPOINT.md",
-      "bytes": 12525,
-      "sha256": "d3e517d72a0056dc9daadb063fe2e49443bf6a4681156ca8db601a66523fabb4"
+      "bytes": 14038,
+      "sha256": "ac6b934ed034a909d440ed8b1e0312219898b1dad1cfeda0ca205ac91e07f884"
+    },
+    {
+      "path": "SPATIAL-DEFENSE-CONTRACT.md",
+      "bytes": 6389,
+      "sha256": "30a0e7509bb9825ce318efb5fb73b89fb2af30659b5477022de20b9f57086379"
     },
     {
       "path": "building-controller/.gitignore",
@@ -360,8 +444,8 @@
     },
     {
       "path": "capability-runtime/README.md",
-      "bytes": 13472,
-      "sha256": "a974c443d7dc290cb66b6b331a2f2457c32a070ef57790ecf973f7f019b16954"
+      "bytes": 14346,
+      "sha256": "45c1113db9d311379e9ad8503da6840203b919f98f371245a6b979fa9ed9588f"
     },
     {
       "path": "capability-runtime/REQUEST-ONLY.md",
@@ -397,6 +481,11 @@
       "path": "capability-runtime/docs/MOB-RESOURCE-GOALS.md",
       "bytes": 2798,
       "sha256": "343be75eee36c3fcebd909313f6bfe74e9a9a7c41073fa5cf68f9627336cff40"
+    },
+    {
+      "path": "capability-runtime/docs/NAVIGATE-ROUTE-LOCAL.md",
+      "bytes": 7312,
+      "sha256": "669969b4c5e1b10724b8d040ce5d0a027a92e1e3c33ecc6b7295524b0ebe4a7e"
     },
     {
       "path": "capability-runtime/docs/NAVIGATE-STEP-DOWN.md",
@@ -470,8 +559,8 @@
     },
     {
       "path": "capability-runtime/mdc_skills/core.py",
-      "bytes": 83578,
-      "sha256": "447c8e7e22c96fe1864d8431be0cfdd1b1679f44ba40ea9d5584372ad83bde0a"
+      "bytes": 84551,
+      "sha256": "d66f49f513f40c97b430f17b9adccb0e8bf774caff6f667d6b5c80f33320b243"
     },
     {
       "path": "capability-runtime/mdc_skills/danger_policy.py",
@@ -569,6 +658,11 @@
       "sha256": "61ba97bd41d82afc03596bd38cbc42cf88f55beeb7c7fb77fe875ed2b7eb2b12"
     },
     {
+      "path": "capability-runtime/mdc_skills/scoped_route_local.py",
+      "bytes": 26754,
+      "sha256": "39a17fea8c8083273d246d3bdb2992b441262e87f5bfc4d0607a42c3ff94f0b6"
+    },
+    {
       "path": "capability-runtime/mdc_skills/scoped_step_down.py",
       "bytes": 4593,
       "sha256": "82b8db625bbb5a21b942f65167364b9a277b2732d43fb7b30b46ef9aaf351998"
@@ -630,8 +724,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/mobility.py",
-      "bytes": 7895,
-      "sha256": "1d93621d17a17c9e22c7344276fc5610306b835ebe0fa038b0802a8b206953d5"
+      "bytes": 10227,
+      "sha256": "a36b1f5f5d81b63291804d24e66c5b6605066095577ec98255831f6c06f6149f"
     },
     {
       "path": "capability-runtime/mdc_toolbox/bindings/production.py",
@@ -660,13 +754,18 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/contracts.py",
-      "bytes": 12838,
-      "sha256": "588a7f4fdfb7fe42e9a61bb467a6eb9b528c5322bc45f1127b69297ee539fc18"
+      "bytes": 13415,
+      "sha256": "8445a33626c60b320357633afcbd6bb426ee601ffa65c8a7e9c1e8fee3e668cd"
     },
     {
       "path": "capability-runtime/mdc_toolbox/control.py",
       "bytes": 2634,
       "sha256": "441fccaf51c89928cd97940034fdc2e2ec13b4d961628981a7fda432443416fa"
+    },
+    {
+      "path": "capability-runtime/mdc_toolbox/defend_once.py",
+      "bytes": 8403,
+      "sha256": "ef2c45a587c37804658e4b204f9ac72535ab381107c4faa63387aa32efc42174"
     },
     {
       "path": "capability-runtime/mdc_toolbox/jobs.py",
@@ -675,8 +774,8 @@
     },
     {
       "path": "capability-runtime/mdc_toolbox/runtime_adapter.py",
-      "bytes": 21966,
-      "sha256": "b3ce0866b9749c21aa45cc54099d875d6f91b5135e6423186d8ed4832aede95f"
+      "bytes": 24426,
+      "sha256": "f37aa4ba9e8a11983fc7d26693294314a9512f1ae9ed3e7901fb950bcd6c8edc"
     },
     {
       "path": "capability-runtime/mdc_toolbox/serialization.py",
@@ -699,9 +798,14 @@
       "sha256": "ea203801b9dd8eda10fb42839d40d790dea816c442b180a954c753ef4e04742f"
     },
     {
+      "path": "capability-runtime/mdc_toolbox/terminal_defense.py",
+      "bytes": 4118,
+      "sha256": "80bef24b2b7aaa0a103cd48bce39b8d35c32941895f50304b82eabeacdf6d514"
+    },
+    {
       "path": "capability-runtime/run_checks.py",
-      "bytes": 3050,
-      "sha256": "ee5ed3bb23caea3cdf5ec327a2818403f0d924a52e74f7c6b46094b7f0debada"
+      "bytes": 3398,
+      "sha256": "21d22ab9fccbd960cfd12e6a75746a3598a3032511e278977c67ad66274dd387"
     },
     {
       "path": "capability-runtime/schemas/building-v3.schema.json",
@@ -710,8 +814,13 @@
     },
     {
       "path": "capability-runtime/schemas/toolbox-v1.schema.json",
-      "bytes": 25865,
-      "sha256": "6c5f406ad82f75da30908911a84f5c36de3ea53622be2b27e1577215c52cabd2"
+      "bytes": 32983,
+      "sha256": "59425816ffca43ea8c9147ad6f14139eee8b363ae10624bdbd48905cb92eae08"
+    },
+    {
+      "path": "capability-runtime/tests/bee_diagnostic_fixture.py",
+      "bytes": 2476,
+      "sha256": "91319fbe570b4ecc73608086381243d06f48f010af73e0c406db67c473315f59"
     },
     {
       "path": "capability-runtime/tests/fixtures/generate_crystal_worlds.py",
@@ -722,6 +831,11 @@
       "path": "capability-runtime/tests/fixtures/native-capability-terrain-pages.json",
       "bytes": 556007,
       "sha256": "2ce01c5303eb0c9c8ba4e142b906b15fec3130fd0845a4b1360e1e14b1366586"
+    },
+    {
+      "path": "capability-runtime/tests/local_segment_fixture.py",
+      "bytes": 4602,
+      "sha256": "051799fc93125807593cf2bbd2cf62250e87582674b98a322f8f3cfca06e9fc2"
     },
     {
       "path": "capability-runtime/tests/mining_collect/PROVENANCE.sha256",
@@ -849,6 +963,31 @@
       "sha256": "80afd259557fcf6b68b50b51f336d04d8aa304724136e51558555030ae7a9813"
     },
     {
+      "path": "capability-runtime/tests/route_terrain_fixture.py",
+      "bytes": 2220,
+      "sha256": "6b88fb1ecb97b2390928c1a2ece9caf0dc8cd7063ba6941916d5285871b4bdbc"
+    },
+    {
+      "path": "capability-runtime/tests/route_threat_diagnostic_fixture.py",
+      "bytes": 1600,
+      "sha256": "1c758070e68d6cbb1441c3ce758a7bc2d72991b593777a5d15944ce98e2db244"
+    },
+    {
+      "path": "capability-runtime/tests/spatial_stop_fixture.py",
+      "bytes": 5191,
+      "sha256": "dc665f8ebf69198540d52e1d3bf57a11da1147579c0295eabae8d2d3191b204a"
+    },
+    {
+      "path": "capability-runtime/tests/spatial_stop_v2_fixture.py",
+      "bytes": 3376,
+      "sha256": "6ae663ede9f8e7f43357ce70333c6180a20c7cff7cd3862ae007d9fa9ffa53ed"
+    },
+    {
+      "path": "capability-runtime/tests/spatial_threat_fixture.py",
+      "bytes": 7208,
+      "sha256": "13068cf2de4e81fb0424b2d06fb49227f238174b3052b7d6adf566e994dc80cb"
+    },
+    {
       "path": "capability-runtime/tests/step_down_fixture.py",
       "bytes": 3916,
       "sha256": "55f056b3a0e821690650f45d51edc3fdc4669e5d67080df80ff46e8e9e4b159f"
@@ -867,6 +1006,16 @@
       "path": "capability-runtime/tests/test_ambient_building.py",
       "bytes": 7702,
       "sha256": "13f5d897c580e4644f4cfac7a828fe5069ec85fbf4774582db6e46a1170ea207"
+    },
+    {
+      "path": "capability-runtime/tests/test_bee_batch_native_wire.py",
+      "bytes": 3119,
+      "sha256": "4c91e6ff31d767a69a811c15d568b2dd86d27574def54e78f8b7c106bc56704c"
+    },
+    {
+      "path": "capability-runtime/tests/test_bee_diagnostic_frontdoor.py",
+      "bytes": 2893,
+      "sha256": "0ce2af69bb7220fa3331e0f0756ce66a4162dcdc61a42c46ee01fd268cedb386"
     },
     {
       "path": "capability-runtime/tests/test_building_budget.py",
@@ -939,6 +1088,16 @@
       "sha256": "36539239eab6b02e193448bbea6f986b11f84b76707af91b3e2b1aef0757f19a"
     },
     {
+      "path": "capability-runtime/tests/test_defend_once_frontdoor.py",
+      "bytes": 6767,
+      "sha256": "cc2a6ed81a2fdab3d1c0250402f8807ba8519067a6fe01dc26f951da7eef6261"
+    },
+    {
+      "path": "capability-runtime/tests/test_defense_late_stop.py",
+      "bytes": 4508,
+      "sha256": "a7ad65515365ea259f1c29b832a18223c0fd360aa35f1b667eaf5df2e4ffbdad"
+    },
+    {
       "path": "capability-runtime/tests/test_delayed_dimension_transition.py",
       "bytes": 9408,
       "sha256": "5ca3cb25761cf1ddab820c9b718c9efa79b7d589b76a1226a1074d57639880e2"
@@ -959,6 +1118,16 @@
       "sha256": "13b93c71d4781c249c2489d9f03c455d8bb21dcf4cbbfb56e9e75b9eb8d163a9"
     },
     {
+      "path": "capability-runtime/tests/test_intent_mailbox_scan_race.py",
+      "bytes": 13572,
+      "sha256": "62125527e232bab3e56105cb7b859fbd69a7e6fb11f9cc16c09ad103b5e58a91"
+    },
+    {
+      "path": "capability-runtime/tests/test_local_segment_native_wire.py",
+      "bytes": 8823,
+      "sha256": "a31b18186250215a625b060a223cb42bc33cc3b1023ed067bb86edcc1862c04f"
+    },
+    {
       "path": "capability-runtime/tests/test_mobility.py",
       "bytes": 8437,
       "sha256": "3a8612d1d0e89ce013f4aec0139ff906624f460546d77d2f43a219d6b03e146a"
@@ -975,8 +1144,8 @@
     },
     {
       "path": "capability-runtime/tests/test_noncombat_watchdog.py",
-      "bytes": 21493,
-      "sha256": "412b188bd4fd1c62e4d696ff8095b1f196f0a493878a1098208955f1da03f776"
+      "bytes": 24629,
+      "sha256": "4893e6f5fd37cbded42a398c648cc735e12f6809e59e8a9c2a90abf4feb104f4"
     },
     {
       "path": "capability-runtime/tests/test_observation_latency_adapter.py",
@@ -1014,6 +1183,81 @@
       "sha256": "7ac50168b3d0182a46bc1f3d93190ef957905fbd59cd7885999a2bdc544200ad"
     },
     {
+      "path": "capability-runtime/tests/test_route_bee_contract.py",
+      "bytes": 21082,
+      "sha256": "9fc39508e1f7ce653ac616d8adcce85862508e69d9bf8182c570b0fcb0ab51ea"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_bee_diagnostic.py",
+      "bytes": 21691,
+      "sha256": "c1e1d433a465613066f094c4949a578a11ae001106fc022e635f6c85385db21e"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_bee_native_wire.py",
+      "bytes": 14367,
+      "sha256": "0d1fcb99b18a7061d34bfdb567e06c6c83e66f5e6c48b6352d4c2b877a7cbd22"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_defend_once_frontdoor.py",
+      "bytes": 8442,
+      "sha256": "ae0a2f0c9428d3459b4d1d3e4752af8a1375201b1b3d9d4301ff1ae424037110"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_local_contract.py",
+      "bytes": 8535,
+      "sha256": "9b9b9cf3e7bffbd8436d81269dfbd87ed5dc47c73324b238a3b9a038daf74d85"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_local_frontdoor.py",
+      "bytes": 22035,
+      "sha256": "1dc90bc6553bd573134228e5dc6c85c0011251168b43a460cd03e8f02afa56d3"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_local_planner.py",
+      "bytes": 28158,
+      "sha256": "05400b2f7e05a935d73577c4d9d72f4d0844bd3f3cb223ca5797a8a7b07bcdcd"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_spatial_stop_contract.py",
+      "bytes": 21314,
+      "sha256": "5902acaff8e15b8d49999de03cfb2a6943d658881e4cfe62ebef3f756786b6a6"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_spatial_stop_native_wire.py",
+      "bytes": 9242,
+      "sha256": "c80537aa7da8fbc937f8676bd155adc1f395caf31c69337d6cebd26e01f3c3ac"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_stop_only_preplanning.py",
+      "bytes": 12258,
+      "sha256": "ca41744fb6f4302f7c4929d0068eb690bcc5d2e5af09f0491e5c110ad488813f"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_survey_acquisition.py",
+      "bytes": 10449,
+      "sha256": "a64f63e302b3a0dfa90c278d313cc57e34f87b81ea3afb8a6936599d843f621f"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_terrain_diagnostic.py",
+      "bytes": 13387,
+      "sha256": "a8e5464dbe838b5aad3391ee6a7fcf5a4f7f3cdc06565151228523da703ebed5"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_terrain_native_wire.py",
+      "bytes": 11308,
+      "sha256": "37bae8123fe83b3da6ffc19ff831165ff49dafcecbcdc624cdee019a7c74bebe"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_threat_diagnostic.py",
+      "bytes": 19428,
+      "sha256": "88b86c60f2a1c718166e51fcb50b4ca8512736019c9aa024fab21a8d17d6a34b"
+    },
+    {
+      "path": "capability-runtime/tests/test_route_threat_diagnostic_frontdoor.py",
+      "bytes": 7795,
+      "sha256": "aecb0186354d0213d06037a1acf97df98a8f3aa5fcd993c910aff0f22eda523a"
+    },
+    {
       "path": "capability-runtime/tests/test_runtime_ownership.py",
       "bytes": 6607,
       "sha256": "6b9203bcc424c0bb04915f70143adf18e0efa103b59b174cff841bd30f5a1c52"
@@ -1037,6 +1281,36 @@
       "path": "capability-runtime/tests/test_sheltered_enderman_los.py",
       "bytes": 28200,
       "sha256": "36fa014a4401c787811640dfae144ce08bdd4b28e4857841a0374017a23cd618"
+    },
+    {
+      "path": "capability-runtime/tests/test_spatial_defense_frontdoor.py",
+      "bytes": 17059,
+      "sha256": "9491b8baf8a4e6225ee752ea3ea467153f302af4ca7acf553d501eb962812093"
+    },
+    {
+      "path": "capability-runtime/tests/test_spatial_stop_failure_contract.py",
+      "bytes": 13684,
+      "sha256": "df706c00eabd2da89b4d6d8be19afad114bd35a4ca6225833041ef9923646560"
+    },
+    {
+      "path": "capability-runtime/tests/test_spatial_stop_failure_frontdoor.py",
+      "bytes": 6111,
+      "sha256": "71a8dd280bafe3f92cc6cb6d0dda2692d6e948b7b2577642352c8b702d810b13"
+    },
+    {
+      "path": "capability-runtime/tests/test_spatial_stop_frontdoor.py",
+      "bytes": 8215,
+      "sha256": "86cffa6d1e8fec9a48f29cc402a34caa09a4df543911fea256859c7ee5e63b27"
+    },
+    {
+      "path": "capability-runtime/tests/test_spatial_stop_v2_frontdoor.py",
+      "bytes": 10242,
+      "sha256": "42390264f8bcde97193c0bcdd223d02f5ec6815e1c194e02626bb0d4aaf087d6"
+    },
+    {
+      "path": "capability-runtime/tests/test_spatial_threat_contract.py",
+      "bytes": 25237,
+      "sha256": "e39c1384a66068fac7fc36f601eb4df4c36efb44c4338978ad12d4ab2384a95c"
     },
     {
       "path": "capability-runtime/tests/test_step_down_contract.py",
@@ -1074,6 +1348,11 @@
       "sha256": "db47058c321c9b95f54f1fa3829527225fa17f5defb65db0958f3ee26b6fd9dd"
     },
     {
+      "path": "capability-runtime/tests/toolbox/test_defend_once_adapter.py",
+      "bytes": 11333,
+      "sha256": "a3ab98e6aea684ac3e64d0f3fa298ee31b9a23edbd867eb5ed535024c3f3a793"
+    },
+    {
       "path": "capability-runtime/tests/toolbox/test_facade.py",
       "bytes": 11184,
       "sha256": "8c822800b21c16dc565a314f0b850fecbbbc8c6fb2f6c325904504ff476a314b"
@@ -1082,6 +1361,16 @@
       "path": "capability-runtime/tests/toolbox/test_p5_tactical_dimensions.py",
       "bytes": 23035,
       "sha256": "558533dc2001b4c2d0b78d0ebe2fd5080d79af75c00b971783c220974b68ef44"
+    },
+    {
+      "path": "capability-runtime/tests/toolbox/test_spatial_terminal_defense.py",
+      "bytes": 1643,
+      "sha256": "2be3376e2d044ef486864000cc2463077fcb46f5f9aa8b67971ec13f08f260ef"
+    },
+    {
+      "path": "capability-runtime/tests/toolbox/test_terminal_defense.py",
+      "bytes": 4839,
+      "sha256": "2a68df0a8beb86b7ca8e83afbe0d6e6c4a0f639de208006d4100fc95f6567d92"
     },
     {
       "path": "client-mod/.gitignore",
@@ -1110,8 +1399,8 @@
     },
     {
       "path": "client-mod/build.gradle",
-      "bytes": 4878,
-      "sha256": "f30a90215b39b11cf08e9275545ea38c8fb6a54f70994c3f3bbb7b9585c287fe"
+      "bytes": 4950,
+      "sha256": "ee7d5f0d42d5f2d4ca65e085dd44ab02351f430d01cf2053bdd048f03c879db8"
     },
     {
       "path": "client-mod/docs/capability-actions.md",
@@ -1279,11 +1568,6 @@
       "sha256": "0322b26903d890aafa885741cadd7e7a598b566079e169c4dd14f67abb08dfd8"
     },
     {
-      "path": "client-mod/gradle.properties",
-      "bytes": 416,
-      "sha256": "f49ba38b5c6269fb7073e7254f558ab4865ad7a75f5e4a3a0d69961c3e8460f1"
-    },
-    {
       "path": "client-mod/gradle/wrapper/LICENSE",
       "bytes": 10174,
       "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
@@ -1297,6 +1581,11 @@
       "path": "client-mod/gradle/wrapper/gradle-wrapper.properties",
       "bytes": 253,
       "sha256": "7e0821d895908883350587c74476b717016ab416320c44dc82a10def916c6fb5"
+    },
+    {
+      "path": "client-mod/gradle.properties",
+      "bytes": 416,
+      "sha256": "f49ba38b5c6269fb7073e7254f558ab4865ad7a75f5e4a3a0d69961c3e8460f1"
     },
     {
       "path": "client-mod/gradlew",
@@ -1325,8 +1614,8 @@
     },
     {
       "path": "client-mod/mcp/README.md",
-      "bytes": 7531,
-      "sha256": "862f2020fca995d4c599e67c4e5f5f9f34bc6c8340d9a766dbbb74a08c79af19"
+      "bytes": 8370,
+      "sha256": "47b8c0aa402d9e6fcefff5e504a4d8b0970123d3df1035e90fcf3975fcb7fad0"
     },
     {
       "path": "client-mod/mcp/boat-transfer-test.mjs",
@@ -1342,6 +1631,11 @@
       "path": "client-mod/mcp/client-action.mjs",
       "bytes": 13937,
       "sha256": "74bed80529a5b0eeef5ca220a103af11ac918ba950efcff0b0e89fdbebfbe9b0"
+    },
+    {
+      "path": "client-mod/mcp/defend-once-test.mjs",
+      "bytes": 2178,
+      "sha256": "2d28d00e350a092f5266f04ff317d12e786778ad256afb72ddbbbf7b870e0014"
     },
     {
       "path": "client-mod/mcp/encounter-contract-test.mjs",
@@ -1375,8 +1669,8 @@
     },
     {
       "path": "client-mod/mcp/package.json",
-      "bytes": 662,
-      "sha256": "b5ed8572c148d2370d3af7791e6d3011063c5deff852a6ece0df107b813bf557"
+      "bytes": 851,
+      "sha256": "6c6db1189891a2c21492fe2d40939e8ad20f30a5aebd65493b21177c648deca5"
     },
     {
       "path": "client-mod/mcp/self-test-platform.mjs",
@@ -1425,8 +1719,8 @@
     },
     {
       "path": "client-mod/mcp/toolbox-schema-test.mjs",
-      "bytes": 5455,
-      "sha256": "479f26940e314e2aed902480f04f1e2bf3c063f40f419d6b3ade9f08b822b374"
+      "bytes": 6101,
+      "sha256": "90d9273a58809b1612a0074ae49011d6285e69b20a839ebe24c269bd6bbe1282"
     },
     {
       "path": "client-mod/mcp/toolbox-test.mjs",
@@ -1435,8 +1729,8 @@
     },
     {
       "path": "client-mod/mcp/toolbox.mjs",
-      "bytes": 28833,
-      "sha256": "be8eb10880852a3f6adf2eda9f4b5d01c012c252f84b0135bd38106c0f838d26"
+      "bytes": 30627,
+      "sha256": "17f81abc5b743a5ec7fc20854bdc4bec2376c2d564e26c0e5077c1f111e41d14"
     },
     {
       "path": "client-mod/scripts/audit-terrain-source.py",
@@ -1545,8 +1839,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombat.java",
-      "bytes": 58993,
-      "sha256": "bbe08a92fdcaab0e41f680899ed1a81ef9891b5634d9d4fc4854c5e357f1e9d3"
+      "bytes": 70715,
+      "sha256": "0cf30f208b01debc5041aa1b9a98fb23e80a2bdc15bb04a96f9d67a3e3d50cfe"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BoundedCombatRequest.java",
@@ -1575,8 +1869,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeJson.java",
-      "bytes": 8897,
-      "sha256": "cb5300695973d2f1615d63cb22f9c08db7d96ecf9e400052de69abff65938128"
+      "bytes": 12080,
+      "sha256": "31281dd6a07cb071f230c4425bda9ad40b5d670c6ebd25f10fd9b639791792a4"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeLog.java",
@@ -1595,8 +1889,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
-      "bytes": 154809,
-      "sha256": "ae49e2030c5c1d84cd7e062a849351cee1b401916a63a127f91cbd4917f66bed"
+      "bytes": 155150,
+      "sha256": "19194221eb6504d603b897ef9cc21364c3485bece697e0c16454ef347dacf5b0"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityCombatSafety.java",
@@ -1670,13 +1964,13 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
-      "bytes": 10086,
-      "sha256": "6ed383e7f698acaf0c09b56f01b21de23633f9bac702107db705777f0cdbc912"
+      "bytes": 11525,
+      "sha256": "6278ff13b5cfce745c36c67db645681b0161fccf2575960224abcf0528b96a51"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
-      "bytes": 84754,
-      "sha256": "5f5d7f5a23a71fc7039e5dbdecc9fa1c58ded3b7a5a3971f7b8b9f495af99bdf"
+      "bytes": 90504,
+      "sha256": "82d40c59befbe1248d0a09f7fd4b7a2104bf085db5286c6cb9e21d5be0afb36a"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientInputIsolation.java",
@@ -1700,8 +1994,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatHealthEvidence.java",
-      "bytes": 4777,
-      "sha256": "b342a631dbc0bd6e0fc19f1f7430fe97c62053505a6d7424afea9c804325ee66"
+      "bytes": 6835,
+      "sha256": "ecaedd68e0cde4f2dbff0e2a8c9515d9e0ae6f3af9f55cc192fac56b02a5ee00"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatInitialEvidence.java",
@@ -1730,8 +2024,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRetreatPolicy.java",
-      "bytes": 14832,
-      "sha256": "5a7be17f7281d8bff05f5e39229f7de7b26d89cb20192f0e17b9c98b3a8a2aef"
+      "bytes": 15475,
+      "sha256": "779add3d3c025b1be3982a0f2bfd4a2b97951929a86bd68d43d387909f3ce248"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatRetreatWindow.java",
@@ -1760,8 +2054,8 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CombatThreats.java",
-      "bytes": 24070,
-      "sha256": "dac788ad8b5f3c805f2ad2470aaa8b3f7797446802afd7df671f8cb0e1f1bcc5"
+      "bytes": 31363,
+      "sha256": "a6a28c0fdbb9f6cd4c6b8ce12a2024940456e46cb90cb0773e413bd1f7fd7735"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CoordinationStepGuard.java",
@@ -1879,14 +2173,19 @@
       "sha256": "a0f4b136dc68db7868f7be3f00425e428a235d01c1b2cde31cb1831d21bd0e11"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeBeeRouteObservation.java",
+      "bytes": 2710,
+      "sha256": "701123c47b70ec59d4784bd6ca9ee469f151a1e06669b663eef7efbd9255c80a"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeLivingObservation.java",
-      "bytes": 7659,
-      "sha256": "bb35806272f87c29a7ad8be5e2dd6846322be992019d5919e111d729cb292cdd"
+      "bytes": 8774,
+      "sha256": "90e1462900e27e6b5d2c69f7ee87cd26ecc7b05b495d978e520e827abbbaf176"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeLivingSnapshot.java",
-      "bytes": 6694,
-      "sha256": "78e5a1408a312776e8435ed4fcd2188a76b6c8e7dbf361b8f2a1104a9a1eb71a"
+      "bytes": 11216,
+      "sha256": "df34387b78a048ac23afa5b25115d50d2dc97ce2eee950da1f985fdbb677ffc1"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeRabbitObservation.java",
@@ -1944,6 +2243,26 @@
       "sha256": "8c3b54bbee5b8841c0365d9a57ad4937aa51a35992e84e5ca2df7685fdd3907e"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/RouteBeeDiagnostics.java",
+      "bytes": 7244,
+      "sha256": "7ba366f0ee7e0224fda0f0aa18413a91b0dc767a0f5aad7d9b716abd908d0967"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/RouteEntityDiagnostics.java",
+      "bytes": 4586,
+      "sha256": "ac2c1dd0c96d5aecda41b409493524ef7bfbcc88f2bd99f2f942a96ab83c6c0e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/RouteTerrainDiagnostics.java",
+      "bytes": 3787,
+      "sha256": "f9b3f688cf9b0349ad957c409acd0852a37ac93d321031d9b9483274012ac17f"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/RouteThreatDiagnostics.java",
+      "bytes": 8226,
+      "sha256": "129c84a115652a8c136312e08ecf09c49b57eb0a0b17f6e4d763b56d52067b79"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedBlockMenuDispatch.java",
       "bytes": 678,
       "sha256": "48adec5e813764505a5700f2f51a0b1d241446b037dafe306c887434a28aae72"
@@ -1979,6 +2298,21 @@
       "sha256": "4f03c0604b0250ef81e5e0bfeeec83dacde12e10e19e97ae5b12cf11f77a9774"
     },
     {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedLocalSegmentDispatch.java",
+      "bytes": 2205,
+      "sha256": "27c94dbb147fb6dd5d6cadf5d9eddf72d7d658e365e292d046e3835db20341b9"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedLocalSegmentMovement.java",
+      "bytes": 50791,
+      "sha256": "b4aa6476be4154fa6fd21f8adee5cc7634bc3e9df1261199022ce30cc7fb9c49"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedLocalSegmentPolicy.java",
+      "bytes": 5933,
+      "sha256": "e8aa17b1b5606521804070c39aa029abaf5d28c53119c3905e075248e41246c1"
+    },
+    {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMining.java",
       "bytes": 30901,
       "sha256": "6bed6d84f2d607bb53c7e9f6668c7f219879f6fe1a5b33500f6d76aa4075d808"
@@ -2005,13 +2339,13 @@
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedMovementWire.java",
-      "bytes": 5108,
-      "sha256": "881b3a7fd71cf73ccfcf9508b132b1294c1fec10b4db12f056c97b1bd7af4c27"
+      "bytes": 6361,
+      "sha256": "0cbc4d759bf0e75b9ee3bef3bee5955ddd09d2876fc87515543a68434cf8fcdd"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedNativePreflight.java",
-      "bytes": 30403,
-      "sha256": "ec7a180327015e0c14d4df47743b2de235582a34512659a1e40e389035c02c40"
+      "bytes": 32676,
+      "sha256": "468ee781bf3fda30f51e04a9dc33bc6030c32de8c4dd190b5f9e1bbd7c08eca1"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacement.java",
@@ -2027,6 +2361,36 @@
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedPlacementIntent.java",
       "bytes": 3679,
       "sha256": "367ff5bc65dfef8e3d22c0f6666e12c61145249705e5440f22246f3b419ca641"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedRetreatPlanning.java",
+      "bytes": 5059,
+      "sha256": "31ee657e91af1c83d90710e1f3c1c53c2eda2991f7c154ab80ed557f927256d5"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedRouteBeePolicy.java",
+      "bytes": 4246,
+      "sha256": "d33d1cc42c8c935b88c85907f39177b61b47aadc59c28d2568a6213b78083664"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedRouteStopEntities.java",
+      "bytes": 16757,
+      "sha256": "56d371bebd53e81e3c2c747daecd4aaa846a5ba7a4a362244a7a18e3068bd609"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedRouteStopPolicy.java",
+      "bytes": 8054,
+      "sha256": "da51ab0cfcf71ebe1da8f64ebc0c086407457df6ab6e80f93b64c7ddc0ed86e4"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedRouteThreatEntities.java",
+      "bytes": 11666,
+      "sha256": "25344c642039c12e826e4a0856e2b9169b7335d191dd3ad50955dcf22917f861"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedRouteThreatPolicy.java",
+      "bytes": 13248,
+      "sha256": "93442408ce2a8a5512079ebee66abf7b0d1c09f2770dc103e5f819c42fb89509"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedStepDownMovement.java",
@@ -2092,6 +2456,11 @@
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/WorldSelectionSnapshot.java",
       "bytes": 13161,
       "sha256": "8e625bd7c63b0a19816173cf45b55db53c7db21a64c5ceacda91a170ee136641"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/EntityLocalSegmentMixin.java",
+      "bytes": 954,
+      "sha256": "bc6caac0e164b4e133a38e8ffe426a12cfbfeaf9d7f5ffdfa111f68e000a974c"
     },
     {
       "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/mixin/EntityMovementBudgetMixin.java",
@@ -2165,8 +2534,8 @@
     },
     {
       "path": "client-mod/src/main/resources/mineclient_bridge.mixins.json",
-      "bytes": 612,
-      "sha256": "c75a74c507da5837847858bf3cde9243145639d4cb93b47599367705f049e40f"
+      "bytes": 643,
+      "sha256": "12d9bbf7b9ff2969294d4a34f05acf678eba946b785387f7c6094a617502b523"
     },
     {
       "path": "client-mod/src/main/resources/mineclient_bridge.png",
@@ -2609,6 +2978,11 @@
       "sha256": "ab0feb7439dbe59a146487f3acd58397532e6e029ef5f3b9e0ae05d4c953abe3"
     },
     {
+      "path": "client-mod/src/test/java/io/github/campione01/mineclientbridge/ScopedLocalSegmentLoaderTest.java",
+      "bytes": 3334,
+      "sha256": "5bf19581279991039927fefede8a05b12fde376dacb992dd262ecd0685e01eca"
+    },
+    {
       "path": "client-mod/src/test/java/io/github/campione01/mineclientbridge/SprintKeyStateTest.java",
       "bytes": 2550,
       "sha256": "cadfe335aadde65fccd76d0c00cc73e52d59b156dee7f7e51c37e5bf2499d1a5"
@@ -2660,8 +3034,8 @@
     },
     {
       "path": "client-mod/src/test/resources/movement-budget-loader.mixins.json",
-      "bytes": 222,
-      "sha256": "d3bc059d377c364e4e39a2eb840861dd7391326867f044ed1ba366108efb2c00"
+      "bytes": 249,
+      "sha256": "2cfb11dfbc338c92ca3baa56d3f5fe6f38aa0013327ce7acc9c7f1cdadb90c6b"
     },
     {
       "path": "client-mod/validation/block-menu-diagnostics/BlockMenuDiagnosticsChecks.java",
@@ -2725,8 +3099,8 @@
     },
     {
       "path": "client-mod/validation/consolidation/java/ConsumeCompletionChecks.java",
-      "bytes": 19495,
-      "sha256": "5a8a1e5e130f4186b4d98f064b31df35fa97eed2ad8d5053657ed7c710ee694f"
+      "bytes": 19548,
+      "sha256": "b67d0878c19cbc4ac9b6ee2b91037f59b67dfa6029cccd09f7f5c24b42557548"
     },
     {
       "path": "client-mod/validation/consolidation/java/FurnaceBlockMenuWire.java",
@@ -2812,6 +3186,61 @@
       "path": "client-mod/validation/container-adapter/src/net/minecraft/world/level/block/ShulkerBoxBlock.java",
       "bytes": 79,
       "sha256": "f403eb94f495f08c09e43f0d7bc6382ddd02487804d7641ed82270b1cb27b581"
+    },
+    {
+      "path": "client-mod/validation/defense-continuity/HealthRecoveryChecks.java",
+      "bytes": 13293,
+      "sha256": "ad1ea969e4c40f4a963e76128c2700cf4309591845ac46fd8f507f673ecb839b"
+    },
+    {
+      "path": "client-mod/validation/defense-continuity/HealthRecoveryControllerChecks.java",
+      "bytes": 15773,
+      "sha256": "79d16a9524228bea484b2dc43b73a4e7e850466a2d48c1ec482eae3c65f0adbf"
+    },
+    {
+      "path": "client-mod/validation/local-segment/LocalSegmentEngineChecks.java",
+      "bytes": 16024,
+      "sha256": "2221f752cc74844f8ca44235f604806d7a7d92ba848d2fcdcd3832694f70b6f0"
+    },
+    {
+      "path": "client-mod/validation/local-segment/LocalSegmentWireProducer.java",
+      "bytes": 7417,
+      "sha256": "87d5841c36c6d5c5e7f561bc738b41c7485df30df392ef7bdf6afe728b76509b"
+    },
+    {
+      "path": "client-mod/validation/local-segment/README.md",
+      "bytes": 6212,
+      "sha256": "3f228cf4b3312f5c23cfb5465c520c128ad37c04b4bd6dae99af2845f4c3a3a8"
+    },
+    {
+      "path": "client-mod/validation/local-segment/check_source_relation.py",
+      "bytes": 2938,
+      "sha256": "aa03234f3e11fc3d7d3e75914fa983dad698f035146cdc5ec0c6d4ef650b71f1"
+    },
+    {
+      "path": "client-mod/validation/local-segment/prepare_engine.py",
+      "bytes": 9349,
+      "sha256": "e7fc7d6c51b2cffdef3d80e1236706efe463051f18a2a7d0cdd847f2a346021c"
+    },
+    {
+      "path": "client-mod/validation/local-segment/run_all.py",
+      "bytes": 3311,
+      "sha256": "40b62a1718d9a74ba5cc54526ad963c161eaa33de2c1fb360077a5ccc40142ac"
+    },
+    {
+      "path": "client-mod/validation/local-segment/run_engine.py",
+      "bytes": 4263,
+      "sha256": "417f391315643275ac3d0e7ede59387d15f0879617e5a1d4985e2e0299c7beb0"
+    },
+    {
+      "path": "client-mod/validation/local-segment/run_native.py",
+      "bytes": 3212,
+      "sha256": "5373a323fdf70906d7e117da97dd566e5a9d9353a118d91555b669738cc700b6"
+    },
+    {
+      "path": "client-mod/validation/local-segment/runner_common.py",
+      "bytes": 1752,
+      "sha256": "9e4dab58682fb53d62dc53eec5db0dd69cf85ed78895ad95d49aa1872524a978"
     },
     {
       "path": "client-mod/validation/mcp-native-contract/.gitignore",
@@ -2994,6 +3423,101 @@
       "sha256": "0bcd20d43b6e57e7e47df50307f4119d1a511b1b9c152e4bfb28d86850a753bd"
     },
     {
+      "path": "client-mod/validation/route-bee/BeePositionPinnedProbe.java",
+      "bytes": 2610,
+      "sha256": "155cc48a5d4f1d15ec5cc4f913ccd9f4d1579ee952f2ff9059c13d1cadb2ac15"
+    },
+    {
+      "path": "client-mod/validation/route-bee/MECHANICS-AUDIT.md",
+      "bytes": 12110,
+      "sha256": "14b71029f20047c3652ddb94605f5c0c4bf1a2d1cce1deb486b9f34186e71dff"
+    },
+    {
+      "path": "client-mod/validation/route-bee/audit_readers.py",
+      "bytes": 6194,
+      "sha256": "7fae1fd6847cfae952ade3ad032de37cd513cc286e4e9a1df7067ac42e7b6657"
+    },
+    {
+      "path": "client-mod/validation/route-stop/BeeBatchEquivalenceEngineChecks.java",
+      "bytes": 18242,
+      "sha256": "6ed05977ca48effc5a3f3459ca4ec77d141b8d6db3892c6a0a6474e37986fa97"
+    },
+    {
+      "path": "client-mod/validation/route-stop/BeeDiagnosticEngineChecks.java",
+      "bytes": 9166,
+      "sha256": "803fb2d348d4352d52a3fd010a2bd6384e27cf9a95ebfbe3f9ad9cd6d545cd9a"
+    },
+    {
+      "path": "client-mod/validation/route-stop/BeeDiagnosticWireProducer.java",
+      "bytes": 1568,
+      "sha256": "5a1d1575a0081be00ca34d72088e485da8d52c0bf5fa52ad808f6274aad3e7ed"
+    },
+    {
+      "path": "client-mod/validation/route-stop/BeeRouteEngineChecks.java",
+      "bytes": 12839,
+      "sha256": "869fa401d087b650b8bfeaa6b2c7db57b76d709336257e73648afa4513b4b2a3"
+    },
+    {
+      "path": "client-mod/validation/route-stop/MECHANICS-AUDIT.md",
+      "bytes": 7649,
+      "sha256": "bf9b60e0d3bcf41e0f741eb85abf6053f7aa035b78c406fb337805ce00573c8e"
+    },
+    {
+      "path": "client-mod/validation/route-stop/RouteStopEngineChecks.java",
+      "bytes": 11994,
+      "sha256": "eb2a02bcf826f0d9f710353676d48963bdce19e0cd7075969f4da94ca369a86d"
+    },
+    {
+      "path": "client-mod/validation/route-stop/RouteStopWireProducer.java",
+      "bytes": 7417,
+      "sha256": "ebf426809587c025a8cdf612510fc8dd4e458aacd914a5d227690065283abae0"
+    },
+    {
+      "path": "client-mod/validation/route-stop/TerrainEquivalenceEngineChecks.java",
+      "bytes": 16626,
+      "sha256": "e59b3c3ba657c10690e4eb4ab81df4254b7efd28e49e250784641db8a55885e8"
+    },
+    {
+      "path": "client-mod/validation/route-stop/audit_readers.py",
+      "bytes": 3989,
+      "sha256": "c153933e792a9b153e2b14bff0b93b9c9388de71c5ec2e50c8ab32cbc5d6db93"
+    },
+    {
+      "path": "client-mod/validation/route-stop/prepare_engine.py",
+      "bytes": 2210,
+      "sha256": "b9dd7d71c3ecd4e00ef15054a4d5196dd989bb3d470144cc68e5808cd50c31f0"
+    },
+    {
+      "path": "client-mod/validation/route-stop/prepare_far_readers.py",
+      "bytes": 1251,
+      "sha256": "439853e037f2bebe0f0b56ac7e31b16de3714011caf4231afdd27e796457cc89"
+    },
+    {
+      "path": "client-mod/validation/route-stop/run_engine.py",
+      "bytes": 6564,
+      "sha256": "055962a628954fb50b4d073b58abdeb7a782f368310093863097b54ecdd4f85b"
+    },
+    {
+      "path": "client-mod/validation/route-stop/run_native.py",
+      "bytes": 4354,
+      "sha256": "55a5bca5831db35c25c7f43e2f6bd9d5d730cfb34d5c7007c110a2b91f4e6759"
+    },
+    {
+      "path": "client-mod/validation/route-stop/runner_common.py",
+      "bytes": 1752,
+      "sha256": "9e4dab58682fb53d62dc53eec5db0dd69cf85ed78895ad95d49aa1872524a978"
+    },
+    {
+      "path": "client-mod/validation/route-threat-diagnostic/RouteThreatDiagnosticChecks.java",
+      "bytes": 10859,
+      "sha256": "355df57e8494689a9ad26d80c5e4f9776d3bf8c3f447e30dd56e0d4cffdd2c9e"
+    },
+    {
+      "path": "client-mod/validation/route-threat-diagnostic/RouteThreatDiagnosticEngineChecks.java",
+      "bytes": 5280,
+      "sha256": "1741aa12a5f986a59df6b5c4e2291c0190ce5201542e47faa35ebbadcdcf587a"
+    },
+    {
       "path": "client-mod/validation/scoped-combat/CombatCallbackFenceChecks.java",
       "bytes": 1833,
       "sha256": "eeaeac53bea00ccf98e8380a9f66ce3ec3241fdbe8ea1e5b49a563094f43cc2f"
@@ -3069,6 +3593,66 @@
       "sha256": "3634cc90b5f05e30179c47cb9635ed969123d387d4458f747815aaaba65f7a53"
     },
     {
+      "path": "client-mod/validation/scoped-retreat/ScopedRetreatControllerChecks.java",
+      "bytes": 21407,
+      "sha256": "3ac5e59e6dec91b89206d021a311e4346100e0f45d7f0d7e4891c604a58a3f0d"
+    },
+    {
+      "path": "client-mod/validation/scoped-retreat/ScopedRetreatPlanningChecks.java",
+      "bytes": 12337,
+      "sha256": "3f960cce88e91c94f113439c994682e6517a50997600c3047badabc82d847c58"
+    },
+    {
+      "path": "client-mod/validation/scoped-retreat/run_checks.py",
+      "bytes": 3573,
+      "sha256": "15d18211de50682b938e417a54bbf7dd705582654e5e09e6887290cd550394bc"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/README.md",
+      "bytes": 8677,
+      "sha256": "f9a7ecf88e1f4818500ca5b17813830b955ef1b4728ee55554f988984cecf7e9"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/RetainedAdmissionStopChecks.java",
+      "bytes": 4846,
+      "sha256": "bfbae233df9f658a998aec78f6b2a532e6d0c1844a1ab56f77c62ae70044b15a"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/SpatialThreatEngineChecks.java",
+      "bytes": 22554,
+      "sha256": "6510c61d4ba52cb87b526e556a2e8374f292269eaa667a81a14e8cc2e3579569"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/SpatialThreatWireProducer.java",
+      "bytes": 9142,
+      "sha256": "8adb22a2f623f1475c6a96c9320f8aab7fb10ad85efee0b145c7732bfc92f9ce"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/StopProofBoundaryChecks.java",
+      "bytes": 9663,
+      "sha256": "f265425d4cfb33a212627e6f91c2bc7b08371bfcfa9d7ae0f4bf8126df975306"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/prepare_engine.py",
+      "bytes": 4922,
+      "sha256": "e7d11a96e0e085e579ff06b6147d4efe72fa627f921b110d54c0eb436a2549c8"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/run_engine.py",
+      "bytes": 5331,
+      "sha256": "7d53f79f301e459e229996079fa5ebddb1c06343c5663c1f9591d9e5d1f078a1"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/run_native.py",
+      "bytes": 3484,
+      "sha256": "2239d56ab7c749ec33f7cb41f5220293e248870cb5d4202a3ce80012c862d8c4"
+    },
+    {
+      "path": "client-mod/validation/spatial-threat/runner_common.py",
+      "bytes": 1752,
+      "sha256": "9e4dab58682fb53d62dc53eec5db0dd69cf85ed78895ad95d49aa1872524a978"
+    },
+    {
       "path": "client-mod/validation/step-down/README.md",
       "bytes": 7569,
       "sha256": "1873205817b52f70abb7e9853636bd24dbe447c58c00546e19510d3192a633a9"
@@ -3085,8 +3669,8 @@
     },
     {
       "path": "client-mod/validation/step-down/check_source_relation.py",
-      "bytes": 2624,
-      "sha256": "9bb13743c30fa7e23851939bbdbb7dc7c0074fad630553c41adef4b2092b0d19"
+      "bytes": 2631,
+      "sha256": "d6d08b90461cabef4b357d63b39e810aab29021797db94ef6d3d3a0a598fffc6"
     },
     {
       "path": "client-mod/validation/step-down/prepare_engine.py",
@@ -3295,8 +3879,8 @@
     },
     {
       "path": "defense-watchdog/intent_client.py",
-      "bytes": 9966,
-      "sha256": "ec0c2e584d288faa89ad41b1f9f34b2b8734b6be5695eec01d5f898aeacf1f54"
+      "bytes": 10496,
+      "sha256": "574b88140ef1f61056f829b0ed0f1a67dfb8c5179ed4e7142cafe9fb92adafc8"
     },
     {
       "path": "defense-watchdog/ranged_tactics.py",
@@ -3380,13 +3964,18 @@
     },
     {
       "path": "docs/CAPABILITY-STATUS.md",
-      "bytes": 15657,
-      "sha256": "5fbb5f9f8dc8ce45d31308407444c0aac9a8bee86065e97df20def6411658e15"
+      "bytes": 16849,
+      "sha256": "8c9607fe6fcc2adf6ff88e1d963db77e9031234ae8e2bcb727dc384b6eb11c8f"
     },
     {
       "path": "docs/CRAFT-T24.md",
       "bytes": 2848,
       "sha256": "203716ed98a449ec93e523c936d031e92cc29fa00fd24afe4329a16ad88554c9"
+    },
+    {
+      "path": "docs/DEFEND-ONCE.md",
+      "bytes": 3746,
+      "sha256": "4bb923429bdcdaf1a0ab5186385936d3b20c42d1e7afae60f5588c2d10545aa6"
     },
     {
       "path": "docs/MINING-COLLECT-COMBAT.md",
@@ -3424,6 +4013,11 @@
       "sha256": "4bd5d821dbe2505b30f4a5a4c204872125e27f283eb000094754b83017ff4df5"
     },
     {
+      "path": "docs/TOOLBOX-QUICKSTART.md",
+      "bytes": 17628,
+      "sha256": "452be48e73ac04c0ba624c3326dfd116883909b99e4513bd8dffe7a40eb0ae60"
+    },
+    {
       "path": "docs/container-integration.md",
       "bytes": 2483,
       "sha256": "b31313a3eda1b5eabfe6c863e409846a48566dfcb9d033980607b70a6a835a92"
@@ -3432,6 +4026,81 @@
       "path": "docs/container-platform-acceptance.md",
       "bytes": 7761,
       "sha256": "6487442b462f0829ec9e9aec715c8462e5eff254248944ee039f7c65775bab90"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/README.md",
+      "bytes": 2311,
+      "sha256": "d6028194c90abe28aca940b5f6b2b969077edbe7ebaf8d7467895d329df9aec4"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/docs/API-EXAMPLES.md",
+      "bytes": 15687,
+      "sha256": "42a5babcbc23bb169bc68d6275a5c921d016c28bad1d2ef973c08ba9735d1a8c"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/docs/CAPABILITY-MATRIX.md",
+      "bytes": 13122,
+      "sha256": "afbc2fc8e42612dc60545c4a1b7dd236d340f3934377dea0fefe3f42787560b3"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/docs/INSTALL.md",
+      "bytes": 5576,
+      "sha256": "87991621863c1b9813072ea2e12f1ba14f49303855760eea182ca5097ad5597a"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/docs/KNOWN-LIMITS.md",
+      "bytes": 3326,
+      "sha256": "e7d611ad8a4b9716368682a81072b53dbc3a7a42c5483c60cd948c3ed15b236d"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/docs/T42-ACCEPTANCE.md",
+      "bytes": 2537,
+      "sha256": "e8d7bae41040ef9f056f468c81a1505b11172e80a9ceea2475864b8b1671ddef"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/docs/T46-ACCEPTANCE.md",
+      "bytes": 2879,
+      "sha256": "c1c3180deedecd077f9e116c70b0b4880a61522ad82a027313208f07037befea"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/evidence/CAPABILITY-EVIDENCE.json",
+      "bytes": 17251,
+      "sha256": "04654888d4367c9124341107cdc275450a7e1b32062fed41e2a2e15c10e4b75f"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/evidence/OFFLINE-SUMMARY.json",
+      "bytes": 1441,
+      "sha256": "d836cc15878c10e58fdeeae9c80be404e9d38cf54a2a70219f19403efaea67fb"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/evidence/PUBLIC-DELIVERY-SUMMARY.json",
+      "bytes": 4194,
+      "sha256": "175feafcdffd30743e6ed365f8eaf7dcaf1f6c3c229e73de71f9d507c4460dc1"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/evidence/T46-SUMMARY.json",
+      "bytes": 1008,
+      "sha256": "e935eb4f361bbb5723d15dc9ad98ad2f760a925d0880d7aa3a0fa43460fb5dfb"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/examples/mcp-client.template.json",
+      "bytes": 295,
+      "sha256": "fd7dda343e19d02175b4f70c35b138e1502b4730da81c44d0eb20b47c7e4d845"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/examples/toolbox-call-examples.json",
+      "bytes": 4161,
+      "sha256": "b7d0060870081c749b2a82be64aabe597d9be30a6ccc5a4078101527c1e12bc0"
+    },
+    {
+      "path": "docs/toolbox-2026-10-16/examples/toolbox-config.template.json",
+      "bytes": 343,
+      "sha256": "401683ff6835c1aab80e687c59bd17c1fc8b7db97485c021ae84c769a656adb8"
+    },
+    {
+      "path": "docs/toolbox-call-examples.json",
+      "bytes": 4161,
+      "sha256": "b7d0060870081c749b2a82be64aabe597d9be30a6ccc5a4078101527c1e12bc0"
     },
     {
       "path": "external-controller/.gitignore",
@@ -4135,8 +4804,8 @@
     },
     {
       "path": "resident-controller/resident_controller/capability_snapshot.py",
-      "bytes": 32797,
-      "sha256": "1a717b45c395c804b7ef3aa2b88a0505449642404db436089ed2f1254aedfbd0"
+      "bytes": 34938,
+      "sha256": "56d1ff51503b78d3e9b6bae1c1a64eddd6f24991b0dde14277cabb783564bd44"
     },
     {
       "path": "resident-controller/resident_controller/collect_snapshot.py",
@@ -4150,8 +4819,8 @@
     },
     {
       "path": "resident-controller/resident_controller/controller.py",
-      "bytes": 84130,
-      "sha256": "3afcef706c75979669f8ac1172d1674972e3274257734ddf044db533436535f4"
+      "bytes": 87441,
+      "sha256": "8ecbb4af2a1dc2cc732eaca5dd4412e42854e9b9cdfca6c6f6ac90a97a26e109"
     },
     {
       "path": "resident-controller/resident_controller/coordination_contract.py",
@@ -4174,6 +4843,11 @@
       "sha256": "2a63c74260e169192accba829769285e67d7e0f0c887bcb31192db66e0d0f22a"
     },
     {
+      "path": "resident-controller/resident_controller/local_segment_snapshot.py",
+      "bytes": 11360,
+      "sha256": "39fe7352db893bc3babc54b68d9e5012a852a5bcf03f85a7e1d49a20c2ffa2e9"
+    },
+    {
       "path": "resident-controller/resident_controller/mining_entities.py",
       "bytes": 7054,
       "sha256": "039b3e522f34033fe838b9f5968297978de7073e41b83a50041651a5bf852a9e"
@@ -4185,8 +4859,8 @@
     },
     {
       "path": "resident-controller/resident_controller/movement_wire.py",
-      "bytes": 9704,
-      "sha256": "3bbc091bb12731db1bbe73673ac3082ff5eec05c85d558580c5502a171a846ab"
+      "bytes": 10747,
+      "sha256": "94e3a35ce4f8d4718c49e43f9a09d00b8a0f57140b5ed4658c7d5ae4f01c7b87"
     },
     {
       "path": "resident-controller/resident_controller/native_combat.py",
@@ -4214,6 +4888,31 @@
       "sha256": "45904b96acc1984031cf32f175f6477f590f5024459a621d7ae3e99a324b57d2"
     },
     {
+      "path": "resident-controller/resident_controller/route_bee_diagnostic.py",
+      "bytes": 6709,
+      "sha256": "c09963d034ac38b9e14d46a754e74928e4240269e896c8cab49cf8d99b8014ee"
+    },
+    {
+      "path": "resident-controller/resident_controller/route_spatial_stop_snapshot.py",
+      "bytes": 17914,
+      "sha256": "b11b682414a9fe493210f4bdd2cd0e38d61814995d9e1085e0d1253a7e56067f"
+    },
+    {
+      "path": "resident-controller/resident_controller/route_terrain_snapshot.py",
+      "bytes": 5534,
+      "sha256": "0c033b942b434917775fa548181c92d9c7084159b3a440f9157a27941202d8c0"
+    },
+    {
+      "path": "resident-controller/resident_controller/route_threat_diagnostic.py",
+      "bytes": 6359,
+      "sha256": "3619e954e4d23906b96a2b8cc7c2ebcce80ac2a00b0e935aad424e1ea6908f78"
+    },
+    {
+      "path": "resident-controller/resident_controller/spatial_threat_snapshot.py",
+      "bytes": 22454,
+      "sha256": "d58981f3e00bc90e34344a333712122f8ce648393486184e75e27cd9df9c2202"
+    },
+    {
       "path": "resident-controller/resident_controller/step_down_snapshot.py",
       "bytes": 7916,
       "sha256": "abe237649f6b52e268c8f6bddc033b004be3bebc953aa3b3022990ed7699589a"
@@ -4235,8 +4934,8 @@
     },
     {
       "path": "resident-controller/resident_controller/transport.py",
-      "bytes": 18891,
-      "sha256": "284d4f6ba94eaff18bd8caa2d866d59053bd9987455f2be2b0f83204be8563c3"
+      "bytes": 22780,
+      "sha256": "152b32e5d53d3ca91579105ea1be0be0fff6bceeb04b01a7b1ae44a926920fd0"
     },
     {
       "path": "resident-controller/resident_controller/world.py",
@@ -4529,6 +5228,11 @@
       "sha256": "cbccbd9b0c45abccb6f6a21e90aeba005c84ee2e1e08ef7908754ee2f7defb96"
     },
     {
+      "path": "test-tools/check_toolbox_call_examples.py",
+      "bytes": 1578,
+      "sha256": "a9a86cc2dce061a20a9f96e95c731f96d601f087081e0532cbc5bdd0c3296474"
+    },
+    {
       "path": "test-tools/encounter-stage1.1-safety-v2/BOAT-ENTRY-GUARD.md",
       "bytes": 8739,
       "sha256": "072a45f2ba7ac19dc30c084f36de5c494a7056b4d9bd5d1ae0fa75b417bfca42"
@@ -4717,6 +5421,16 @@
       "path": "test-tools/encounter-stage1.1-safety-v2/tests/test_receipt_binding.py",
       "bytes": 13490,
       "sha256": "57e725af7204c51c3d24ed0c4a40b3b5e620dcd2df250ba5a26b74da4deed042"
+    },
+    {
+      "path": "test-tools/package_toolbox_delivery.py",
+      "bytes": 6685,
+      "sha256": "63383ac78050a8f84dac38dfee234fc4fb73d3cb2deaca927de68e3bdca2f721"
+    },
+    {
+      "path": "test-tools/test_package_toolbox_delivery.py",
+      "bytes": 3868,
+      "sha256": "f93e53ad88455752928871b2e27ad42cb81eb4ee5a3f604ef113e0d014c32239"
     }
   ]
 }

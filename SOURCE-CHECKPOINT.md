@@ -1,3 +1,29 @@
+> 历史源码记录：本文各项结论仅适用于其原始截点。2026-10-16 当前交付、安装入口和验证边界见[工具箱交付说明](docs/toolbox-2026-10-16/README.md)。本次 Git 发布不改产品代码或继承旧 JAR 的实机验收。
+
+# Combined local-route, terminal-defense and delivery source
+
+This integration starts from published T34 commit
+`d06a085baa2fbe315db84f8c26905c2c1d6316cf`. It adds bounded
+`navigate_route_local`, explicit same-owner `defend_once`, and a documented
+12-tool MCP delivery interface. The backend allowlist contains 20 capabilities;
+actual availability remains per-profile negotiation through `mdc_catalog`.
+
+The route and reactive-defense changes have source/offline evidence only.
+A combined installed runtime, composed ordinary-world workflow and reactive
+encounter remain pending. No historical microtrial is promoted to acceptance
+of this new integration. Earlier T17/T32/T34 qualifications and unknown/HOLD
+outcomes remain unchanged. Default reactions stay `stop`; explicit defense is
+bounded, does not resume the ordinary task, and cannot retry an unknown action.
+
+See [quickstart](docs/TOOLBOX-QUICKSTART.md),
+[route contract](capability-runtime/docs/NAVIGATE-ROUTE-LOCAL.md),
+[terminal defense](docs/DEFEND-ONCE.md) and
+[capability status](docs/CAPABILITY-STATUS.md).
+Public and runtime inventories remain separately frozen; no private trials,
+worlds, credentials or generated artifacts belong in this source tree.
+
+## Historical T34 consolidation
+
 # Source consolidation with bounded descent
 
 This update preserves the published T32 documentation baseline

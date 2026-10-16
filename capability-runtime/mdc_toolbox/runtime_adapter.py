@@ -16,6 +16,8 @@ from .control import JobControl
 from .budgets import SharedBudget
 from .supervisor import LocalSupervisor
 from .serialization import serialize_outcome
+from . import defend_once
+from .contracts import POLICY, validate_schema, ToolboxError
 
 
 def _ref(value):
@@ -26,9 +28,17 @@ def _public_context(context):
     return {k: deepcopy(v) for k, v in context.items() if k not in ('cancel_event', 'emit')}
 
 
+def profiles_defense_ready(scoped):
+    return (isinstance(scoped, dict) and scoped.get('version') == 'scoped-native-preflight/1'
+            and scoped.get('same_callback_capture_validate_admit') is True
+            and scoped.get('private_singleplayer_only') is True
+            and scoped.get('capability_guard_schema_version') == 1
+            and scoped.get('profiles', {}).get('combat-local-observed-v1') == ['combat_entity'])
+
+
 class OwnerRuntimeBackend:
     INITIAL_CAPABILITIES = frozenset({'select_hotbar','ensure_hotbar','equip','consume','close_menu',
-        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','navigate_step_down','mine_local','collect_local','place_local','engage'})
+        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','navigate_step_down','navigate_route_local','mine_local','collect_local','place_local','engage'})
     REQUIRED_ACTIONS = {
         'mine_local': {'break_block'},
         'place_local': {'place_block'},
@@ -36,6 +46,7 @@ class OwnerRuntimeBackend:
         'engage': {'combat_entity'},
         'navigate_local': {'follow_path'},
         'navigate_step_down': {'follow_path'},
+        'navigate_route_local': {'follow_path'},
         'select_hotbar': {'select_hotbar'}, 'ensure_hotbar': {'select_hotbar','click_slot'},
         'equip': {'select_hotbar','click_slot'}, 'consume': {'select_hotbar','click_slot','use_item'},
         'interact': {'interact_block'}, 'close_menu': {'close_menu'}, 'craft': {'click_slot'}, 'smelt': {'click_slot'},
@@ -75,11 +86,12 @@ class OwnerRuntimeBackend:
             features.extend('action:' + name for name in scoped.get('guarded_actions', []))
         negotiated_actions = set(self._profile_actions({'scoped_profiles': scoped.get('profiles', {}) if isinstance(scoped, dict) else {}}))
         supported = sorted(name for name in self._plugins() if name in self.INITIAL_CAPABILITIES
-                           and ((name in ('collect_local','navigate_step_down') and isinstance(scoped,dict)
+                           and ((name in ('collect_local','navigate_step_down','navigate_route_local') and isinstance(scoped,dict)
                                  and scoped.get('profiles',{}).get({'collect_local':'collect-local-observed-v1',
-                                     'navigate_step_down':'movement-step-down-observed-v1'}[name]) == ['follow_path'])
-                                or (name not in ('collect_local','navigate_step_down') and self.REQUIRED_ACTIONS[name] <= negotiated_actions))
-                           and (name not in ('place_local','navigate_step_down') or session.get('execution_policy') == 'request_only')
+                                     'navigate_step_down':'movement-step-down-observed-v1',
+                                     'navigate_route_local':'movement-local-segment-observed-v1'}[name]) == ['follow_path'])
+                                or (name not in ('collect_local','navigate_step_down','navigate_route_local') and self.REQUIRED_ACTIONS[name] <= negotiated_actions))
+                           and (name not in ('place_local','navigate_step_down','navigate_route_local') or session.get('execution_policy') == 'request_only')
                            and 'scoped-native-preflight/1' in features)
         known = isinstance(session.get('capability_context'), dict) and all(
             isinstance(session['capability_context'].get(k), str) for k in ('world_generation','dimension','player_uuid','action_session'))
@@ -90,7 +102,7 @@ class OwnerRuntimeBackend:
                 'session_ref': _ref(session.get('session_id')), 'context_ref': _ref(session.get('capability_context')),
                 'supported_capabilities': supported, 'native_features': sorted(features),
                 'supported_budget_metrics': list(SharedBudget.METRICS),
-                'supported_policies': {'version': 1, 'execution_mode': ['noncombat','guarded','request_only'], 'reactions': ['stop']},
+                'supported_policies': {'version': 1, 'execution_mode': ['noncombat','guarded','request_only'], 'reactions': ['stop', 'defend_once'] if profiles_defense_ready(scoped) else ['stop']},
                 'execution_policy': session.get('execution_policy'),
                 'cancellation_supported': session.get('capability_cancel_schema_version') == 1,
                 'scoped_profiles': deepcopy(scoped.get('profiles', {})) if isinstance(scoped, dict) else {},
@@ -132,10 +144,16 @@ class OwnerRuntimeBackend:
             if context.get('expected_context') not in (None, description.get('context_ref')):
                 return self._blocked('expected_context_changed', context)
             policy = context.get('policy', {})
-            if (not isinstance(policy, dict) or set(policy) - {'version','execution_mode','reactions'}
-                    or policy.get('version') != 1 or policy.get('execution_mode') not in ('noncombat','guarded','request_only')
-                    or policy.get('reactions', 'stop') != 'stop'):
+            try:
+                validate_schema(policy, POLICY)
+            except ToolboxError:
                 return self._blocked('unsupported_execution_or_reaction_policy', context)
+            reaction = policy.get('reactions', 'stop')
+            if reaction not in description['supported_policies']['reactions']:
+                return self._blocked('unsupported_execution_or_reaction_policy', context)
+            if reaction == 'defend_once' and (capability not in defend_once.SUPPORTED_TASKS
+                    or context.get('budget', {}).get('reflex_reserve_actions', 0) < 1):
+                return self._blocked('defense_task_or_reserve_unsupported', context)
             expected_policy = {'noncombat': 'noncombat', 'guarded': 'standard', 'request_only': 'request_only'}[policy['execution_mode']]
             if description.get('execution_policy') != expected_policy:
                 return self._blocked('requested_gateway_execution_policy_not_active', context)
@@ -149,6 +167,19 @@ class OwnerRuntimeBackend:
                 profiles['follow_path'] = 'collect-local-observed-v1'
             if capability == 'navigate_step_down':
                 profiles['follow_path'] = 'movement-step-down-observed-v1'
+            if capability == 'navigate_route_local':
+                profiles['follow_path'] = 'movement-local-segment-observed-v1'
+                if (reaction == 'stop' and description.get('scoped_profiles', {}).get(
+                        'movement-local-segment-spatial-stop-v1') == ['follow_path']):
+                    profiles['follow_path'] = 'movement-local-segment-spatial-stop-v1'
+                if (reaction == 'stop' and description.get('scoped_profiles', {}).get(
+                        'movement-local-segment-spatial-stop-v2') == ['follow_path']):
+                    profiles['follow_path'] = 'movement-local-segment-spatial-stop-v2'
+                if (reaction == 'defend_once' and description.get('scoped_profiles', {}).get(
+                        'movement-local-segment-spatial-threat-v1') == ['follow_path']):
+                    profiles['follow_path'] = 'movement-local-segment-spatial-threat-v1'
+                    control.route_threat_guard = {'schema_version': 1,
+                        'target_uuid': policy['defense']['target_uuid']}
             self.runtime.begin_job(control, scoped_profiles=profiles)
             begun = True
             self._active['owner_context'] = self.runtime.owner_context()
@@ -156,6 +187,9 @@ class OwnerRuntimeBackend:
             with supervisor.ordinary():
                 control.checkpoint()
                 outcome = plugin.invoke(capability, self.runtime, deepcopy(arguments), control)
+                if (reaction == 'defend_once' and outcome.reason in ('capability_damage_observed', 'capability_threat_observed')
+                        and outcome.status in ('failed', 'cancelled')):
+                    defend_once.run(self.runtime, control, policy, outcome)
         except SkillError as exc:
             outcome = Outcome(exc.status, exc.reason, (exc.request_id,) if exc.request_id else ())
         except Exception as exc:

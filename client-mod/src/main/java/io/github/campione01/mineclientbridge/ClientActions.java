@@ -53,6 +53,7 @@ final class ClientActions {
         BlockHitResult scopedPacketHit;
         ScopedFlatMovement scopedMovement;
         ScopedStepDownMovement scopedStepDown;
+        ScopedLocalSegmentMovement scopedLocalSegment;
         ScopedMining scopedMining;
         ScopedPlacement scopedPlacement;
         ScopedCombat scopedCombat;
@@ -218,6 +219,8 @@ final class ClientActions {
             active.entry.result.add("scoped_native_preflight", scoped.witness(request.id()));
             active.scopedMovement = scoped.movement;
             if (active.scopedMovement != null) active.scopedMovement.activate(active.entry);
+            active.scopedLocalSegment=scoped.localSegment;
+            if(active.scopedLocalSegment!=null)active.scopedLocalSegment.activate(active.entry);
             active.scopedStepDown=scoped.stepDown;
             if(active.scopedStepDown!=null)active.scopedStepDown.activate(active.entry);
             active.scopedCombat=scoped.combat;
@@ -246,6 +249,14 @@ final class ClientActions {
         }
         if (request.hotbarSlot() >= 0) mc.player.getInventory().selected = request.hotbarSlot();
         if(capabilityGuard!=null)capabilityGuard.activate();
+        // A registered, fully witnessed stop-only route never reaches a view, movement or input effect.
+        if(active.scopedLocalSegment!=null&&active.scopedLocalSegment.admissionThreat()){
+            RuntimeAction admitted=active;
+            try{admitted.scopedLocalSegment.beforeEffect(mc);
+                if(active==admitted)finish("cancelled","route_spatial_admission_attacker_changed");}
+            catch(RuntimeException failure){if(active==admitted)finish("cancelled",ScopedLocalSegmentMovement.rejection(failure));}
+            return status(request.id());
+        }
         if(request.action().equals("movement_budget_start"))MovementBudget.start(mc,request);
         // block-menu-v1 owns exactly one synchronous interaction inside this admitted callback.
         // No asynchronous post-tick dispatch can extend its capture or replay a missing menu.
@@ -300,6 +311,18 @@ final class ClientActions {
     static boolean ownsScopedStepDown(ScopedStepDownMovement descent,ActionRegistry.Entry entry) {
         return active!=null && active.scopedStepDown==descent && active.entry==entry
                 && ACTIONS.active()==entry && entry!=null && entry.running();
+    }
+    static boolean ownsScopedLocalSegment(ScopedLocalSegmentMovement descent,ActionRegistry.Entry entry) {
+        return active!=null && active.scopedLocalSegment==descent && active.entry==entry
+                && ACTIONS.active()==entry && entry!=null && entry.running();
+    }
+    static void localSegmentMotionFailed(ScopedLocalSegmentMovement owner,String reason) {
+        owner.motionUnknown(reason);
+        if(active!=null&&active.scopedLocalSegment==owner){
+            active.entry.result.addProperty("motion_gate_rejected",true);
+            active.entry.result.addProperty("effect_outcome","unknown");
+            finish("cancelled",reason);
+        }
     }
     static boolean ownsCapabilityTarget(CapabilityTargetAction target) { return active!=null && active.capabilityTarget==target; }
     static JsonObject status(String id) { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(id);j.add("movement_budget",MovementBudget.snapshot(Minecraft.getInstance()));return j; }
@@ -414,6 +437,7 @@ final class ClientActions {
 
     private static void preTick() {
         Minecraft mc = Minecraft.getInstance();
+        ScopedLocalSegmentDispatch.nextTick();
         MovementBudget.preTick(mc);
         NavigationPositionGuard.tick(mc);
         if (!context(mc,"pre_tick")) return;
@@ -490,8 +514,9 @@ final class ClientActions {
         Input input = event.getInput();
         if(a.scopedCombat!=null){
             try {ScopedCombat.require(ScopedFlatMovement.neutral(input),"scoped_combat_external_movement_input");
-                a.scopedCombat.check(Minecraft.getInstance(),false);a.combat.beforeScopedMovement(Minecraft.getInstance(),a.forward);
-                if(active!=a)return; a.scopedCombat.check(Minecraft.getInstance(),false);
+                a.scopedCombat.check(Minecraft.getInstance(),false);
+                if(active!=a)return; a.combat.beforeScopedMovement(Minecraft.getInstance(),a.forward);
+                if(active!=a)return; // The final permit must not be followed by another mutable guard hook.
                 if(input!=a.player.input || event.getInput()!=input || !ScopedFlatMovement.neutral(input))throw new ClientActionRequest.Rejected(409,"scoped_combat_input_identity_changed");
             } catch(RuntimeException failed){if(active==a)finish("cancelled","scoped_combat_movement_revalidation_failed");return;}
         }
@@ -517,6 +542,17 @@ final class ClientActions {
                 a.dispatched=true;a.scopedStepDown.markAttempted();
             } catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedStepDownMovement.rejection(failed));return;}
         }
+        if(a.scopedLocalSegment!=null) {
+            try {
+                if(input!=a.player.input || event.getInput()!=input || !ScopedFlatMovement.neutral(input))
+                    throw new ClientActionRequest.Rejected(409,"local_segment_external_input");
+                a.scopedLocalSegment.beforeEffect(Minecraft.getInstance());
+                if(active!=a)return;
+                if(input!=a.player.input || event.getInput()!=input || !ScopedFlatMovement.neutral(input))
+                    throw new ClientActionRequest.Rejected(409,"local_segment_input_changed_after_hooks");
+                a.dispatched=true;a.scopedLocalSegment.markAttempted();
+            } catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedLocalSegmentMovement.rejection(failed));return;}
+        }
         if(a.scopedMining!=null) {
             ScopedMining guard=a.scopedMining;
             try {
@@ -531,6 +567,10 @@ final class ClientActions {
                 if(active!=a||event.getInput()!=input||input!=a.player.input||!ScopedMining.neutral(input))
                     throw new ClientActionRequest.Rejected(409,"placement_input_changed_after_hooks");
             } catch(RuntimeException failure){a.scopedPlacement.recordFailure(failure);if(active==a)finish("cancelled","placement_input_context_unconfirmed");return;}
+        }
+        if(a.scopedLocalSegment!=null){
+            try {ScopedLocalSegmentDispatch.arm(a.scopedLocalSegment);a.scopedLocalSegment.recordInput(a.jump,a.forward);}
+            catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedLocalSegmentMovement.rejection(failed));return;}
         }
         a.input = input;
         input.forwardImpulse = a.forward;
@@ -553,6 +593,7 @@ final class ClientActions {
         RuntimeAction entered=active;
         try {
             RuntimeAction a = entered;
+            if(a.scopedLocalSegment!=null){a.scopedLocalSegment.beforeEffect(mc);if(active!=a)return;}
             switch (a.entry.request.action()) {
                 case "break_block" -> observeBreak(mc, a);
                 case "place_block" -> { if(a.capabilityGuard!=null)placeCapability(mc,a);else place(mc,a); }
@@ -571,12 +612,27 @@ final class ClientActions {
                 default -> { }
             }
         } catch (RuntimeException failure) {
+            // A reentrant default-stop callback must never annotate or finish a replacement owner.
+            if(entered.scopedLocalSegment!=null&&entered.scopedLocalSegment.spatialStopProfile()&&active!=entered)return;
+            // Preserve this already validated, owned, pre-next-effect proof in the post-tick callback too.
+            // Generic legacy failures and motion-gate unknown outcomes keep their existing paths.
+            if(entered.scopedLocalSegment!=null&&entered.scopedLocalSegment.spatialThreatProfile()){
+                if(active!=entered)return; // A failed old callback must never release a replacement owner.
+                String reason=failure.getMessage();
+                boolean known=failure instanceof ClientActionRequest.Rejected
+                    &&("capability_threat_observed".equals(reason)&&entered.scopedLocalSegment.hasValidatedThreatStop(entered.entry)
+                        ||"route_spatial_pre_effect_attacker_changed".equals(reason)&&entered.scopedLocalSegment.hasPreEffectThreatRace(entered.entry));
+                if(known)finish("cancelled",reason);else failException(failure);
+                return;
+            }
+            if(active==entered&&entered.scopedLocalSegment!=null)entered.scopedLocalSegment.recordFailure(failure);
             if(entered.scopedPlacement!=null)entered.scopedPlacement.recordFailure(failure);
             if(entered.scopedPlacement==null || active==entered)failException(failure);
         }
     }
 
     private static void followPath(Minecraft mc, RuntimeAction a) {
+        if(a.scopedLocalSegment!=null){followLocalSegment(mc,a);return;}
         if(a.scopedStepDown!=null){
             try {a.scopedStepDown.beforeEffect(mc);}
             catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedStepDownMovement.rejection(failed));return;}
@@ -651,6 +707,24 @@ final class ClientActions {
         a.entry.result.addProperty("waypoint_index", points.size());
         a.entry.result.addProperty("waypoint_count", points.size());
         finish("succeeded", "path_reached");
+    }
+
+    private static void followLocalSegment(Minecraft mc,RuntimeAction a) {
+        try {
+            a.scopedLocalSegment.beforeEffect(mc);
+            if(active!=a)return;
+            var step=a.scopedLocalSegment.step();
+            if(step.done()){finish("succeeded","path_reached");return;}
+            // Revalidate after any prior facts and recompute from the unchanged raw pose.
+            a.scopedLocalSegment.beforeEffect(mc);
+            if(active!=a)return;
+            step=a.scopedLocalSegment.step();
+            a.scopedLocalSegment.markAttempted();a.dispatched=true;
+            a.player.setYRot(step.yaw());
+            a.forward=step.forward();a.jump=step.jump();a.sneak=false;
+            a.entry.result.addProperty("phase","local_segment_active");
+            a.entry.result.addProperty("waypoint_index",0);a.entry.result.addProperty("waypoint_count",1);
+        } catch(RuntimeException failed){if(active==a){a.scopedLocalSegment.recordFailure(failed);finish("cancelled",ScopedLocalSegmentMovement.rejection(failed));}}
     }
 
     private static void sprint(Minecraft mc, RuntimeAction a, boolean wanted) {
@@ -1248,6 +1322,13 @@ final class ClientActions {
                 released &= neutral;
                 a.entry.result.add("step_down",a.scopedStepDown.terminal(neutral));
                 if(status.equals("succeeded") && !a.scopedStepDown.settled()){status="failed";reason="step_down_landing_unconfirmed";}
+            }
+            if(a.scopedLocalSegment!=null) {
+                boolean neutral=ScopedFlatMovement.neutral(a.input) && ScopedFlatMovement.neutral(a.player.input)
+                        && !ScopedFlatMovement.keysDown(Minecraft.getInstance()) && !BridgeServer.hasHeldInputs();
+                released &= neutral;
+                a.entry.result.add("local_segment",a.scopedLocalSegment.terminal(neutral));
+                if(status.equals("succeeded") && !a.scopedLocalSegment.settled()){status="failed";reason="local_segment_landing_unconfirmed";}
             }
             // Keep encounter evidence aligned with the terminal cleanup outcome.
             if(a.combat!=null) a.combat.terminal(released?status:"failed",released?reason:"input_release_unconfirmed");

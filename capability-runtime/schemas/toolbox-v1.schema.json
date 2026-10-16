@@ -271,7 +271,8 @@
               "type": "string",
               "enum": [
                 "noncombat",
-                "guarded"
+                "guarded",
+                "request_only"
               ]
             },
             "reactions": {
@@ -279,15 +280,75 @@
               "enum": [
                 "stop",
                 "avoid",
-                "defend"
+                "defend",
+                "defend_once"
               ]
+            },
+            "defense": {
+              "type": "object",
+              "properties": {
+                "target_uuid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 50,
+                  "maximum": 5000
+                },
+                "min_health": {
+                  "type": "number",
+                  "minimum": 14,
+                  "maximum": 20
+                }
+              },
+              "required": [
+                "target_uuid",
+                "timeout_ms",
+                "min_health"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
             "version",
             "execution_mode"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "reactions": {
+                    "const": "defend_once"
+                  }
+                },
+                "required": [
+                  "reactions"
+                ]
+              },
+              "then": {
+                "required": [
+                  "defense"
+                ],
+                "properties": {
+                  "execution_mode": {
+                    "enum": [
+                      "guarded",
+                      "request_only"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "defense"
+                  ]
+                }
+              }
+            }
+          ]
         },
         "budgets": {
           "type": "object",
@@ -377,7 +438,8 @@
               "type": "string",
               "enum": [
                 "noncombat",
-                "guarded"
+                "guarded",
+                "request_only"
               ]
             },
             "reactions": {
@@ -385,15 +447,75 @@
               "enum": [
                 "stop",
                 "avoid",
-                "defend"
+                "defend",
+                "defend_once"
               ]
+            },
+            "defense": {
+              "type": "object",
+              "properties": {
+                "target_uuid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 50,
+                  "maximum": 5000
+                },
+                "min_health": {
+                  "type": "number",
+                  "minimum": 14,
+                  "maximum": 20
+                }
+              },
+              "required": [
+                "target_uuid",
+                "timeout_ms",
+                "min_health"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
             "version",
             "execution_mode"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "reactions": {
+                    "const": "defend_once"
+                  }
+                },
+                "required": [
+                  "reactions"
+                ]
+              },
+              "then": {
+                "required": [
+                  "defense"
+                ],
+                "properties": {
+                  "execution_mode": {
+                    "enum": [
+                      "guarded",
+                      "request_only"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "defense"
+                  ]
+                }
+              }
+            }
+          ]
         },
         "budgets": {
           "type": "object",
@@ -530,7 +652,8 @@
                     "type": "string",
                     "enum": [
                       "noncombat",
-                      "guarded"
+                      "guarded",
+                      "request_only"
                     ]
                   },
                   "reactions": {
@@ -538,15 +661,75 @@
                     "enum": [
                       "stop",
                       "avoid",
-                      "defend"
+                      "defend",
+                      "defend_once"
                     ]
+                  },
+                  "defense": {
+                    "type": "object",
+                    "properties": {
+                      "target_uuid": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 50,
+                        "maximum": 5000
+                      },
+                      "min_health": {
+                        "type": "number",
+                        "minimum": 14,
+                        "maximum": 20
+                      }
+                    },
+                    "required": [
+                      "target_uuid",
+                      "timeout_ms",
+                      "min_health"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
                   "version",
                   "execution_mode"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "reactions": {
+                          "const": "defend_once"
+                        }
+                      },
+                      "required": [
+                        "reactions"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "defense"
+                      ],
+                      "properties": {
+                        "execution_mode": {
+                          "enum": [
+                            "guarded",
+                            "request_only"
+                          ]
+                        }
+                      }
+                    },
+                    "else": {
+                      "not": {
+                        "required": [
+                          "defense"
+                        ]
+                      }
+                    }
+                  }
+                ]
               },
               "budgets": {
                 "type": "object",
@@ -825,7 +1008,8 @@
               "type": "string",
               "enum": [
                 "noncombat",
-                "guarded"
+                "guarded",
+                "request_only"
               ]
             },
             "reactions": {
@@ -833,15 +1017,75 @@
               "enum": [
                 "stop",
                 "avoid",
-                "defend"
+                "defend",
+                "defend_once"
               ]
+            },
+            "defense": {
+              "type": "object",
+              "properties": {
+                "target_uuid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 50,
+                  "maximum": 5000
+                },
+                "min_health": {
+                  "type": "number",
+                  "minimum": 14,
+                  "maximum": 20
+                }
+              },
+              "required": [
+                "target_uuid",
+                "timeout_ms",
+                "min_health"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
             "version",
             "execution_mode"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "reactions": {
+                    "const": "defend_once"
+                  }
+                },
+                "required": [
+                  "reactions"
+                ]
+              },
+              "then": {
+                "required": [
+                  "defense"
+                ],
+                "properties": {
+                  "execution_mode": {
+                    "enum": [
+                      "guarded",
+                      "request_only"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "defense"
+                  ]
+                }
+              }
+            }
+          ]
         },
         "budgets": {
           "type": "object",

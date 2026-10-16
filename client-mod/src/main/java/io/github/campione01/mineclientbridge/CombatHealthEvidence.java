@@ -9,7 +9,36 @@ final class CombatHealthEvidence {
 
     /** Adds one self-contained snapshot; existing health/result fields keep their old semantics. */
     static void append(JsonObject evidence, CombatThreats.HealthGuard guard) {
-        evidence.add("health_diagnostics", snapshot(guard == null ? null : guard.diagnostics()));
+        JsonObject data=snapshot(guard == null ? null : guard.diagnostics());
+        if(guard!=null && guard.observationRecoveryEnabled()) {
+            data.addProperty("latch_semantics","adverse_health_and_invalid_observation_latches_are_irrevocable_wall_gap_recovery_is_separate");
+            JsonObject recovery=new JsonObject();
+            recovery.addProperty("policy","scoped_source_tick_full_loss_window_v2");
+            recovery.addProperty("recovery_clock","action_tick_and_client_level_game_time");
+            recovery.addProperty("source_tick_progress_required",true);
+            var source=guard.sourceDiagnostic();
+            JsonObject sourceData=new JsonObject();
+            if(source!=null) {
+                sourceData.addProperty("source_tick",source.sourceTick());
+                sourceData.addProperty("last_policy_source_tick",source.lastPolicySourceTick());
+                sourceData.addProperty("source_tick_delta",source.delta());
+                sourceData.addProperty("same_source_tick_elapsed_ns",source.sameSourceTickElapsedNanos());
+                sourceData.addProperty("advanced",source.advanced());sourceData.addProperty("valid",source.valid());
+            }
+            recovery.add("current_source_observation",sourceData);
+            recovery.addProperty("active",guard.recovering());
+            recovery.addProperty("required_continuous_ns",CombatThreats.HealthGuard.WINDOW_NANOS);
+            recovery.addProperty("episodes",guard.recoveryEpisodes());
+            recovery.addProperty("continuous_sample_count",guard.recoverySamples());
+            recovery.addProperty("completed",guard.recoveryCompleted());
+            if(guard.recoveryEpisodes()>0) recovery.addProperty("last_started_ns",guard.recoveryStarted());
+            else recovery.add("last_started_ns",JsonNull.INSTANCE);
+            recovery.addProperty("loss_history_reset",false);
+            recovery.addProperty("unobserved_interval_proven",false);
+            recovery.addProperty("offense_allowed_while_active",false);
+            data.add("observation_recovery",recovery);
+        }
+        evidence.add("health_diagnostics",data);
     }
 
     static JsonObject snapshot(CombatThreats.HealthGuard.Diagnostics diagnostics) {

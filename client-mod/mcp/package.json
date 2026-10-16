@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs && node self-test-platform.mjs",
+    "test": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs && node self-test-platform.mjs && npm run test:toolbox",
     "test:portable": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs",
-    "test:windows": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs && node self-test.mjs"
+    "test:windows": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs && node self-test.mjs",
+    "test:toolbox": "node --test toolbox-test.mjs toolbox-schema-test.mjs toolbox-owner-chain-test.mjs toolbox-placement-owner-chain-test.mjs defend-once-test.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -135,7 +135,13 @@ VERSION = {'type':'string','const':API_VERSION}
 CAPABILITY = {'type':'string','pattern':'^[a-z][a-z0-9_]{0,79}$','maxLength':80}
 WAIT = integer(0,10000)
 POLICY = obj({'version':{'type':'integer','const':1}, 'execution_mode':{'type':'string','enum':['noncombat','guarded','request_only']},
-              'reactions':{'type':'string','enum':['stop','avoid','defend']}}, ('version','execution_mode'))
+              'reactions':{'type':'string','enum':['stop','avoid','defend','defend_once']},
+              'defense':obj({'target_uuid':{'type':'string','pattern':'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'},
+                  'timeout_ms':integer(50,5000), 'min_health':{'type':'number','minimum':14,'maximum':20}},
+                  ('target_uuid','timeout_ms','min_health'))}, ('version','execution_mode'))
+POLICY['allOf'] = [{'if':{'properties':{'reactions':{'const':'defend_once'}},'required':['reactions']},
+    'then':{'required':['defense'], 'properties':{'execution_mode':{'enum':['guarded','request_only']}}},
+    'else':{'not':{'required':['defense']}}}]
 BUDGETS = obj({'deadline_seconds':integer(1,86400),'max_actions':integer(1,32768),'max_observations':integer(1,32768),
                'reflex_reserve_actions':integer(0,32768),'cleanup_reserve_actions':integer(0,32768)}, ('deadline_seconds','max_actions'))
 SELECTORS = obj({'item_ids':{'type':'array','items':string(128),'maxItems':64}, 'entity_ids':{'type':'array','items':string(128),'maxItems':64},

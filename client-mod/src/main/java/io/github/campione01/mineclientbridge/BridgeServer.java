@@ -393,7 +393,12 @@ public final class BridgeServer {
             // Terminal action metadata still occurs three times, so all existing reserves remain unchanged.
             int one=BridgeJson.toJson(standalone).getBytes(StandardCharsets.UTF_8).length;
             int three=BridgeJson.toJson(bundle).getBytes(StandardCharsets.UTF_8).length;
-            try {ScopedEntityPolicy.requireResponseSizes(one,three,MAX_JSON_BYTES);}
+            try {
+                boolean spatial=proposedAction.getAsJsonObject("result").getAsJsonObject("scoped_native_preflight")
+                    .get("profile").getAsString().equals(ScopedRouteThreatPolicy.PROFILE);
+                if(spatial)ScopedRouteThreatPolicy.requireResponseSizes(one,three,MAX_JSON_BYTES);
+                else ScopedEntityPolicy.requireResponseSizes(one,three,MAX_JSON_BYTES);
+            }
             catch(IllegalArgumentException oversized){
                 // Diagnostic rendering must never erase an already known size refusal.
                 JsonObject diagnostic=null;

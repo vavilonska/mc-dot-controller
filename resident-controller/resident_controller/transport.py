@@ -5,10 +5,15 @@ import http.client
 import hashlib
 import json
 import re
+from copy import deepcopy
 from urllib.parse import parse_qsl, urlsplit
 
 from .capability_snapshot import source_freshness
+from .route_spatial_stop_snapshot import (PROFILE as ROUTE_STOP_PROFILE, PROFILES as ROUTE_STOP_PROFILES,
+                                          valid_rejection_diagnostic)
 from .movement_wire import MARKER as MOVEMENT_WIRE_MARKER, load_strict, retain, valid_size_diagnostic
+from .route_threat_diagnostic import (PROFILE as ROUTE_THREAT_PROFILE,
+    valid_rejection_diagnostic as valid_threat_rejection, matches_request as threat_matches_request)
 
 READS = {'/control/status', '/control/capabilities', '/control/state', '/control/screen',
          '/control/keymaps', '/control/terrain', '/control/action/status', '/control/frame',
@@ -106,13 +111,19 @@ def _embedded_metadata(raw, names, raw_values=None):
 
 class BridgeError(RuntimeError):
     def __init__(self, code, *, uncertain=False, status=None, capability_source_freshness=None, capability_source_freshness_status=None,
-                 scoped_movement_response_size=None, scoped_movement_response_size_status=None):
+                 scoped_movement_response_size=None, scoped_movement_response_size_status=None,
+                 route_entity_rejection=None, route_entity_rejection_status=None,
+                 route_threat_rejection=None, route_threat_rejection_status=None):
         super().__init__(code)
         self.code, self.uncertain, self.status = code, uncertain, status
         self.capability_source_freshness = capability_source_freshness
         self.capability_source_freshness_status = capability_source_freshness_status
         self.scoped_movement_response_size = scoped_movement_response_size
         self.scoped_movement_response_size_status = scoped_movement_response_size_status
+        self.route_entity_rejection = route_entity_rejection
+        self.route_entity_rejection_status = route_entity_rejection_status
+        self.route_threat_rejection = deepcopy(route_threat_rejection)
+        self.route_threat_rejection_status = route_threat_rejection_status
 
 
 def json_bytes(value):
@@ -279,6 +290,8 @@ class Bridge:
                 code = 'bridge_http_' + str(response.status)
                 freshness = None
                 movement_size = None
+                route_entity_rejection = None
+                route_threat_rejection = None
                 try:
                     value = load_strict(raw) if route.path == '/control/scoped-action' else json.loads(raw)
                     candidate = value.get('error') if isinstance(value, dict) else None
@@ -291,28 +304,61 @@ class Bridge:
                             freshness = value['capability_source_freshness']
                             self.last_response_metadata['capability_source_freshness'] = freshness
                     if (method == 'POST' and route.path == '/control/scoped-action' and response.status == 409
+                            and type(body) is dict and type(body.get('preflight')) is dict
+                            and body['preflight'].get('profile') in ROUTE_STOP_PROFILES
+                            and isinstance(value, dict) and 'route_entity_rejection' in value):
+                        diagnostic = value['route_entity_rejection']
+                        from .route_bee_diagnostic import matches_request
+                        valid = (valid_rejection_diagnostic(diagnostic) and diagnostic['rejection_code'] == code
+                                 and diagnostic['profile'] == body['preflight']['profile']
+                                 and matches_request(diagnostic, body.get('intent')))
+                        self.last_response_metadata['route_entity_rejection_status'] = 'reported' if valid else 'invalid'
+                        if valid:
+                            route_entity_rejection = diagnostic
+                    if (method == 'POST' and route.path == '/control/scoped-action' and response.status == 409
+                            and type(body) is dict and type(body.get('preflight')) is dict
+                            and body['preflight'].get('profile') == ROUTE_THREAT_PROFILE
+                            and isinstance(value, dict) and 'route_threat_rejection' in value):
+                        diagnostic = value['route_threat_rejection']
+                        valid = (valid_threat_rejection(diagnostic) and diagnostic['rejection_code'] == code
+                                 and threat_matches_request(diagnostic, body.get('intent')))
+                        self.last_response_metadata['route_threat_rejection_status'] = 'reported' if valid else 'invalid'
+                        if valid:
+                            route_threat_rejection = diagnostic
+                    if (method == 'POST' and route.path == '/control/scoped-action' and response.status == 409
                             and code == 'scoped_movement_response_evidence_too_large'
                             and isinstance(value, dict) and 'scoped_movement_response_size' in value):
                         valid = valid_size_diagnostic(value['scoped_movement_response_size'])
                         self.last_response_metadata['scoped_movement_response_size_status'] = 'reported' if valid else 'invalid'
                         if valid:
                             movement_size = value['scoped_movement_response_size']
-                except (ValueError, UnicodeError):
+                except (ValueError, UnicodeError, RecursionError):
                     pass
                 raise BridgeError(code, status=response.status, capability_source_freshness=freshness,
                                   capability_source_freshness_status=self.last_response_metadata.get('capability_source_freshness_status'),
                                   scoped_movement_response_size=movement_size,
                                   scoped_movement_response_size_status=self.last_response_metadata.get('scoped_movement_response_size_status'),
+                                  route_entity_rejection=route_entity_rejection,
+                                  route_entity_rejection_status=self.last_response_metadata.get('route_entity_rejection_status'),
+                                  route_threat_rejection=route_threat_rejection,
+                                  route_threat_rejection_status=self.last_response_metadata.get('route_threat_rejection_status'),
                                   uncertain=method == 'POST' and response.status >= 500)
             if is_frame:
                 if not raw.startswith(b'\x89PNG\r\n\x1a\n'):
                     raise BridgeError('invalid_frame')
                 return raw
-            result = (load_strict(raw) if route.path == '/control/capability-snapshot' else
+            strict_route_stop = (route.path == '/control/scoped-action' and type(body) is dict
+                and type(body.get('preflight')) is dict and body['preflight'].get('profile') in ROUTE_STOP_PROFILES)
+            result = (load_strict(raw) if route.path == '/control/capability-snapshot' or strict_route_stop else
                       json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()),
                                  **({'object_pairs_hook': _unique_object} if acquisition else {})))
             if not isinstance(result, dict):
                 raise ValueError()
+            receipt = result.get('result')
+            witness = receipt.get('scoped_native_preflight') if type(receipt) is dict else None
+            if (route.path == '/control/action/status' and type(witness) is dict
+                    and witness.get('profile') in ROUTE_STOP_PROFILES):
+                result = load_strict(raw)  # New-profile status cannot hide duplicate JSON keys.
             if acquisition and route.path == ACQUISITION_ROOT + 'prepare':
                 spans = {}
                 self.last_response_metadata.update(_embedded_metadata(raw, ('a', 'manifest'), spans))

@@ -96,6 +96,18 @@ final class CombatRetreatPolicy {
     private static String safeReason(String reason) { return reason==null?"retreat_window_unknown":reason; }
 
     /** Try observed nearest-threat away heading first, then alternate bounded angular offsets. */
+    static CombatDetour.Point proposal(CombatThreats.Snapshot threats, CombatDetour.Point from, int index) {
+        if(index<0 || index>=MAX_CANDIDATES) return null;
+        CombatThreats.Observed closest=nearest(threats,from);
+        if(closest==null) return null;
+        double dx=from.x()-closest.x(),dz=from.z()-closest.z();
+        if(Math.hypot(dx,dz)<EPSILON) return null;
+        int offset=index==0?0:(index+1)/2*(index%2==1?1:-1);
+        double angle=Math.atan2(dz,dx)+offset*Math.PI/8;
+        return new CombatDetour.Point(from.x()+Math.cos(angle)*PLAN_DISTANCE,
+                from.z()+Math.sin(angle)*PLAN_DISTANCE);
+    }
+
     static Plan plan(CombatThreats.Snapshot threats, CombatDetour.Point from,
                      CombatDetour.EdgeCheck check, LongSupplier clock) {
         return plan(threats,from,check,clock,()->null);

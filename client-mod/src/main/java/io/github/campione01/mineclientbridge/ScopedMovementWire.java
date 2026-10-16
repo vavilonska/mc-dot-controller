@@ -25,6 +25,10 @@ final class ScopedMovementWire {
                 || !witness.getAsJsonPrimitive("profile").isString()
                 || !(witness.get("profile").getAsString().equals(ScopedFlatMovement.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedStepDownMovement.PROFILE)
+                    || witness.get("profile").getAsString().equals(ScopedLocalSegmentMovement.PROFILE)
+                    || witness.get("profile").getAsString().equals(ScopedRouteThreatPolicy.PROFILE)
+                    || witness.get("profile").getAsString().equals(ScopedRouteStopPolicy.PROFILE_V2)
+                    || witness.get("profile").getAsString().equals(ScopedRouteStopPolicy.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedPlacement.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedMining.PROFILE)
                     || witness.get("profile").getAsString().equals(ScopedCollectTarget.PROFILE)))
@@ -48,18 +52,23 @@ final class ScopedMovementWire {
     static JsonObject sizeDiagnostic(JsonObject action,int standalone,int capability,int limit) {
         JsonObject witness=action.getAsJsonObject("result").getAsJsonObject(WITNESS);
         boolean mining=witness.get("profile").getAsString().equals(ScopedMining.PROFILE);
+        boolean spatial=witness.get("profile").getAsString().equals(ScopedRouteThreatPolicy.PROFILE);
+        boolean bees=witness.get("profile").getAsString().equals(ScopedRouteStopPolicy.PROFILE_V2);
+        boolean spatialStop=bees||witness.get("profile").getAsString().equals(ScopedRouteStopPolicy.PROFILE);
+        boolean localSegment=spatialStop||spatial||witness.get("profile").getAsString().equals(ScopedLocalSegmentMovement.PROFILE);
         boolean descent=witness.get("profile").getAsString().equals(ScopedStepDownMovement.PROFILE);
         boolean placement=witness.get("profile").getAsString().equals(ScopedPlacement.PROFILE);
-        JsonObject footprint=witness.getAsJsonObject("facts").getAsJsonObject(descent?"step_down":placement?"placement":mining?"mining":"movement");
+        JsonObject footprint=witness.getAsJsonObject("facts").getAsJsonObject(localSegment?"local_segment":descent?"step_down":placement?"placement":mining?"mining":"movement");
         JsonObject entities=footprint.getAsJsonObject("entity_guard");
         JsonObject out=new JsonObject();out.addProperty("schema_version",mining?2:1);
         if(mining)out.addProperty("profile",ScopedMining.PROFILE);
         if(placement){out.addProperty("schema_version",3);out.addProperty("profile",ScopedPlacement.PROFILE);}
+        if(localSegment){out.addProperty("schema_version",bees?8:spatialStop?7:spatial?6:5);out.addProperty("profile",bees?ScopedRouteStopPolicy.PROFILE_V2:spatialStop?ScopedRouteStopPolicy.PROFILE:spatial?ScopedRouteThreatPolicy.PROFILE:ScopedLocalSegmentMovement.PROFILE);}
         if(descent){out.addProperty("schema_version",4);out.addProperty("profile",ScopedStepDownMovement.PROFILE);}
         out.addProperty("standalone_bytes",standalone);out.addProperty("capability_bytes",capability);
         out.addProperty("response_limit",limit);
-        out.addProperty("standalone_reserve_bytes",ScopedEntityPolicy.TERMINAL_GROWTH_BYTES);
-        out.addProperty("capability_reserve_bytes",3*ScopedEntityPolicy.TERMINAL_GROWTH_BYTES);
+        out.addProperty("standalone_reserve_bytes",spatial?ScopedRouteThreatPolicy.STOP_GROWTH_BYTES:ScopedEntityPolicy.TERMINAL_GROWTH_BYTES);
+        out.addProperty("capability_reserve_bytes",3*(spatial?ScopedRouteThreatPolicy.STOP_GROWTH_BYTES:ScopedEntityPolicy.TERMINAL_GROWTH_BYTES));
         out.addProperty("witness_bytes",fullBytes(witness));out.addProperty("entity_frame_bytes",fullBytes(entities));
         out.addProperty("enumerated_count",entities.get("enumerated_count").getAsInt());
         out.addProperty("cell_count",footprint.getAsJsonArray("cells").size());

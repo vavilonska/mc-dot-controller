@@ -1,0 +1,94 @@
+{
+  "schema": "MDC_PUBLIC_SOURCE_DELIVERY_V1",
+  "date": "2026-10-16",
+  "archive_name": "mdc-linux-toolbox-t46-qualified-candidate-20261016-r2.zip",
+  "archive_sha256": "d1bd40dd14069914fbf4d050a1e03daf17354f3ad1b9889db76a40b435ff8e00",
+  "jar_sha256": "59523ef1a2e6c9c1a738c13958d60c506ff526033ae21af6023140bd6f0b2694",
+  "frozen_runtime_source_files": 1034,
+  "frozen_runtime_source_bytes": 10564728,
+  "frozen_source_manifest_sha256": "fa72779950d6a31088e9a938a1f9e7579721a85eff2a1ab231c7e543f759ed41",
+  "publication_changes": "Reader-facing documentation and publication inventories only; implementation, build configuration and tests are byte-identical to the delivered runtime source.",
+  "delivery_checks": {
+    "checker_tests_passed": 8,
+    "call_templates_passed": 9,
+    "independent_inline_and_template_schema_checks": 15,
+    "capability_matrix_rows": 24,
+    "staged_and_extracted_health": "PASS",
+    "deterministic_archive_byte_equal": true
+  },
+  "current_live_case": {
+    "case": "T46",
+    "status": "CORE_DEFENSE_LIVE_PASS_SAVED_WITH_EXPLICIT_COVERAGE_LIMITS",
+    "jar_sha256": "59523ef1a2e6c9c1a738c13958d60c506ff526033ae21af6023140bd6f0b2694",
+    "all_requested_defense_goals_verified": false,
+    "verified": {
+      "movement_preempted_before_motion": true,
+      "same_owner_attack_dispatches": 3,
+      "target_health_before": 20,
+      "target_health_after": 0,
+      "is_blocking_ticks": 14,
+      "player_health": 20,
+      "player_displacement": 0,
+      "normal_close": true,
+      "saved_copy_files": 33,
+      "route_terminal_state": "interrupted",
+      "route_resumed": false
+    },
+    "not_verified": [
+      "actual shield damage blocking",
+      "health observation recovery",
+      "low-health retreat",
+      "freeze/pause lifecycle",
+      "complex-world reliability",
+      "real refusal reproduction for new diagnostic"
+    ],
+    "evidence_scope": "Reviewed client observations and scoped saved-state checks; no server-finality claim. Raw evidence and worlds are private and are not published."
+  },
+  "offline_verification": {
+    "scope": "Offline source and artifact verification, before T46 live testing; no rerun of historical full suite during packaging",
+    "source_gate": {
+      "status": "PASS_OFFLINE_READY_FOR_BUILD",
+      "sha256": "6f37b057a018133393783e93bfbc4eeee32063053124800320338f33d008b10f"
+    },
+    "artifact_checks": {
+      "production_java_sources": 155,
+      "fresh_production_classes": 387,
+      "compile_dependencies": 24,
+      "mixins": 14,
+      "genuine_target_transformations": 9,
+      "zip_members": 400,
+      "fresh_classes_match_source_and_independent_compile": true,
+      "independent_artifact_review": "PASS_INDEPENDENT_OFFLINE_ARTIFACT_REVIEW",
+      "deterministic_jar_rebuild_equal": true
+    },
+    "focused_source_checks": {
+      "java_assertions_groups": [
+        314,
+        28,
+        343
+      ],
+      "focused_consumer": 21,
+      "engine_wire": 2,
+      "resident": 423,
+      "adjacent_passed": 154,
+      "adjacent_optional_fixture_skips": 6
+    },
+    "prior_full_aggregate_scope": "Continuity r2 source had 15-component aggregate: Python 2668 passed / 47 skipped, Node 168 passed. The latest diagnostic changes have the focused checks above; this is not a new full-aggregate run.",
+    "limits": [
+      "Mixin bytecode transformation gate is not full FML lifecycle/gameplay.",
+      "Synthetic engine/reader adapters and offline fixtures are not real game physics or live recovery.",
+      "Latest live coverage is separately summarized in T46-SUMMARY.json."
+    ]
+  },
+  "historical_live": {
+    "case": "T42",
+    "jar_sha256": "64aaa1a35a3f528cfa96cd2bb3a9978e49626d2dd9deeac5d2ecb72664ee7e3e",
+    "scope": "11-job workshop; 40 native mutations; 24 route segments; 2 planks made into 4 sticks and deposited. Automatic HOLD and subsequent manual normal close remain separate; strict saved aggregate=false. Not rerun wholesale on current JAR."
+  },
+  "preserved_outcomes": [
+    "T43 unknown",
+    "T44 full-defense failure",
+    "T45 known rejection/blocked"
+  ],
+  "github_ci": "Check the commit status separately; offline tests and delivery checks are not GitHub CI."
+}

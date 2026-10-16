@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mdc": {
+      "command": "/REPLACE/absolute/path/to/node",
+      "args": ["/REPLACE/absolute/path/to/bundle/source/client-mod/mcp/mineclient-bridge-mcp.mjs"],
+      "env": {
+        "MINECLIENT_TOOLBOX_CONFIG": "/REPLACE/private/toolbox-config.json"
+      }
+    }
+  }
+}

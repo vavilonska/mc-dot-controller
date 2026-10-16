@@ -661,6 +661,20 @@ class Runtime:
                 self._finish(record, "blocked", "preflight_observation_stale")
                 raise SkillError("preflight_observation_stale")
             if self._job_control is not None and record["kind"] == "mutation":
+                # Reservation persistence/session work may have observed a stop.
+                # This is the final admission boundary before transport starts;
+                # a known unsubmitted mutation must not leave an unknown latch.
+                try:
+                    self._job_control.checkpoint()
+                    # Owner validation can perform session I/O. Recheck stop
+                    # without another owner/network call at the submit boundary.
+                    stop = self._job_control.stop_reason()
+                    if stop:
+                        raise SkillError(stop, status="cancelled" if stop == "cancel_requested" else "interrupted")
+                except SkillError as exc:
+                    self._finish(record, "cancelled" if exc.status == "cancelled" else "blocked", exc.reason,
+                                 {"submission_outcome": "stopped_before_dispatch", "gameplay_effect_confirmed": False})
+                    raise
                 self._job_effect_certainty = "unknown"
             returned = self.client.submit(command, request_id=rid)
             self._observation_timing(record, "submit_returned")

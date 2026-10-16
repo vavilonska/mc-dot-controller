@@ -33,7 +33,11 @@ final class BoundedCombat {
     private final CombatPursuit pursuit = new CombatPursuit();
     private boolean shieldOwned;
     private ScopedCombat scopedGuard;
-    void bindScoped(ScopedCombat guard){scopedGuard=guard;}
+    void bindScoped(ScopedCombat guard){
+        if(guard==null || scopedGuard!=null || encounter!=null)
+            throw new IllegalStateException("scoped_combat_binding_invalid");
+        healthGuard.enableObservationRecovery();scopedGuard=guard;
+    }
     private final CombatDetour detour = new CombatDetour();
     private final CombatRouteMotion routeMotion = new CombatRouteMotion();
     private final CombatRetreatPolicy.Progress retreatProgress = new CombatRetreatPolicy.Progress();
@@ -46,7 +50,7 @@ final class BoundedCombat {
     private CombatRetreatDiagnostics pendingRetreatDiagnostics;
     private JsonObject pendingRetreatEvidence;
     private boolean pendingRetreatPlan;
-    private int waypointIndex, retreatStartTick = -1, healthTriggerTick = -1;
+    private int waypointIndex, retreatStartTick = -1;
     private long retreatStartNanos;
     private String safetyReason;
     private CombatDetour.Point retreatGoal;
@@ -87,6 +91,7 @@ final class BoundedCombat {
     Step tick(Minecraft mc, int tick) {
         currentTick = tick;
         pendingRetreatDiagnostics=null;pendingRetreatEvidence=null;pendingRetreatPlan=false;
+        pendingScopedRetreatFrame=null;
         Step step = tickCombat(mc, tick);
         if(!ClientActions.ownsCombat(this))return Step.end("cancelled","combat_owner_changed_after_callback");
         evidence.addProperty("combat_tick", tick);
@@ -117,6 +122,7 @@ final class BoundedCombat {
             }
             CombatRetreatEvidence.stamp(pendingRetreatEvidence,pendingRetreatDiagnostics);
         }
+        if(step.terminal()==null && pendingScopedRetreatFrame!=null) pendingScopedRetreatFrame.check(mc);
         return step;
     }
 
@@ -133,7 +139,7 @@ final class BoundedCombat {
         captureThreats(mc,currentTick);
         CombatThreats.Gate gate=CombatThreats.evaluate(threats,System.nanoTime(),currentTick,
             mc.player.getX(),mc.player.getY(),mc.player.getZ(),request.targetId(),request.targetUuid(),
-            healthGuard.sample(currentTick,System.nanoTime(),mc.player.getHealth()));
+            sampleHealth(mc,currentTick));
         ScopedCombat.require(!gate.stop() && safetyReason==null,"scoped_combat_attack_threat_changed");
         ScopedCombat.require(!(mc.player.getMainHandItem().getItem() instanceof SwordItem) || !sweepRisk(mc,target),
             "scoped_combat_protected_sweep_overlap");
@@ -148,16 +154,41 @@ final class BoundedCombat {
         guard.check(mc,false);
         if(forward==0){guard.callbackFence(mc,callbackStarted,callbackTick);return;}
         ScopedCombat.require(currentTick<=600,"scoped_combat_tick_budget_600");
+        ScopedRetreatFrame frame=new ScopedRetreatFrame(mc,guard,callbackStarted,callbackTick);
+        CombatThreats.Snapshot before=threats;
+        CombatDetour.Point beforePose=point(mc.player.position());
         captureThreats(mc,currentTick);
-        var health=healthGuard.sample(currentTick,System.nanoTime(),mc.player.getHealth());
+        frame.bind(mc,threats);
+        var health=sampleHealth(mc,currentTick);
         var gate=CombatThreats.evaluate(threats,System.nanoTime(),currentTick,mc.player.getX(),mc.player.getY(),mc.player.getZ(),
             request.targetId(),request.targetUuid(),health);
+        ScopedCombat.require(!healthGuard.recovering(),"scoped_combat_movement_health_observation_recovering");
         if(gate.stop() && safetyReason==null){safetyReason=gate.reason();throw new ClientActionRequest.Rejected(409,"scoped_combat_stale_offensive_movement");}
         double yaw=Math.toRadians(mc.player.getYRot());
         CombatDetour.Point from=point(mc.player.position());
+        if(safetyReason!=null) {
+            ScopedCombat.require(forward>0 && retreatGoal!=null,"scoped_retreat_proposal_missing");
+            ScopedCombat.require(mc.player.getYRot()==expectedYaw && mc.player.getXRot()==expectedPitch,
+                    "scoped_retreat_heading_changed");
+            ScopedCombat.require(currentTick-retreatStartTick<60 && System.nanoTime()-retreatStartNanos<3_000_000_000L
+                    && retreatDistance<4,"scoped_retreat_episode_budget");
+            ScopedCombat.require(CombatRetreatPolicy.continuity(before,threats,beforePose,from)==null,
+                    "scoped_retreat_effect_threat_continuity_changed");
+            retreatWindowMetrics=null;lastRouteTerrain=null;
+            var checked=ScopedRetreatPlanning.validateAll(from,retreatGoal,
+                    (a,b)->retreatWindow(mc,a,b),System::nanoTime,()->frame.check(mc));
+            evidence.add("scoped_retreat_effect_validation",scopedRetreatEvidence(checked,"movement_input",false));
+            ScopedCombat.require(checked.clear(),"scoped_retreat_effect_full_route_refused");
+        }
         CombatDetour.Point to=new CombatDetour.Point(from.x()-Math.sin(yaw)*.65*Math.signum(forward),from.z()+Math.cos(yaw)*.65*Math.signum(forward));
         var edge=liveRouteEdge(mc,from,to,safetyReason!=null);
-        ScopedCombat.require(edge.clear(),"scoped_combat_effect_corridor_changed");guard.check(mc,false);guard.callbackFence(mc,callbackStarted,callbackTick);
+        ScopedCombat.require(edge.clear(),"scoped_combat_effect_corridor_changed");frame.check(mc);
+        if(safetyReason!=null) evidence.getAsJsonObject("scoped_retreat_effect_validation").addProperty("movement_authorized",true);
+        try { frame.check(mc); } // JSON observation is also before the final execution fence.
+        catch(RuntimeException failure) {
+            if(safetyReason!=null) evidence.getAsJsonObject("scoped_retreat_effect_validation").addProperty("movement_authorized",false);
+            throw failure;
+        }
     }
 
     boolean isEncounter() { return encounter!=null; }
@@ -183,6 +214,10 @@ final class BoundedCombat {
         return new Step(decision.forward(),decision.terminal(),decision.reason());
     }
 
+    private CombatThreats.HealthGuard.Result sampleHealth(Minecraft mc,int tick) {
+        return healthGuard.sampleSource(tick,mc.level.getGameTime(),System.nanoTime(),mc.player.getHealth());
+    }
+
     private Step tickCombat(Minecraft mc, int tick) {
         ScopedCombat scoped=scopedGuard;
         long callbackStarted=System.nanoTime(),callbackTick=mc.level.getGameTime();
@@ -190,7 +225,7 @@ final class BoundedCombat {
         if (CombatRules.manualViewChanged(mc.player.getYRot(),mc.player.getXRot(),expectedYaw,expectedPitch))
             return Step.end("cancelled", "manual_view_changed");
         captureThreats(mc, tick);
-        CombatThreats.HealthGuard.Result health = healthGuard.sample(tick, System.nanoTime(), mc.player.getHealth());
+        CombatThreats.HealthGuard.Result health = sampleHealth(mc,tick);
         LivingEntity target = target(mc);
         if(scoped!=null){scoped.check(mc,false);scoped.callbackFence(mc,callbackStarted,callbackTick);}
         CombatThreats.Gate gate = CombatThreats.evaluate(threats, System.nanoTime(), tick,
@@ -202,9 +237,12 @@ final class BoundedCombat {
         observe(mc, target);
         if (mc.player.position().distanceTo(origin) > 12) return Step.end("failed", "combat_area_limit");
         if (!weapon(mc.player.getMainHandItem().getItem())) return Step.end("failed", "selected_weapon_changed");
+        evidence.addProperty("observation_recovery_zero_forward",false);
+        Step observationWait=observationRecoveryStep(mc,tick,scoped,callbackStarted,callbackTick);
+        if(observationWait!=null) return observationWait;
         if (gate.stop() && safetyReason == null) safetyReason = gate.reason();
         // Safety latches for this action, before any target-facing view or attack.
-        if (safetyReason != null) return safetyRetreat(mc, tick, gate);
+        if (safetyReason != null) return safetyRetreat(mc, tick, gate,callbackStarted,callbackTick);
         if (!target.isAlive()) {
             evidence.addProperty("target_dead_observed", true);
             evidence.addProperty("attack_completed", true);
@@ -320,6 +358,21 @@ final class BoundedCombat {
         ScopedCombatDispatch.attack(this,mc::startAttack);
         evidence.addProperty("attack_dispatches",attacks);
         return Step.waitFor("attack_dispatched");
+    }
+
+    /** A recoverable observation gap permits only the existing explicitly requested shield. */
+    private Step observationRecoveryStep(Minecraft mc,int tick,ScopedCombat scoped,long started,long callbackTick) {
+        if(scoped==null || safetyReason!=null || !healthGuard.recovering()) return null;
+        // Keep the view unchanged. This returns zero requested forward, not a claim that
+        // external velocity/knockback is zero or that the player is safe while waiting.
+        CombatThreats.Gate defensive=CombatThreats.defensiveTarget(threats,System.nanoTime(),tick,
+                mc.player.getX(),mc.player.getY(),mc.player.getZ(),request.targetId(),request.targetUuid());
+        if(defensive.stop()) { safetyReason=defensive.reason();return null; }
+        shield(mc,request.shield()); // The original guarded offhand effect path is mandatory.
+        scoped.check(mc,false);scoped.callbackFence(mc,started,callbackTick);
+        evidence.addProperty("observation_recovery_zero_forward",true);
+        evidence.addProperty("observation_recovery_wait_grants_offense",false);
+        return Step.waitFor("health_observation_recovering");
     }
 
     private Step move(Minecraft mc, LivingEntity target, int direction, String phase) {
@@ -457,15 +510,17 @@ final class BoundedCombat {
 
     private void observeThreatGate(CombatThreats.Gate gate, CombatThreats.HealthGuard.Result health) {
         JsonObject data = new JsonObject();
-        if(health.interrupted() && healthTriggerTick<0) healthTriggerTick=currentTick;
+        CombatThreats.HealthGuard.Diagnostics healthDiagnostic=healthGuard.diagnostics();
+        boolean latched=healthDiagnostic!=null && healthDiagnostic.latched();
         data.addProperty("evaluated_tick",currentTick);data.addProperty("stop_offense",gate.stop());
         data.addProperty("reason",gate.reason());data.addProperty("fresh",gate.fresh());
         data.addProperty("emergency_entity_id",gate.emergencyId());
         data.addProperty("emergency_uuid",gate.emergencyUuid());
         data.addProperty("thresholds_live_calibrated",false);
         data.addProperty("health_gate_reason",health.reason());data.addProperty("health_known",health.known());
-        data.addProperty("health_value_semantics",health.interrupted()?"latched_trigger_metrics":"current_sample");
-        data.addProperty("health_sample_tick",health.interrupted()?healthTriggerTick:currentTick);
+        data.addProperty("health_value_semantics",latched?"latched_trigger_metrics":
+                healthGuard.recovering()?"current_recovery_sample":"current_sample");
+        data.addProperty("health_sample_tick",latched?healthDiagnostic.trigger().sampleTick():currentTick);
         number(data,"health",health.health());number(data,"rolling_loss_1s",health.damageInWindow());
         data.addProperty("health_sample_count",health.sampleCount());
         CombatHealthEvidence.append(data,healthGuard);
@@ -603,7 +658,115 @@ final class BoundedCombat {
         scopedRawOwner(mc);mc.player.setYRot(expectedYaw);scopedRawOwner(mc);mc.player.setXRot(expectedPitch);scopedRawOwner(mc);mc.player.setYHeadRot(expectedYaw);
     }
 
-    private Step safetyRetreat(Minecraft mc,int tick,CombatThreats.Gate gate) {
+    private final ScopedRetreatPlanning.Cursor scopedRetreatCursor=new ScopedRetreatPlanning.Cursor();
+    private ScopedRetreatFrame pendingScopedRetreatFrame;
+
+    /** Same-callback proof owner. No geometry or cell observations survive this invocation. */
+    private final class ScopedRetreatFrame {
+        final ScopedCombat guard;
+        final long started,gameTick;
+        final Vec3 playerPosition,targetPosition,velocity;
+        final boolean onGround;
+        float yaw,pitch;
+        CombatThreats.Snapshot snapshot;
+        ScopedRetreatFrame(Minecraft mc,ScopedCombat guard,long started,long gameTick) {
+            this.guard=guard;this.started=started;this.gameTick=gameTick;
+            playerPosition=mc.player.position();targetPosition=guard.target.position();
+            velocity=mc.player.getDeltaMovement();onGround=mc.player.onGround();
+            yaw=mc.player.getYRot();pitch=mc.player.getXRot();
+        }
+        void bind(Minecraft mc,CombatThreats.Snapshot snapshot) { this.snapshot=snapshot;check(mc); }
+        void check(Minecraft mc) {
+            guard.check(mc,false);guard.callbackFence(mc,started,gameTick);
+            ScopedCombat.require(mc.player.position().equals(playerPosition) && guard.target.position().equals(targetPosition)
+                    && mc.player.getDeltaMovement().equals(velocity) && mc.player.onGround()==onGround
+                    && mc.player.getYRot()==yaw && mc.player.getXRot()==pitch,"scoped_retreat_geometry_changed_during_hooks");
+            ScopedCombat.require(snapshot!=null && threats==snapshot
+                    && CombatThreats.snapshotProblem(snapshot,System.nanoTime(),currentTick)==null,"scoped_retreat_snapshot_changed_or_stale");
+            guard.callbackFence(mc,started,gameTick);
+        }
+        void acceptView(Minecraft mc,float expectedYaw,float expectedPitch) {
+            yaw=expectedYaw;pitch=expectedPitch;check(mc);
+        }
+    }
+
+    private JsonObject scopedRetreatEvidence(ScopedRetreatPlanning.Checked checked,String scope,boolean proposal) {
+        JsonObject data=new JsonObject();data.addProperty("schema_version",1);data.addProperty("scope",scope);
+        data.addProperty("evaluated_tick",currentTick);data.addProperty("reason",checked.reason());
+        data.addProperty("complete",checked.clear());data.addProperty("hard_failure",checked.hardFailure());
+        data.addProperty("window_checks",checked.windows());data.addProperty("elapsed_ns",checked.elapsedNanos());
+        data.addProperty("scheduling_budget_ns",CombatRetreatPolicy.MAX_CHECK_NANOS);
+        data.addProperty("scheduling_budget_exceeded",checked.softBudgetExceeded());
+        data.addProperty("hard_boundary","scoped_callback_same_tick_context_50ms_and_fresh_snapshot");
+        data.addProperty("proposal_only",proposal);data.addProperty("movement_authorized",false);
+        data.addProperty("all_remaining_windows_revalidated",checked.clear());
+        data.addProperty("candidate_attempts",scopedRetreatCursor.attempts());
+        return data;
+    }
+
+    private Step scopedSafetyRetreat(Minecraft mc,int tick,long started,long gameTick) {
+        ScopedRetreatFrame frame=new ScopedRetreatFrame(mc,scopedGuard,started,gameTick);
+        pendingScopedRetreatFrame=frame;
+        shield(mc,false);detour.clear();
+        evidence.addProperty("safety_interrupt_reason",safetyReason);
+        evidence.addProperty("risk_remaining",true);evidence.addProperty("outcome_kind","risk_remaining");
+        captureThreats(mc,tick);frame.bind(mc,threats);
+        if(threats.entities().stream().anyMatch(e->e.alive() && e.type().equals("minecraft:enderman")))
+            return Step.end("failed","enderman_gaze_unplanned_risk_remaining");
+        if(!finite(mc.player.getDeltaMovement())) return Step.end("failed","invalid_retreat_motion_risk_remaining");
+        if(!mc.player.onGround() || Math.abs(mc.player.getY()-Math.rint(mc.player.getY()))>.05)
+            return Step.end("failed","unsafe_retreat_pose_risk_remaining");
+        if(retreatStartTick<0) {retreatStartTick=tick;retreatStartNanos=System.nanoTime();}
+        if(previousRetreatPose!=null) retreatDistance+=mc.player.position().distanceTo(previousRetreatPose);
+        previousRetreatPose=mc.player.position();
+        evidence.addProperty("retreat_distance_observed",retreatDistance);
+        evidence.addProperty("retreat_elapsed_ticks",tick-retreatStartTick);
+        if(tick-retreatStartTick>=60 || System.nanoTime()-retreatStartNanos>=3_000_000_000L || retreatDistance>=4)
+            return Step.end("failed","retreat_budget_risk_remaining");
+        CombatDetour.Point current=point(mc.player.position());
+        if(retreatGoal==null) {
+            ScopedRetreatPlanning.Proposal proposal=scopedRetreatCursor.next(threats,current,tick);
+            if(proposal==null) return Step.end("failed","no_safe_retreat_risk_remaining");
+            retreatWindowMetrics=null;lastRouteTerrain=null;
+            var checked=ScopedRetreatPlanning.validateAll(current,proposal.goal(),
+                    (a,b)->retreatWindow(mc,a,b),System::nanoTime,()->frame.check(mc));
+            JsonObject data=scopedRetreatEvidence(checked,"one_candidate_current_tick",true);
+            data.addProperty("candidate_index",proposal.index());evidence.add("scoped_retreat_plan",data);
+            frame.check(mc);
+            if(checked.hardFailure()) {scopedRetreatCursor.close();return Step.end("failed",checked.reason()+"_risk_remaining");}
+            if(!checked.clear()) {
+                if(scopedRetreatCursor.attempts()>=CombatRetreatPolicy.MAX_CANDIDATES)
+                    return Step.end("failed","no_safe_retreat_risk_remaining");
+                return Step.waitFor("scoped_retreat_candidate_rejected_waiting_risk_remaining");
+            }
+            retreatGoal=proposal.goal();
+            JsonObject goal=new JsonObject();goal.addProperty("x",retreatGoal.x());goal.addProperty("z",retreatGoal.z());
+            goal.addProperty("proposal_only",true);evidence.add("retreat_goal",goal);
+            retreatProgress.start(threats,current,retreatGoal,tick,System.nanoTime());
+            frame.check(mc);return Step.waitFor("scoped_retreat_proposal_ready_risk_remaining");
+        }
+        String progressProblem=retreatProgress.observe(threats,current,tick,System.nanoTime());
+        JsonObject progress=new JsonObject();progress.addProperty("evaluated_tick",tick);
+        progress.addProperty("reason",progressProblem==null?"observed_continuity_clear":progressProblem);
+        number(progress,"window_player_advance",retreatProgress.observedAdvance());
+        number(progress,"window_clearance_gain",retreatProgress.observedClearanceGain());
+        evidence.add("retreat_progress",progress);
+        if(progressProblem!=null) return Step.end("failed",progressProblem+"_risk_remaining");
+        double dx=retreatGoal.x()-current.x(),dz=retreatGoal.z()-current.z(),distance=Math.hypot(dx,dz);
+        if(distance<=CombatRetreatPolicy.ARRIVAL_DISTANCE) return Step.end("failed","retreat_segment_completed_risk_remaining");
+        Step motion=routeMotionStep(mc,dx,dz,true);if(motion!=null)return motion;
+        retreatWindowMetrics=null;lastRouteTerrain=null;
+        var checked=ScopedRetreatPlanning.validateAll(current,retreatGoal,
+                (a,b)->retreatWindow(mc,a,b),System::nanoTime,()->frame.check(mc));
+        evidence.add("scoped_retreat_live_validation",scopedRetreatEvidence(checked,"pre_tick_complete_route",false));
+        frame.check(mc);
+        if(!checked.clear()) return Step.end("failed",checked.reason()+"_risk_remaining");
+        faceMovement(mc,dx,dz);frame.acceptView(mc,expectedYaw,expectedPitch);
+        return new Step(distance<.5?.35F:1F,null,"safety_retreating_risk_remaining");
+    }
+
+    private Step safetyRetreat(Minecraft mc,int tick,CombatThreats.Gate gate,long callbackStarted,long callbackTick) {
+        if(scopedGuard!=null) return scopedSafetyRetreat(mc,tick,callbackStarted,callbackTick);
         shield(mc,false);detour.clear();
         evidence.addProperty("safety_interrupt_reason",safetyReason);
         evidence.addProperty("risk_remaining",true);evidence.addProperty("outcome_kind","risk_remaining");

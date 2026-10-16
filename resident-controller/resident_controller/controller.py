@@ -27,6 +27,8 @@ from .pause_contract import pause_body, validate_pause_receipt
 from .transport import BridgeError, DIRECT
 from .capability_snapshot import source_freshness
 from .movement_wire import valid_size_diagnostic
+from .route_spatial_stop_snapshot import valid_rejection_diagnostic
+from .route_threat_diagnostic import valid_rejection_diagnostic as valid_threat_rejection
 from .world import WorldCache, scan_identity
 from .action_progress import active_progress
 
@@ -49,6 +51,17 @@ def action_rejection_admission(exc):
             result['scoped_movement_response_size'] = deepcopy(movement_size)
         elif movement_size is not None or getattr(exc, 'scoped_movement_response_size_status', None) == 'invalid':
             result['scoped_movement_response_size_status'] = 'invalid'
+    rejection = getattr(exc, 'route_entity_rejection', None)
+    if exc.status == 409 and valid_rejection_diagnostic(rejection) and rejection['rejection_code'] == exc.code:
+        result['route_entity_rejection'] = deepcopy(rejection)
+    elif rejection is not None or getattr(exc, 'route_entity_rejection_status', None) == 'invalid':
+        result['route_entity_rejection_status'] = 'invalid'
+    threat_rejection = getattr(exc, 'route_threat_rejection', None)
+    if (exc.status == 409 and not exc.uncertain and valid_threat_rejection(threat_rejection)
+            and threat_rejection['rejection_code'] == exc.code):
+        result['route_threat_rejection'] = deepcopy(threat_rejection)
+    elif threat_rejection is not None or getattr(exc, 'route_threat_rejection_status', None) == 'invalid':
+        result['route_threat_rejection_status'] = 'invalid'
     return result
 
 
@@ -75,6 +88,7 @@ class Running:
     step_number: int = 0
     response: object = None
     last_action_result: object = None
+    scoped_original_intent: dict | None = None
     last_action_observed_monotonic: float | None = None
     last_action_observed_unix: float | None = None
     wake_at: float = 0.0
@@ -409,6 +423,10 @@ class Resident:
             from .terrain_acquisition import closure_command
             if closure_command(self, command):
                 return
+        from .spatial_threat_snapshot import validate_request as validate_route_threat_request
+        validate_route_threat_request(command.get('scoped_native_preflight'), command)
+        from .route_spatial_stop_snapshot import validate_request as validate_route_stop_request
+        validate_route_stop_request(command.get('scoped_native_preflight'), command)
         validate_encounter_command(command)  # Reject before any read, cancellation or takeover.
         operation = command.get('op')
         if operation == 'capability_cancel_exact':
@@ -1233,6 +1251,10 @@ class Resident:
             if kind == 'action':
                 if self.paused and self.reason == 'encounter_requires_handoff':
                     raise ValueError('encounter_requires_handoff')
+                from .spatial_threat_snapshot import validate_request as validate_route_threat_request
+                validate_route_threat_request(task.command.get('scoped_native_preflight'), step['body'])
+                from .route_spatial_stop_snapshot import validate_request as validate_route_stop_request
+                validate_route_stop_request(task.command.get('scoped_native_preflight'), step['body'])
                 task.encounter_request = validate_encounter_request(step['body'])
                 task.step_number += 1
                 task.action_id = uuid.uuid5(uuid.UUID(self.session_id), task.command['request_id'] + ':' + str(task.step_number)).hex
@@ -1240,6 +1262,8 @@ class Resident:
                 if task.encounter_request is not None:
                     self.publish()  # Publish the new bounded owner before a possibly blocking POST.
                 if 'scoped_native_preflight' in task.command:
+                    if task.command['scoped_native_preflight'].get('profile') in ('movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2'):
+                        task.scoped_original_intent = deepcopy({**step['body'], 'action_id': task.action_id})
                     result = self.bridge.request('POST', '/control/scoped-action', {
                         'preflight': task.command['scoped_native_preflight'],
                         'intent': {**step['body'], 'action_id': task.action_id}})
@@ -1324,6 +1348,19 @@ class Resident:
         if (result.get('action_schema_version') != 1 or result.get('action_id') != task.action_id
                 or result.get('action_session') != self.bridge_identity['action_session']):
             raise BridgeError('action_status_mismatch', uncertain=True)
+        route_profile = task.command.get('scoped_native_preflight', {}).get('profile')
+        if route_profile in ('movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2'):
+            detail = 'route_spatial_stop' if route_profile in ('movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2') else 'route_threat'
+            try:
+                from .capability_snapshot import validate_scoped_witness, exact
+                witness = validate_scoped_witness(result, task.command['scoped_native_preflight'], task.action_id,
+                                                  task.scoped_original_intent)
+                if task.last_action_result is not None:
+                    previous = task.last_action_result.get('result', {}).get('scoped_native_preflight')
+                    if not exact(witness, previous):
+                        raise ValueError(detail + '_admission_witness_changed')
+            except (ValueError, KeyError, TypeError):
+                raise BridgeError(detail + '_action_receipt_invalid', uncertain=True) from None
         try:
             validate_encounter_receipt(result, task.encounter_request)
         except (ValueError, KeyError, TypeError):

@@ -283,10 +283,68 @@ class NoncombatGatewayTests(unittest.TestCase):
         self.bridge.focused = False
         self.until(lambda: not self.dog.armed)
         self.assertEqual(self.dog.reason, 'noncombat_observation_not_safe_idle')
+        # The client observes the published state, not the daemon's in-memory
+        # armed flag. Wait for that publication before expecting client refusal.
+        self.until(lambda: self.client.session()['state'] == 'paused')
         self.assertFalse(self.bridge.posts)
         self.assertFalse(self.mutations())
         with self.assertRaisesRegex(ValueError, 'watchdog_not_accepting_intents'):
             self.client.acquire_capability(self.owner)
+        self.assertFalse(self.bridge.posts)
+        self.assertFalse(self.mutations())
+        self.assertIsNone(self.dog.capability_lease)
+        self.assertIsNone(self.client._capability_owner)
+
+    def test_focus_loss_stale_publication_refuses_lease_without_input_mutation(self):
+        paused_write = threading.Event()
+        publish = threading.Event()
+        real_write = base_watchdog.write_json
+        outcome = []
+        def hold_first_paused_publication(path, value):
+            if (Path(path).name == 'state.json' and value.get('state') == 'paused'
+                    and not paused_write.is_set()):
+                paused_write.set()
+                if not publish.wait(3):
+                    raise AssertionError('test_paused_publication_not_released')
+            return real_write(path, value)
+        def acquire():
+            try:
+                self.client.acquire_capability(self.owner, timeout=3)
+                outcome.append(None)
+            except Exception as exc:
+                outcome.append(exc)
+        worker = None
+        with patch.object(base_watchdog, 'write_json', hold_first_paused_publication):
+            try:
+                self.bridge.focused = False
+                self.assertTrue(paused_write.wait(2))
+                self.assertFalse(self.dog.armed)
+                self.assertEqual(self.client.session()['state'], 'ready')
+                worker = threading.Thread(target=acquire, daemon=True)
+                worker.start()
+                # Prove the stale client enqueued exactly a lease control before
+                # releasing publication. No resident/gameplay request is sent.
+                self.until(lambda: any(json.loads(path.read_text()).get('op') == 'capability_acquire'
+                    for path in (self.root / 'watchdog' / 'inbox').glob('*.json')))
+            finally:
+                publish.set()
+                if worker is not None:
+                    worker.join(timeout=4)
+        self.assertIsNotNone(worker)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(outcome), 1)
+        self.assertIsInstance(outcome[0], ValueError)
+        self.assertEqual(str(outcome[0]), 'capability_control_unconfirmed:capability_owner_requires_handoff')
+        self.assertFalse(self.bridge.posts)
+        self.assertFalse(self.mutations())
+        self.assertIsNone(self.dog.capability_lease)
+        self.assertIsNone(self.client._capability_owner)
+        controls = [json.loads(path.read_text()) for path in (self.root / 'watchdog' / 'results').glob('*.json')]
+        self.assertEqual(len(controls), 1)
+        self.assertEqual(controls[0]['result']['status'], 'failed')
+        self.assertEqual(controls[0]['result']['reason'], 'capability_owner_requires_handoff')
+        self.assertFalse(controls[0]['result']['gameplay_effect_confirmed'])
+        self.assertIsNone(controls[0]['queue_request_id'])
 
     def test_focus_loss_under_lease_preserves_handoff_without_mutation(self):
         self.claim()

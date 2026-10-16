@@ -1,0 +1,36 @@
+{
+  "scope": "Offline source and artifact verification, before T46 live testing; no rerun of historical full suite during packaging",
+  "source_gate": {
+    "status": "PASS_OFFLINE_READY_FOR_BUILD",
+    "sha256": "6f37b057a018133393783e93bfbc4eeee32063053124800320338f33d008b10f"
+  },
+  "artifact_checks": {
+    "production_java_sources": 155,
+    "fresh_production_classes": 387,
+    "compile_dependencies": 24,
+    "mixins": 14,
+    "genuine_target_transformations": 9,
+    "zip_members": 400,
+    "fresh_classes_match_source_and_independent_compile": true,
+    "independent_artifact_review": "PASS_INDEPENDENT_OFFLINE_ARTIFACT_REVIEW",
+    "deterministic_jar_rebuild_equal": true
+  },
+  "focused_source_checks": {
+    "java_assertions_groups": [
+      314,
+      28,
+      343
+    ],
+    "focused_consumer": 21,
+    "engine_wire": 2,
+    "resident": 423,
+    "adjacent_passed": 154,
+    "adjacent_optional_fixture_skips": 6
+  },
+  "prior_full_aggregate_scope": "Continuity r2 source had 15-component aggregate: Python 2668 passed / 47 skipped, Node 168 passed. The latest diagnostic changes have the focused checks above; this is not a new full-aggregate run.",
+  "limits": [
+    "Mixin bytecode transformation gate is not full FML lifecycle/gameplay.",
+    "Synthetic engine/reader adapters and offline fixtures are not real game physics or live recovery.",
+    "Latest live coverage is separately summarized in T46-SUMMARY.json."
+  ]
+}

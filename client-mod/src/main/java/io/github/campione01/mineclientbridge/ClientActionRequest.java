@@ -148,12 +148,27 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         final int httpStatus;
         final JsonObject capabilitySourceFreshness;
         final JsonObject scopedMovementResponseSize;
+        final JsonObject routeEntityRejection;
+        final JsonObject routeTerrainRejection;
+        final JsonObject routeThreatRejection;
         Rejected(int httpStatus, String reason) { this(httpStatus, reason, null); }
         Rejected(int httpStatus, String reason, JsonObject freshness) {
             this(httpStatus,reason,freshness,null);
         }
         Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize) {
+            this(httpStatus,reason,freshness,movementSize,null);
+        }
+        Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection) {
+            this(httpStatus,reason,freshness,movementSize,routeEntityRejection,null);
+        }
+        Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection) {
+            this(httpStatus,reason,freshness,movementSize,routeEntityRejection,routeTerrainRejection,null);
+        }
+        Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection,JsonObject routeThreatRejection) {
             super(reason); this.httpStatus = httpStatus;
+            this.routeThreatRejection=routeThreatRejection==null?null:routeThreatRejection.deepCopy();
+            this.routeTerrainRejection=routeTerrainRejection==null?null:routeTerrainRejection.deepCopy();
+            this.routeEntityRejection=routeEntityRejection==null?null:routeEntityRejection.deepCopy();
             capabilitySourceFreshness = freshness == null ? null : freshness.deepCopy();
             scopedMovementResponseSize = httpStatus==409 && reason.equals("scoped_movement_response_evidence_too_large")
                     && movementSize!=null ? movementSize.deepCopy() : null;
@@ -164,6 +179,8 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             if (capabilitySourceFreshness != null)
                 body.add("capability_source_freshness", capabilitySourceFreshness.deepCopy());
             if(scopedMovementResponseSize!=null)body.add("scoped_movement_response_size",scopedMovementResponseSize.deepCopy());
+            if(routeEntityRejection!=null)body.add("route_entity_rejection",routeEntityRejection.deepCopy());
+            if(routeThreatRejection!=null)body.add("route_threat_rejection",routeThreatRejection.deepCopy());
             return body;
         }
     }

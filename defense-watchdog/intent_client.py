@@ -10,6 +10,19 @@ from base_watchdog import recovery_close_command
 from capability_ownership import CONTROL_OPS
 ID = re.compile(r'[A-Za-z0-9_-]{1,80}')
 
+def _pending_owner_intent(directory):
+    # The daemon atomically claims inbox files into working. Restart the whole
+    # read-only snapshot when that happens; never skip an unreadable entry or
+    # retry a submit/write. Admission counts pending inbox work, not the active
+    # working request, which remains serialized by the daemon's owner.
+    for attempt in range(3):
+        try:
+            return any(json.loads(p.read_text()).get('op') not in CONTROL_OPS
+                       for p in directory.glob('*.json'))
+        except FileNotFoundError:
+            if attempt == 2:
+                raise
+
 class IntentClient:
     def __init__(self, directory):
         self.root = Path(directory)
@@ -46,8 +59,7 @@ class IntentClient:
         name = request_id+'.json'
         for folder in ('inbox','working','results'):
             if (self.root/folder/name).exists():return request_id
-        if command.get('op') not in CONTROL_OPS and any(
-                json.loads(p.read_text()).get('op') not in CONTROL_OPS for p in (self.root/'inbox').glob('*.json')):
+        if command.get('op') not in CONTROL_OPS and _pending_owner_intent(self.root/'inbox'):
             raise ValueError('one_pending_owner_intent_only')
         body = {**command, '_watchdog_session_id': session['session_id']}
         if recovery:

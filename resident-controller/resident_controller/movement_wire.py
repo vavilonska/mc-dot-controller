@@ -64,7 +64,7 @@ def decode(bundle):
     result = action['result']
     authority = result.get(WITNESS)
     require(REFERENCE not in result and type(authority) is dict, 'authority_missing_or_chained')
-    require(authority.get('profile') in ('movement-flat-observed-v2','movement-step-down-observed-v1','mining-local-observed-v2','collect-local-observed-v1','placement-local-observed-v1')
+    require(authority.get('profile') in ('movement-flat-observed-v2','movement-step-down-observed-v1','movement-local-segment-observed-v1','movement-local-segment-spatial-threat-v1','movement-local-segment-spatial-stop-v1','movement-local-segment-spatial-stop-v2','mining-local-observed-v2','collect-local-observed-v1','placement-local-observed-v1')
             and authority.get('version') == 'scoped-native-preflight/1'
             and type(authority.get('schema_version')) is int and authority['schema_version'] == 1
             and authority.get('coverage_complete') is True and authority.get('admitted') is True
@@ -159,15 +159,20 @@ def valid_size_diagnostic(value):
     mining = value.get('schema_version') == 2 and value.get('profile') == 'mining-local-observed-v2'
     placement = value.get('schema_version') == 3 and value.get('profile') == 'placement-local-observed-v1'
     descent = value.get('schema_version') == 4 and value.get('profile') == 'movement-step-down-observed-v1'
-    if set(value) != (keys | {'profile'} if mining or placement or descent else keys):
+    local_segment = value.get('schema_version') == 5 and value.get('profile') == 'movement-local-segment-observed-v1'
+    spatial = value.get('schema_version') == 6 and value.get('profile') == 'movement-local-segment-spatial-threat-v1'
+    spatial_stop = value.get('schema_version') == 7 and value.get('profile') == 'movement-local-segment-spatial-stop-v1'
+    spatial_stop_v2 = value.get('schema_version') == 8 and value.get('profile') == 'movement-local-segment-spatial-stop-v2'
+    if set(value) != (keys | {'profile'} if mining or placement or descent or local_segment or spatial or spatial_stop or spatial_stop_v2 else keys):
         return False
     if not all(type(value[k]) is int and 0 <= value[k] <= 2147483647 for k in keys):
         return False
-    return (value['schema_version'] == (4 if descent else 3 if placement else 2 if mining else 1) and value['response_limit'] == WIRE_LIMIT
-            and value['standalone_reserve_bytes'] == 8192 and value['capability_reserve_bytes'] == 24576
-            and (value['cell_count'] == 180 if descent else 1 <= value['cell_count'] <= 512 if mining or placement else value['cell_count'] == 150)
+    standalone_reserve, capability_reserve = (40960, 122880) if spatial else (8192, 24576)
+    return (value['schema_version'] == (8 if spatial_stop_v2 else 7 if spatial_stop else 6 if spatial else 5 if local_segment else 4 if descent else 3 if placement else 2 if mining else 1) and value['response_limit'] == WIRE_LIMIT
+            and value['standalone_reserve_bytes'] == standalone_reserve and value['capability_reserve_bytes'] == capability_reserve
+            and (value['cell_count'] in (150,180) if local_segment or spatial or spatial_stop or spatial_stop_v2 else value['cell_count'] == 180 if descent else 1 <= value['cell_count'] <= 512 if mining or placement else value['cell_count'] == 150)
             and 1 <= value['enumerated_count'] <= 1024
             and value['entity_frame_bytes'] <= 192 * 1024
             and value['entity_frame_bytes'] <= value['witness_bytes'] <= value['standalone_bytes']
-            and (value['standalone_bytes'] > WIRE_LIMIT - 8192
-                 or value['capability_bytes'] > WIRE_LIMIT - 24576))
+            and (value['standalone_bytes'] > WIRE_LIMIT - standalone_reserve
+                 or value['capability_bytes'] > WIRE_LIMIT - capability_reserve))

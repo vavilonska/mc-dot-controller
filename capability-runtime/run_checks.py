@@ -18,14 +18,15 @@ env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1', WATCHDOG_CANDIDATE=str(SOURC
 wire = SOURCE.parent / 'baseline-evidence' / 'wire' / 'grass-support-wire.json'
 if 'MDC_GRASS_SUPPORT_WIRE' not in env and wire.is_file():
     env['MDC_GRASS_SUPPORT_WIRE'] = str(wire)
-commands = []
+commands = [('toolbox-doc-examples', SOURCE, [sys.executable, '-B', 'test-tools/check_toolbox_call_examples.py']),
+            ('toolbox-package-integrity', SOURCE, [sys.executable, '-B', 'test-tools/test_package_toolbox_delivery.py'])]
 for part in parts:
     sub = '.' if part in ('defense-watchdog', 'building-controller', 'external-controller') else 'tests'
     commands.append((part, SOURCE / part, [sys.executable, '-B', '-m', 'unittest', 'discover', '-s', sub, '-p', 'test*.py', '-v']))
 commands.append(('python-toolbox', SOURCE / 'capability-runtime',
                  [sys.executable, '-B', '-m', 'unittest', 'discover', '-s', 'tests/toolbox', '-p', 'test*.py', '-v']))
 mcp = SOURCE / 'client-mod' / 'mcp'
-commands.extend([('node-portable', mcp, ['node', '--test', 'client-action-test.mjs', 'encounter-contract-test.mjs', 'mainline-client-action-test.mjs', 'boat-transfer-test.mjs', 'encounter-pause-flag-test.mjs', 'three-zombie-contract-test.mjs', 'toolbox-test.mjs']),
+commands.extend([('node-portable', mcp, ['node', '--test', 'client-action-test.mjs', 'encounter-contract-test.mjs', 'mainline-client-action-test.mjs', 'boat-transfer-test.mjs', 'encounter-pause-flag-test.mjs', 'three-zombie-contract-test.mjs', 'toolbox-test.mjs', 'toolbox-schema-test.mjs', 'toolbox-owner-chain-test.mjs', 'toolbox-placement-owner-chain-test.mjs', 'defend-once-test.mjs']),
                  ('node-framing', mcp, ['node', 'ndjson-framing-test.mjs']),
                  ('node-platform', mcp, ['node', 'self-test-platform.mjs'])])
 results = {'started_utc': datetime.now(timezone.utc).isoformat(), 'scope': 'offline only', 'components': []}

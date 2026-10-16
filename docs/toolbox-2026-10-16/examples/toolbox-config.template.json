@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "python_executable": "/REPLACE/absolute/path/to/python3",
+  "python_sha256": "REPLACE_WITH_VERIFIED_64_LOWERCASE_HEX_SHA256",
+  "control_directory": "/REPLACE/private/mdc-control",
+  "journal_directory": "/REPLACE/private/mdc-toolbox-journal",
+  "runtime_journal_directory": "/REPLACE/private/mdc-runtime-journal"
+}

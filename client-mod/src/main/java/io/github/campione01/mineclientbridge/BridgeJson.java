@@ -83,17 +83,29 @@ final class BridgeJson {
                     || capabilityStateRoot && key.equals("movement_budget")) && value.isJsonObject();
             // This new profile has an explicit nullable target in every complete entity row.
             // Existing profiles and unrelated result subtrees retain their exact legacy encoding.
-            boolean observedMovementWitness = path.equals(List.of("result")) && key.equals("scoped_native_preflight")
+            boolean observedMovementWitness = path.equals(List.of("result")) && (key.equals("scoped_native_preflight")||key.equals("route_threat_stop"))
                     && value.isJsonObject() && value.getAsJsonObject().has("profile")
                     && value.getAsJsonObject().get("profile").isJsonPrimitive()
                     && value.getAsJsonObject().get("profile").getAsJsonPrimitive().isString()
                     && (value.getAsJsonObject().get("profile").getAsString().equals(ScopedFlatMovement.PROFILE)
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedStepDownMovement.PROFILE)
+                        || value.getAsJsonObject().get("profile").getAsString().equals("movement-local-segment-observed-v1")
+                        || value.getAsJsonObject().get("profile").getAsString().equals("movement-local-segment-spatial-threat-v1")
+                        || value.getAsJsonObject().get("profile").getAsString().equals("movement-local-segment-spatial-stop-v1")
+                        || value.getAsJsonObject().get("profile").getAsString().equals("movement-local-segment-spatial-stop-v2")
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedPlacement.PROFILE)
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedMining.PROFILE)
                         || value.getAsJsonObject().get("profile").getAsString().equals(ScopedCollectTarget.PROFILE));
+            boolean terrainDiagnostic=path.equals(List.of("result"))&&key.equals("route_terrain_rejection")
+                    &&value.isJsonObject()&&value.getAsJsonObject().has("profile")
+                    &&value.getAsJsonObject().get("profile").isJsonPrimitive()
+                    &&value.getAsJsonObject().getAsJsonPrimitive("profile").isString()
+                    &&(value.getAsJsonObject().get("profile").getAsString().equals("movement-local-segment-spatial-stop-v1")
+                        ||value.getAsJsonObject().get("profile").getAsString().equals("movement-local-segment-spatial-stop-v2"));
+            boolean beeDiagnostic=(path.isEmpty()||path.equals(List.of("result")))&&key.equals("route_entity_rejection")&&routeBeeDiagnostic(value);
+            boolean threatDiagnostic=path.isEmpty()&&key.equals("route_threat_rejection")&&routeThreatDiagnostic(value);
             writer.name(key);
-            writer.setSerializeNulls(wholeObject || observedMovementWitness || nullable.contains(key) && (!nativeLivingContract || value.isJsonNull())
+            writer.setSerializeNulls(wholeObject || observedMovementWitness || terrainDiagnostic || beeDiagnostic || threatDiagnostic || nullable.contains(key) && (!nativeLivingContract || value.isJsonNull())
                     || path.isEmpty() && pauseEnvelope && PAUSE_NULLABLE_FIELDS.contains(key)
                     || path.isEmpty() && readonlyClock(object) && Set.of("observation_clock","observation_clock_unavailable").contains(key));
             List<String> child = new ArrayList<>(path);child.add(key);
@@ -113,6 +125,26 @@ final class BridgeJson {
             writer.setSerializeNulls(false);
         }
         writer.endObject();
+    }
+
+    private static boolean routeThreatDiagnostic(JsonElement value) {
+        if(!value.isJsonObject())return false;
+        JsonObject j=value.getAsJsonObject();JsonElement version=j.get("schema_version"),profile=j.get("profile"),policy=j.get("policy");
+        return version!=null&&version.isJsonPrimitive()&&version.getAsJsonPrimitive().isNumber()&&version.getAsDouble()==1
+            &&profile!=null&&profile.isJsonPrimitive()&&profile.getAsJsonPrimitive().isString()
+            &&profile.getAsString().equals("movement-local-segment-spatial-threat-v1")
+            &&policy!=null&&policy.isJsonPrimitive()&&policy.getAsJsonPrimitive().isString()
+            &&policy.getAsString().equals("route-spatial-threat-v1");
+    }
+
+    private static boolean routeBeeDiagnostic(JsonElement value) {
+        if(!value.isJsonObject())return false;
+        JsonObject j=value.getAsJsonObject();JsonElement version=j.get("schema_version"),profile=j.get("profile"),policy=j.get("policy"),type=j.get("entity_type");
+        return version!=null&&version.isJsonPrimitive()&&version.getAsJsonPrimitive().isNumber()&&version.getAsDouble()==2
+                &&profile!=null&&profile.isJsonPrimitive()&&profile.getAsJsonPrimitive().isString()&&profile.getAsString().equals("movement-local-segment-spatial-stop-v2")
+                &&policy!=null&&policy.isJsonPrimitive()&&policy.getAsJsonPrimitive().isString()&&policy.getAsString().equals("route-spatial-stop-v2")
+                &&type!=null&&type.isJsonPrimitive()&&type.getAsJsonPrimitive().isString()&&type.getAsString().equals("minecraft:bee")
+                &&j.has("native_bee_diagnostic")&&j.get("native_bee_diagnostic").isJsonObject();
     }
 
     private static boolean capabilityEnvelope(JsonObject object) {

@@ -8,6 +8,7 @@
     "MouseHandlerMixin",
     "KeyboardHandlerMixin",
     "EntityMovementBudgetMixin",
+    "EntityLocalSegmentMixin",
     "ScopedBlockMenuPacketMixin",
     "ScopedPlacementItemMixin",
     "ScopedPlacementPacketMixin",

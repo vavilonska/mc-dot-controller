@@ -86,10 +86,21 @@ final class CombatThreats {
         if (invalid != null) return gate(snapshot, now, tick, true, invalid, null, true);
         if (!finite(playerX, playerY, playerZ))
             return gate(snapshot, now, tick, true, "invalid_player_position", null, true);
-        boolean risk = snapshot.entities.stream().anyMatch(e -> e.alive && e.isDangerous());
         if (health == null || !health.known())
             return gate(snapshot, now, tick, true, health == null ? "health_unknown" : health.reason(), null, true);
         if (health.interrupted()) return gate(snapshot, now, tick, true, health.reason(), null, true);
+
+        return defensiveTarget(snapshot,now,tick,playerX,playerY,playerZ,targetId,targetUuid);
+    }
+
+    /** Fresh identity/threat observations only. This is never health or offensive authority. */
+    static Gate defensiveTarget(Snapshot snapshot,long now,int tick,double playerX,double playerY,
+                                double playerZ,int targetId,String targetUuid) {
+        String invalid=snapshotProblem(snapshot,now,tick);
+        if(invalid!=null) return gate(snapshot,now,tick,true,invalid,null,true);
+        if(!finite(playerX,playerY,playerZ))
+            return gate(snapshot,now,tick,true,"invalid_player_position",null,true);
+        boolean risk=snapshot.entities.stream().anyMatch(e->e.alive && e.isDangerous());
 
         Observed nearest = null, creeper = null, unsupported = null, enderman = null, nonTargetNear = null;
         int nearbyDangerCount = 0;
@@ -310,12 +321,48 @@ final class CombatThreats {
         private SampleDiagnostic diagnosticPrevious, triggerDiagnostic;
         private long diagnosticTickStartedNanos;
         private Diagnostics diagnostics;
+        private boolean observationRecoveryEnabled,recovering;
+        private long recoveryStarted,recoveryLastAdvanceNanos;
+        // Action callbacks can advance while /tick freeze stops the source world clock.
+        private Long lastSourceTick,sampledSourceTick;
+        private long sourceTickStartedNanos;
+        private SourceDiagnostic sourceDiagnostic;
+        record SourceDiagnostic(Long sourceTick,Long lastPolicySourceTick,Long delta,
+                long sameSourceTickElapsedNanos,boolean advanced,boolean valid) {}
+        SourceDiagnostic sourceDiagnostic() { return sourceDiagnostic; }
+        private int recoveryEpisodes,recoverySamples,recoveryCompleted;
+
+        /** Only scoped combat opts in, before the first sample. No adverse latch is cleared. */
+        void enableObservationRecovery() {
+            if(lastTick>=0 || diagnostics!=null || latched!=null)
+                throw new IllegalStateException("health_recovery_requires_unsampled_guard");
+            observationRecoveryEnabled=true;
+        }
+        boolean observationRecoveryEnabled() { return observationRecoveryEnabled; }
+        boolean recovering() { return recovering && latched==null; }
+        long recoveryStarted() { return recoveryStarted; }
+        int recoveryEpisodes() { return recoveryEpisodes; }
+        int recoverySamples() { return recoverySamples; }
+        int recoveryCompleted() { return recoveryCompleted; }
 
         Result sample(int tick, long now, double health) {
+            return sampleInternal(tick,now,health,null);
+        }
+        Result sampleSource(int tick,long sourceTick,long now,double health) {
+            return sampleInternal(tick,now,health,sourceTick);
+        }
+        private Result sampleInternal(int tick,long now,double health,Long sourceTick) {
+            sampledSourceTick=sourceTick;
+            Long delta=sourceTick==null || lastSourceTick==null?null:sourceTick-lastSourceTick;
+            boolean valid=sourceTick!=null && sourceTick>=0 && (delta==null || delta>=0);
+            long same=sourceTick!=null && sourceTick.equals(lastSourceTick)?now-sourceTickStartedNanos:0;
+            sourceDiagnostic=new SourceDiagnostic(sourceTick,lastSourceTick,delta,same,
+                    valid && (delta==null || delta>0),valid);
             SampleDiagnostic current = describe(tick, now, health);
             boolean alreadyLatched = latched != null;
-            Result result = samplePolicy(tick, now, health);
-            boolean triggeredNow = !alreadyLatched && result.interrupted();
+            Result result = observationRecoveryEnabled ? sampleRecoverable(tick,now,health)
+                    : samplePolicy(tick, now, health);
+            boolean triggeredNow = !alreadyLatched && latched!=null;
             if (triggeredNow) triggerDiagnostic = current;
             diagnostics = new Diagnostics(current, triggerDiagnostic, latched, triggeredNow);
             if (current.valid()) {
@@ -395,6 +442,72 @@ final class CombatThreats {
             lastHealth = health;
             if (damage + LOSS_EPSILON >= MAX_ROLLING_LOSS) return latch("rapid_health_loss", health, true);
             return new Result(false, "health_within_limits", health, damage, size, true);
+        }
+
+        /**
+         * A wall-time scheduling gap is an observation interruption, not observed damage.
+         * Stop offense immediately and rebuild an entire rolling-loss window in place.
+         * Gap samples still charge every observed loss; healing never refunds it. Any loss
+         * at a gap or during recovery, invalid clock/data, tick gap or low health latches.
+         * Only advancing action AND actual source-world ticks grant recovery credit. Source
+         * regression, excessive source gaps and >150ms frozen source ticks latch. No
+         * same-source callback, missing sample or elapsed action timeout advances recovery.
+         */
+        private Result sampleRecoverable(int tick,long now,double health) {
+            if(latched!=null) return latched;
+            if(tick<0 || !Double.isFinite(health) || health<0)
+                return latch("health_data_unknown",health,false);
+            if(lastTick>=0 && (tick<lastTick || now-lastNanos<0))
+                return latch("health_clock_invalid",health,false);
+            String sourceFailure=sampledSourceTick==null?"health_source_tick_missing"
+                    :!sourceDiagnostic.valid()?"health_source_clock_invalid"
+                    :sourceDiagnostic.delta()!=null && sourceDiagnostic.delta()>MAX_TICK_GAP?"health_source_tick_gap"
+                    :sourceDiagnostic.sameSourceTickElapsedNanos()>MAX_GAP_NANOS?"health_source_tick_frozen":null;
+            boolean sourceAdvanced=sourceDiagnostic.advanced();
+            boolean wallAdvanced=lastTick<0 || now>lastNanos;
+            boolean wallGap=lastTick>=0 && now-lastNanos>MAX_GAP_NANOS;
+            boolean unsafeGap=lastTick>=0 && ((long)tick-lastTick>MAX_TICK_GAP
+                    || tick==lastTick && now-tickStartedNanos>MAX_GAP_NANOS);
+            // Preserve numerically observed loss before reporting a source-clock refusal.
+            // Invalid health/action clocks above cannot supply a valid timed loss sample.
+            if(sourceFailure==null) {
+                if(sourceAdvanced) sourceTickStartedNanos=now;
+                lastSourceTick=sampledSourceTick;
+            }
+            while(size>0 && now-times[head]>WINDOW_NANOS) {
+                damage-=losses[head];head=(head+1)%CAPACITY;size--;
+            }
+            double loss=lastTick<0?0:Math.max(0,lastHealth-health);
+            boolean advanced=tick!=lastTick;
+            if(tick==lastTick && size>0) {
+                int newest=(head+size-1)%CAPACITY;times[newest]=now;losses[newest]+=loss;
+            } else {
+                if(size==CAPACITY) return latch("health_history_overflow",health,false);
+                int tail=(head+size)%CAPACITY;times[tail]=now;losses[tail]=loss;size++;tickStartedNanos=now;
+            }
+            damage=Math.max(0,damage+loss);
+            lastTick=tick;lastNanos=now;lastHealth=health;
+            if(health<=minimumHealth)
+                return latch(minimumHealth>LOW_HEALTH?"caller_min_health":"low_health",health,true);
+            if(damage+LOSS_EPSILON>=MAX_ROLLING_LOSS) return latch("rapid_health_loss",health,true);
+            if((wallGap || recovering || unsafeGap || sourceFailure!=null) && loss>0)
+                return latch("health_loss_during_observation_recovery",health,true);
+            if(sourceFailure!=null) return latch(sourceFailure,health,false);
+            if(unsafeGap) return latch("health_observation_gap",health,false);
+            boolean observationAdvanced=advanced && sourceAdvanced && wallAdvanced;
+            boolean recoveryAdvanceGap=recovering && observationAdvanced
+                    && now-recoveryLastAdvanceNanos>MAX_GAP_NANOS;
+            if(wallGap || recoveryAdvanceGap) {
+                if(!recovering) recoveryEpisodes++;
+                recovering=true;recoveryStarted=recoveryLastAdvanceNanos=now;recoverySamples=1;
+            } else if(recovering && observationAdvanced) {
+                recoverySamples++;recoveryLastAdvanceNanos=now;
+                if(now-recoveryStarted>=WINDOW_NANOS && recoverySamples>=2) {
+                    recovering=false;recoveryCompleted++;
+                }
+            }
+            if(recovering) return new Result(true,"health_observation_recovering",health,damage,size,false);
+            return new Result(false,"health_within_limits",health,damage,size,true);
         }
         private Result latch(String reason, double health, boolean known) {
             latched = new Result(true, reason, health, Math.max(0, damage), size, known);
