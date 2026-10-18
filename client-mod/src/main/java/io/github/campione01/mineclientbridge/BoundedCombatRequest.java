@@ -6,7 +6,7 @@ import java.util.UUID;
 
 /** Explicit single-target request. No target acquisition, player targets or replay. */
 record BoundedCombatRequest(String world, String player, String session, String targetUuid,
-        int targetId, String targetType, boolean approach, boolean shield, double minHealth, EncounterRequest encounter) {
+        int targetId, String targetType, boolean approach, boolean shield, double minHealth, EncounterRequest encounter, DefensiveCombatPolicy defensive) {
     // Request admission is distinct from attack permission: creeper requests are withdrawal-only.
     static final Set<String> REQUEST_TYPES = Set.of("minecraft:zombie", "minecraft:husk", "minecraft:zombie_villager",
             "minecraft:skeleton", "minecraft:stray", "minecraft:bogged", "minecraft:creeper");
@@ -20,7 +20,7 @@ record BoundedCombatRequest(String world, String player, String session, String 
         return new BoundedCombatRequest(uuid(body,"expected_world_generation"), uuid(body,"expected_player_uuid"),
                 uuid(body,"expected_action_session"), uuid(body,"target_uuid"), id, type,
                 ClientActionRequest.bool(body,"approach",true), ClientActionRequest.bool(body,"shield",true),
-                CapabilityCombatSafety.minimum(body,CombatThreats.HealthGuard.LOW_HEALTH), EncounterRequest.parseOptional(body));
+                CapabilityCombatSafety.minimum(body,CombatThreats.HealthGuard.LOW_HEALTH), EncounterRequest.parseOptional(body), DefensiveCombatPolicy.parseOptional(body));
     }
     private static String uuid(JsonObject body, String field) {
         String value = ClientActionRequest.string(body, field);

@@ -34,7 +34,7 @@ public final class CombinedWireChecks {
         JsonObject parsedA=JsonParser.parseString(a).getAsJsonObject(),parsedC=JsonParser.parseString(c).getAsJsonObject();
         JsonObject witness=parsedA.getAsJsonObject("result").getAsJsonObject(ScopedMovementWire.WITNESS);
         check(witness.equals(parsedC.getAsJsonObject("action").getAsJsonObject("result").getAsJsonObject(ScopedMovementWire.WITNESS)),name+" standalone/coherent witness equality after actual serialization");
-        if(name.equals("collect")){
+        if(name.startsWith("collect")){
             check(parsedC.has(ScopedMovementWire.MARKER),"collect single-authority marker");
             for(String sibling:List.of("status","state")){
                 var result=parsedC.getAsJsonObject(sibling).getAsJsonObject("client_action").getAsJsonObject("result");
@@ -61,6 +61,15 @@ public final class CombinedWireChecks {
         JsonObject scope=request(),original=intent(),f=facts(frame);scope.addProperty("profile",ScopedCollectTarget.PROFILE);original.add("pickup_target",target.deepCopy());
         JsonObject movement=f.getAsJsonObject("movement");movement.addProperty("profile",ScopedCollectTarget.PROFILE);target.addProperty("simple_components",true);target.addProperty("on_ground",true);target.addProperty("resting_envelope",PICKUP_RESTING_ENVELOPE);movement.add("pickup_target",target);
         emit(out,"collect",scope,original,f);
+        JsonObject itemMatrix=new JsonObject();JsonArray itemIds=new JsonArray();
+        for(String itemId:new TreeSet<>(ScopedCollectTarget.ITEMS)) {
+            original.getAsJsonObject("pickup_target").addProperty("item_id",itemId);
+            movement.getAsJsonObject("pickup_target").addProperty("item_id",itemId);
+            emit(out,"collect-item-"+itemId.substring("minecraft:".length()),scope,original,f);
+            itemIds.add(itemId);
+        }
+        itemMatrix.add("item_ids",itemIds);itemMatrix.addProperty("facts","synthetic; actual production witness and codec");
+        write(out,"collect-items.json",itemMatrix);
 
         scope=request();scope.addProperty("profile",ScopedCombat.PROFILE);original=intent();
         for(String key:List.of("waypoints","capability_route","jump","sneak","sprint"))original.remove(key);

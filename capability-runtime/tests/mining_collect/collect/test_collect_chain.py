@@ -29,17 +29,17 @@ def bound_fixture(intent,scope):
 
 class CollectEndpoint(owner_fixture.CombatEndpoint):
     def __init__(self):
-        super().__init__();self.collect_mode='success';self.fixture_error=None;self.advertise=True;self.collected=False
+        super().__init__();self.collect_mode='success';self.fixture_error=None;self.advertise=True;self.collected=False;self.collect_item='minecraft:coal'
     def snapshot(self):
         state=super().snapshot()
         state['player']['inventory_total']=36
         for row in state['player']['inventory']:
             row.update(id='',count=0,empty=True,item_fingerprint=FP,component_fingerprint=FP,max_stack_size=0,identity_complete=True)
         if self.collected and self.collect_mode not in ('removed','cancel'):
-            state['player']['inventory'][0].update(id='minecraft:coal',count=3,empty=False,max_stack_size=64)
+            state['player']['inventory'][0].update(id=self.collect_item,count=3,empty=False,max_stack_size=64)
         target={'uuid':UUID,'entity_id':7,'type':'minecraft:item','class':'net.minecraft.world.entity.item.ItemEntity',
             'alive':True,'x':1.5,'y':64.,'z':.5,'distance':1.,
-            'item':{'id':'minecraft:coal','count':3,'empty':False,'item_fingerprint':FP,'component_fingerprint':FP,'max_stack_size':64,'identity_complete':True}}
+            'item':{'id':self.collect_item,'count':3,'empty':False,'item_fingerprint':FP,'component_fingerprint':FP,'max_stack_size':64,'identity_complete':True}}
         state['nearby'].update(entities=[] if self.collected else [target],total=0 if self.collected else 1,returned=0 if self.collected else 1)
         state['scoped_native_preflight']={'version':'scoped-native-preflight/1','private_singleplayer_only':True,
             'same_callback_capture_validate_admit':True,'capability_guard_schema_version':1,
@@ -72,7 +72,7 @@ class PublicCollectChainTests(unittest.TestCase):
         d=self.backend.describe()
         return self.service.call('mdc_job',{'api_version':'mdc.toolbox/1','operation':'submit','request_id':'collect_one',
             'session_ref':d['session_ref'],'expected_context_ref':d['context_ref'],'capability':'collect_local','capability_version':1,
-            'arguments':{'target_uuid':UUID,'item_id':'minecraft:coal'},'policy':{'version':1,'execution_mode':'guarded'},
+            'arguments':{'target_uuid':UUID,'item_id':self.bridge.collect_item},'policy':{'version':1,'execution_mode':'guarded'},
             'budgets':{'max_actions':3,'max_observations':32,'deadline_seconds':10,**budgets},'wait_ms':0})
     def finish_job(self,response):
         self.assertIn('job_id',response,response)
@@ -119,5 +119,20 @@ class PublicCollectChainTests(unittest.TestCase):
         r=self.submit(max_observations=1)
         if 'job_id' in r:r=self.finish_job(r)
         self.assertNotEqual(r.get('state'),'succeeded',r);self.assertFalse(self.bridge.posts)
+
+# Each finite ID gets a fresh real owner/resident/public service fixture; only native replies are synthetic.
+from mdc_skills.scoped_collect import ITEMS
+
+def survival_item_case(item):
+    def test(self):
+        self.bridge.collect_item=item
+        self.test_typed_gain_after_exact_absence_cancel()
+        self.assertEqual(self.result['result']['evidence']['item_id'],item)
+        post=next(b for p,b in self.bridge.posts if p=='/control/scoped-action')
+        self.assertEqual(post['intent']['pickup_target']['item_id'],item)
+    return test
+
+for item in sorted(ITEMS):
+    setattr(PublicCollectChainTests,'test_survival_item_'+item.split(':')[1],survival_item_case(item))
 
 if __name__=='__main__':unittest.main()

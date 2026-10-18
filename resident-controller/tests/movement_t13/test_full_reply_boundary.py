@@ -437,8 +437,8 @@ class FullReplyTests(unittest.TestCase):
             if size == MIB:
                 check(reply == original, 'Python rejected/changed exact full-line bound')
             else:
-                check(parsed.get('id') == 'tb_1' and parsed.get('error', {}).get('code') == 'response_too_large'
-                      and 'result' not in parsed, 'Python +1 did not produce explicit correlated refusal')
+                check(parsed.get('id') == 'tb_1' and parsed.get('result', {}).get('error', {}).get('code') == 'response_too_large'
+                      and len(reply) <= MAX_LINE, 'Python +1 did not produce bounded correlated refusal')
             NODE_CASES.append({'label': label, 'reply': str((case / 'reply.ndjson').relative_to(OUT)),
                 'request': str((case / 'request.ndjson').relative_to(OUT)),
                 'reply_bytes': len(reply), 'reply_sha256': digest(reply)})

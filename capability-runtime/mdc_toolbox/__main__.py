@@ -22,7 +22,20 @@ def serve(service,source=sys.stdin.buffer,sink=sys.stdout.buffer):
     def write(value):
         encoded=json_data(value)+b'\n'
         if len(encoded)>MAX_LINE:
-            encoded=json.dumps({'id':value.get('id'),'error':{'code':'response_too_large','reason':'Result exceeds transport bound; query a narrower view'}}).encode()+b'\n'
+            original=value.get('result',{})
+            identity={key:original[key] for key in ('api_version','job_id','request_id','job_request_id','session_ref',
+                      'state','job_state','effect_certainty','cleanup_certainty','continuation')
+                      if isinstance(original,dict) and key in original and isinstance(original[key],(str,int,bool,type(None)))}
+            ids=original.get('request_ids',[]) if isinstance(original,dict) else []
+            # Bound even the fallback, but never invent or replace an identity.
+            if isinstance(ids,list):
+                identity['request_ids']=[rid for rid in ids if isinstance(rid,str) and len(rid)<=128][:512]
+                identity['request_ids_truncated']=len(identity['request_ids'])!=len(ids)
+            identity.update(api_version=API_VERSION,error={'code':'response_too_large','stage':'transport',
+                            'reason':'Result exceeds transport bound; query the original identity',
+                            'effect_certainty':original.get('effect_certainty','unknown') if isinstance(original,dict) else 'unknown',
+                            'affected_ids':identity.get('request_ids',[]),'suggested_next_operation':'status'})
+            encoded=json_data({'id':value.get('id'),'result':identity})+b'\n'
         with output_lock:sink.write(encoded);sink.flush()
     def respond(request):
         identity=request.get('id') if isinstance(request,dict) else None
@@ -61,13 +74,18 @@ def main():
     parser.add_argument('--control',help='Operator-only existing authorized control directory')
     parser.add_argument('--journal',required=True,help='Operator-only toolbox identity journal')
     parser.add_argument('--runtime-journal',help='Operator-only existing Runtime journal')
+    parser.add_argument('--storage-warn-free-bytes',type=int,default=1024*1024*1024)
+    parser.add_argument('--storage-min-free-bytes',type=int,default=512*1024*1024)
+    parser.add_argument('--event-history-admission-bytes',type=int,default=64*1024*1024)
     args=parser.parse_args()
     if bool(args.control)!=bool(args.runtime_journal):parser.error('--control and --runtime-journal must be provided together')
     if args.control:
         from .runtime_adapter import create_backend
         backend=create_backend(args.control,args.runtime_journal)
     else:backend=UnavailableBackend()
-    service=ToolboxService(backend,args.journal)
+    from .storage_reserve import StorageReserve
+    policy=StorageReserve(args.storage_warn_free_bytes,args.storage_min_free_bytes,args.event_history_admission_bytes)
+    service=ToolboxService(backend,args.journal,storage_reserve=policy)
     def stop(signum,frame):
         result=service.shutdown();raise SystemExit(0 if result['cleanup_confirmed'] else 3)
     signal.signal(signal.SIGTERM,stop)

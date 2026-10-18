@@ -62,7 +62,7 @@ final class ScopedRouteThreatEntities {
                 require(entity!=null && seen.put(entity,Boolean.TRUE)==null,"scoped_movement_entity_duplicate_object");
                 if(entity==player){self++;continue;}
                 boolean removed=entity.isRemoved();
-                if(removed)requireBaseIdentityReaders(entity);else require(supported(entity),"scoped_movement_entity_unsupported");
+                if(removed)requireBaseIdentityReaders(entity);else if(!supported(entity))throw NativeEntityDiagnostics.unsupported(entity,ScopedRouteThreatPolicy.PROFILE);
                 int id=entity.getId();String uuid=entity.getUUID().toString();
                 require(id!=player.getId() && !uuid.equals(player.getUUID().toString()) && ids.add(id) && uuids.add(uuid),
                         "scoped_movement_entity_duplicate_identity");

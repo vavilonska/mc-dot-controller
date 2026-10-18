@@ -11,7 +11,7 @@ STATES = ('accepted', 'running', 'stopping', 'succeeded', 'blocked', 'failed', '
 EFFECT_CERTAINTIES = ('none_proven', 'known', 'unknown')
 CLEANUP_CERTAINTIES = ('not_needed', 'pending', 'confirmed', 'unknown')
 TERMINAL = frozenset(STATES) - {'accepted', 'running', 'stopping'}
-PROFILES = ('player', 'inventory', 'menu', 'entities', 'local_terrain', 'survey', 'memory')
+PROFILES = ('player', 'inventory', 'menu', 'entities', 'local_terrain', 'survey', 'memory', 'compact', 'reconciliation')
 
 class ToolboxError(ValueError):
     def __init__(self, code, reason, *, stage='validation', effect_certainty='none_proven', affected_ids=(), suggested_next_operation=None):
@@ -136,6 +136,7 @@ CAPABILITY = {'type':'string','pattern':'^[a-z][a-z0-9_]{0,79}$','maxLength':80}
 WAIT = integer(0,10000)
 POLICY = obj({'version':{'type':'integer','const':1}, 'execution_mode':{'type':'string','enum':['noncombat','guarded','request_only']},
               'reactions':{'type':'string','enum':['stop','avoid','defend','defend_once']},
+              'fall_rescue':obj({'schema_version':{'type':'integer','const':1},'water_bucket':{'type':'boolean','const':True}},('schema_version','water_bucket')),
               'defense':obj({'target_uuid':{'type':'string','pattern':'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'},
                   'timeout_ms':integer(50,5000), 'min_health':{'type':'number','minimum':14,'maximum':20}},
                   ('target_uuid','timeout_ms','min_health'))}, ('version','execution_mode'))
@@ -151,8 +152,12 @@ BASE = {'api_version':VERSION}
 INTENT = {'capability':CAPABILITY,'capability_version':{'type':'integer','const':1},'arguments':{'type':'object'},'policy':POLICY,'budgets':BUDGETS}
 CATALOG_SCHEMA = obj({**BASE,'group':string(64),'capability_ids':{'type':'array','items':CAPABILITY,'maxItems':128,'uniqueItems':True},
                       'detail':{'type':'string','enum':['summary','contracts']},'cursor':{'type':'string','pattern':'^[0-9]{1,8}$'},'limit':integer(1,128)}, ('api_version',))
-OBSERVE_SCHEMA = obj({**BASE,'session_ref':REFERENCE,'profile':{'type':'string','enum':list(PROFILES)},'selectors':SELECTORS,'bounds':BOUNDS,
+OBSERVE_SCHEMA = obj({**BASE,'request_id':IDENTIFIER,'original_job_id':IDENTIFIER,'session_ref':REFERENCE,'profile':{'type':'string','enum':list(PROFILES)},'selectors':SELECTORS,'bounds':BOUNDS,
                       'acquisition_profile':string(80),'wait_ms':WAIT},('api_version','session_ref','profile'))
+OBSERVE_SCHEMA['allOf']=[{'if':{'properties':{'profile':{'const':'reconciliation'}},'required':['profile']},
+    'then':{'required':['original_job_id'],'properties':{'bounds':obj({'radius':{'const':1}}),
+        'selectors':obj({}),'wait_ms':{'const':0}},'not':{'required':['acquisition_profile']}},
+    'else':{'not':{'required':['original_job_id']}}}]
 PLAN_SCHEMA = obj({**BASE,**INTENT,'session_ref':REFERENCE,'observation_refs':{'type':'array','items':REFERENCE,'maxItems':16}},
                    ('api_version','capability','capability_version','arguments'))
 JOB_OPERATION_SCHEMAS = {
@@ -162,6 +167,15 @@ JOB_OPERATION_SCHEMAS = {
  'cancel':obj({**BASE,'operation':{'const':'cancel'},'session_ref':REFERENCE,'job_id':IDENTIFIER,'cancel_request_id':IDENTIFIER,'reason':string(256),'wait_ms':WAIT},('api_version','operation','session_ref','job_id','cancel_request_id')),
  'reconcile':obj({**BASE,'operation':{'const':'reconcile'},'session_ref':REFERENCE,'job_id':IDENTIFIER},('api_version','operation','session_ref','job_id')),
 }
+for operation in ('adjudication_prepare','adjudicate','adjudication_status'):
+    properties={**BASE,'operation':{'const':operation},'session_ref':REFERENCE,'job_id':IDENTIFIER}
+    required=['api_version','operation','session_ref','job_id']
+    if operation!='adjudication_prepare':
+        properties.update(adjudication_request_id=IDENTIFIER,
+            original_receipt_sha256={'type':'string','pattern':'^[0-9a-f]{64}$','maxLength':64},
+            acknowledgment={'type':'string','const':'release_authority_keep_original_effects_unknown_no_resume'})
+        required+=['adjudication_request_id','original_receipt_sha256','acknowledgment']
+    JOB_OPERATION_SCHEMAS[operation]=obj(properties,required)
 JOB_OPERATION_SCHEMAS['status']['oneOf'] = [{'required':['job_id'],'not':{'required':['request_id']}},{'required':['request_id'],'not':{'required':['job_id']}}]
 JOB_SCHEMA = obj({key:deepcopy(value) for schema in JOB_OPERATION_SCHEMAS.values() for key,value in schema['properties'].items()}, ('api_version','operation','session_ref'))
 JOB_SCHEMA['properties']['operation'] = {'type':'string','enum':list(JOB_OPERATION_SCHEMAS)}

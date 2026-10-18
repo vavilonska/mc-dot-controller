@@ -1,4 +1,5 @@
 """Real public MCP/owner-chain tests; synthetic native endpoint, never live evidence."""
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import unittest
 from unittest.mock import patch
@@ -197,18 +198,23 @@ class SpatialDefenseFrontdoorTests(unittest.TestCase):
 
     def test_preempted_before_motion(self): self.assert_preempted()
     def test_preempted_overlap(self): self.assert_preempted()
-    def test_admission_refusal(self): self.assert_no_attack()
+    def test_admission_refusal(self):
+        self.expected_mcp_exit = 2
+        self.assert_no_attack(unknown=True)
 
     def assert_fast_refusal(self, dispatched=False):
+        if dispatched: self.expected_mcp_exit = 2
         result = self.defend()
-        self.assertEqual(result['state'], 'blocked', result)
         self.assertFalse(self.bridge.moves)
         self.assertFalse(self.bridge.terrain_responses)
         self.assertEqual(len(self.posts()), int(dispatched))
         if dispatched:
+            assert_unknown_refusal(self, result)
             self.assertIs(self.posts()[0]['intent']['route_stop_only'], True)
-        self.assertEqual(result['cleanup_certainty'], 'confirmed')
-        self.assertIsNone(self.client.session()['capability_lease'])
+        else:
+            self.assertEqual(result['state'], 'blocked', result)
+            self.assertEqual(result['cleanup_certainty'], 'confirmed')
+            self.assertIsNone(self.client.session()['capability_lease'])
 
     def test_fast_target_disappeared(self): self.assert_fast_refusal(dispatched=True)
     def test_fast_corridor_rejected(self): self.assert_fast_refusal(dispatched=True)

@@ -10,6 +10,8 @@
     "EntityMovementBudgetMixin",
     "EntityLocalSegmentMixin",
     "ScopedBlockMenuPacketMixin",
+    "InventoryRecoveryClickMixin",
+    "InventoryRecoverySendMixin",
     "ScopedPlacementItemMixin",
     "ScopedPlacementPacketMixin",
     "ScopedPlacementSendMixin",
@@ -17,7 +19,8 @@
     "ScopedMiningGameModeMixin",
     "ScopedCombatPacketMixin",
     "ScopedCombatAttackMixin",
-    "ScopedCombatInteractAccessor"
+    "ScopedCombatInteractAccessor",
+    "NativeFallRescueBucketMixin"
   ],
   "injectors": {
     "defaultRequire": 1

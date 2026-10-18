@@ -6,7 +6,7 @@ from .menu_fixture import digest
 UUID='12345678-1234-1234-1234-123456789abc'
 FP='12345678-1234-1234-1234-123456789def'
 
-def collect_fixture(collecting=True):
+def collect_fixture(collecting=True, item_id='minecraft:coal'):
     native,scope,aid,intent=movement_fixture()
     profile='collect-local-observed-v1' if collecting else 'movement-flat-observed-v2'
     scope['profile']=profile
@@ -21,7 +21,7 @@ def collect_fixture(collecting=True):
       'prism':[m['min_x'],m['min_y'],m['min_z'],m['max_x']+1,m['max_y']+1,m['max_z']+1],'rows':[]}
     m['entity_guard']=guard
     if collecting:
-        target={'uuid':UUID,'entity_id':7,'item_id':'minecraft:coal','count':3,'item_fingerprint':FP,
+        target={'uuid':UUID,'entity_id':7,'item_id':item_id,'count':3,'item_fingerprint':FP,
                 'component_fingerprint':FP,'x':1.5,'y':64.,'z':.5}
         intent['pickup_target']=deepcopy(target);m['pickup_target']={**target,'simple_components':True,'on_ground':True,'resting_envelope':'vanilla-grounded-item-v1'}
         guard.update(enumerated_count=2,live_other_count=1,permitted_pickup_uuid=UUID)

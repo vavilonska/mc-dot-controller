@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.campione01.mineclientbridge.mixin",
+  "plugin": "io.github.campione01.mineclientbridge.mixin.OptionalBaritoneMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["ManagedNavigationInputMixin"],
+  "injectors": {"defaultRequire": 1}
+}

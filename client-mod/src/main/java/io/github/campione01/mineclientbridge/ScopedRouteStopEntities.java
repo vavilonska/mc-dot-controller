@@ -93,7 +93,7 @@ final class ScopedRouteStopEntities {
                 diagnostics.phase(RouteEntityDiagnostics.Phase.IDENTITY);diagnostics.entityType(entity);
                 boolean removed=entity.isRemoved();
                 diagnostics.phase(RouteEntityDiagnostics.Phase.TYPE);
-                if(removed)requireBaseIdentityReaders(entity);else require(supported(entity,bees),"scoped_movement_entity_unsupported");
+                if(removed)requireBaseIdentityReaders(entity);else if(!supported(entity,bees))throw NativeEntityDiagnostics.unsupported(entity,bees?ScopedRouteStopPolicy.PROFILE_V2:ScopedRouteStopPolicy.PROFILE);
                 int id=entity.getId();String uuid=entity.getUUID().toString();
                 require(id!=player.getId() && !uuid.equals(player.getUUID().toString()) && ids.add(id) && uuids.add(uuid),
                         "scoped_movement_entity_duplicate_identity");

@@ -27,7 +27,7 @@ def mining_fixture(intent_override=None,scope_override=None):
        'min_x':min(0,t['x'])-1,'max_x':max(0,t['x'])+1,'min_y':min(63,t['y']-1),'max_y':max(66,t['y']+1),
        'min_z':min(0,t['z'])-1,'max_z':max(0,t['z'])+1,'all_loaded':True,'stationary':True,'survival':True,
        'closed_inventory':True,'entity_scope':'all-client-loaded-mining-prism-with-passive-items','entity_policy':'mining-observed-items-v1','passive_items':0,'other_entities':0,'entity_limit':1024,
-       'target_static_class':'net.minecraft.world.level.block.Block','require_correct_tool':intent['require_correct_tool'],
+       'target_static_class':'net.minecraft.world.level.block.'+('RotatedPillarBlock' if intent['expected_block_id'].endswith('_log') else 'DropExperienceBlock' if intent['expected_block_id'] in ('minecraft:iron_ore','minecraft:deepslate_iron_ore') else 'Block'),'require_correct_tool':intent['require_correct_tool'],
        'deadline_nano':str(int(w['source_nano'])+intent['timeout_ms']*1000000),'maximum_reach':6,
        'eye':{'x':.5,'y':65.62,'z':.5},'velocity':{'x':0.,'y':0.,'z':0.},'callbacks_installed':True}
     cells=[]
@@ -37,7 +37,8 @@ def mining_fixture(intent_override=None,scope_override=None):
                 is_target=(x,y,z)==tuple(t[k] for k in ('x','y','z'));solid=y==63 or is_target
                 cells.append({'x':x,'y':y,'z':z,'id':intent['expected_block_id'] if is_target else 'minecraft:stone' if solid else 'minecraft:air',
                     'state':'synthetic exact block state','loaded':True,'fluid':'minecraft:empty','air':not solid,
-                    'static_full_cube':solid,'block_class':'net.minecraft.world.level.block.'+('Block' if solid else 'AirBlock'),'properties':{}})
+                    'static_full_cube':solid,'block_class':m['target_static_class'] if is_target else 'net.minecraft.world.level.block.'+('Block' if solid else 'AirBlock'),
+                    'properties':deepcopy(intent['expected_block_properties']) if is_target else {}})
     m.update(cells=cells,expected_cells=len(cells),maximum_action_ticks=160,maximum_timeout_ms=8000)
     m['entity_guard']={'schema_version':1,'policy':'mining-observed-items-v1','source':'native-client-loaded-level',
         'scope':'all-client-loaded-mining-prism-with-passive-items','guarantee':'same-callback-current-facts-only',

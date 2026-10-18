@@ -27,6 +27,8 @@ final class BridgeJson {
     private static final Map<List<String>,Set<String>> NULLABLE_FIELDS = Map.ofEntries(
             Map.entry(List.of(), Set.of("action_id")),
             Map.entry(List.of("world"), Set.of("biome_id")),
+            Map.entry(List.of("external_navigation_status"), Set.of()),
+            Map.entry(List.of("managed_navigation_status"), Set.of()),
             Map.entry(List.of("world_selection"), Set.of("reason", "data")),
             Map.entry(List.of("world_selection", "data"), Set.of("selected_list_index")),
             Map.entry(List.of("result"), Set.of()),
@@ -55,6 +57,20 @@ final class BridgeJson {
             writeObject(writer, body, List.of(), pauseEnvelope(body));
         }
         return buffer.toString();
+    }
+
+    private static boolean managedNavigationStatus(List<String> path,JsonObject object) {
+        if(!path.isEmpty()&&!path.equals(List.of("managed_navigation_status")))return false;
+        JsonElement version=object.get("managed_navigation_schema_version");
+        return version!=null&&version.isJsonPrimitive()&&version.getAsJsonPrimitive().isNumber()
+            &&version.getAsString().equals("1");
+    }
+
+    private static boolean externalNavigationStatus(List<String> path,JsonObject object) {
+        if(!path.isEmpty()&&!path.equals(List.of("external_navigation_status")))return false;
+        JsonElement version=object.get("external_navigation_schema_version");
+        return version!=null&&version.isJsonPrimitive()&&version.getAsJsonPrimitive().isNumber()
+            &&version.getAsString().equals("1");
     }
 
     private static boolean pauseEnvelope(JsonObject body) {
@@ -107,6 +123,7 @@ final class BridgeJson {
             writer.name(key);
             writer.setSerializeNulls(wholeObject || observedMovementWitness || terrainDiagnostic || beeDiagnostic || threatDiagnostic || nullable.contains(key) && (!nativeLivingContract || value.isJsonNull())
                     || path.isEmpty() && pauseEnvelope && PAUSE_NULLABLE_FIELDS.contains(key)
+                    || (externalNavigationStatus(path,object)||managedNavigationStatus(path,object)) && key.equals("cancel_accepted")
                     || path.isEmpty() && readonlyClock(object) && Set.of("observation_clock","observation_clock_unavailable").contains(key));
             List<String> child = new ArrayList<>(path);child.add(key);
             if (path.isEmpty() && capabilityEnvelope(object) && CAPABILITY_SIBLINGS.contains(key) && value.isJsonObject()) {

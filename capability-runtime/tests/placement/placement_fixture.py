@@ -31,8 +31,8 @@ def placement_fixture(intent_override=None, scope_override=None):
     s=intent['support'];face=intent['face'];t={k:s[k]+FACES[face][i] for i,k in enumerate(('x','y','z'))}
     standing={'x':math.floor(f['x']),'y':math.floor(f['y']-.01),'z':math.floor(f['z'])}
     p={'profile':PROFILE,'source':'native-client-loaded-level','support':deepcopy(s),'target':t,'standing_support':standing,
-       'face':face,'support_id':intent['expected_support_id'],'support_properties':{},'block_id':'minecraft:cobblestone',
-       'block_properties':{},'selected_slot':f['selected_slot'],'initial_count':held['count'],
+       'face':face,'support_id':intent['expected_support_id'],'support_properties':{},'block_id':intent['expected_block_id'],
+       'block_properties':deepcopy(intent['expected_block_properties']),'selected_slot':f['selected_slot'],'initial_count':held['count'],
        'all_loaded':True,'complete':True,'callbacks_installed':True,'maximum_action_ticks':40,'maximum_timeout_ms':2000,
        'deadline_nano':str(int(w['source_nano'])+intent['timeout_ms']*1000000)}
     for k in ('x','y','z'):

@@ -16,7 +16,7 @@ import { toolboxTools, executeToolbox } from "./toolbox.mjs";
 import { TOOLBOX_NAMES, loadToolboxConfiguration, startConfiguredToolbox, legacyMutationRefusal } from "./toolbox-bridge.mjs";
 
 const SERVER_NAME = "mineclient-bridge";
-const SERVER_VERSION = "1.1.7-integrated.1";
+const SERVER_VERSION = "1.1.8-recovery-test.2.5";
 const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
 // Explicit operator configuration starts only the fixed local facade service.
 // No tool argument can configure an endpoint, credential, executable or path.

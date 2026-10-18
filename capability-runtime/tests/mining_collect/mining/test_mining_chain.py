@@ -65,12 +65,12 @@ class PublicMiningChainTests(unittest.TestCase):
     def tearDown(self):
         self.service.close();self.runtime.close()
         owner_fixture.ActualGatewayOwnershipTests.tearDown(self)
-    def submit(self):
+    def submit(self,arguments=None):
         description=self.backend.describe()
         self.assertIn('mine_local',description['supported_capabilities'])
         return self.service.call('mdc_job',{'api_version':'mdc.toolbox/1','operation':'submit','request_id':'mine_one',
             'session_ref':description['session_ref'],'expected_context_ref':description['context_ref'],
-            'capability':'mine_local','capability_version':1,'arguments':{'target':{'x':2,'y':64,'z':0},'expected_block_id':'minecraft:stone','expected_block_properties':{}},
+            'capability':'mine_local','capability_version':1,'arguments':arguments or {'target':{'x':2,'y':64,'z':0},'expected_block_id':'minecraft:stone','expected_block_properties':{}},
             'policy':{'version':1,'execution_mode':'guarded'},
             'budgets':{'max_actions':3,'max_observations':16,'deadline_seconds':10},'wait_ms':0})
     def finish_job(self,response):

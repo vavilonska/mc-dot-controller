@@ -2,6 +2,7 @@
 
 Only the native Bridge endpoint is synthetic. No native physics or live acceptance claim.
 """
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import hashlib
 import gzip
@@ -248,7 +249,10 @@ class RouteLocalFrontdoorTests(unittest.TestCase):
     def test_changed_geometry(self):
         result=self.finish(self.submit());self.assertEqual(result['state'],'blocked',result);self.assertEqual(len(self.posts()),1)
     def test_native_refusal(self):
-        result=self.finish(self.submit());self.assertEqual(result['state'],'blocked',result);self.assertEqual(len(self.posts()),1)
+        self.expected_mcp_exit = 2
+        result = self.finish(self.submit())
+        assert_unknown_refusal(self, result)
+        self.assertEqual(len(self.posts()), 1)
     def test_insufficient_budget(self):
         result=self.finish(self.submit(budgets={'deadline_seconds':120,'max_actions':2,'max_observations':256,'cleanup_reserve_actions':1,'reflex_reserve_actions':0}))
         self.assertEqual(result['state'],'interrupted',result);self.assertEqual(len(self.posts()),1)

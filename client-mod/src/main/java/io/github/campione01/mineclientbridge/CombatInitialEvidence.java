@@ -7,8 +7,9 @@ final class CombatInitialEvidence {
     /** Shared native receipt initialization; pure so generated-wire regression uses production fields. */
     static void initialize(BoundedCombatRequest request,JsonObject evidence,float lastPlayerHealth,float lastTargetHealth) {
         evidence.addProperty("combat_loop_schema_version", 1);
+        if(request.defensive()!=null){evidence.add("defensive_policy",request.defensive().json());evidence.addProperty("offensive_effects_allowed",false);evidence.addProperty("physical_safe",false);evidence.addProperty("defensive_completed",false);evidence.addProperty("defensive_health_rule","finite_positive_no_offense");}
         evidence.addProperty("requested_min_health", request.minHealth());
-        evidence.addProperty("effective_min_health", Math.max(request.minHealth(),CombatThreats.HealthGuard.LOW_HEALTH));
+        evidence.addProperty("effective_min_health", request.defensive()==null?Math.max(request.minHealth(),CombatThreats.HealthGuard.LOW_HEALTH):0);
         evidence.addProperty("pursuit_diagnostics_schema_version", 1);
         evidence.addProperty("threat_safety_schema_version", 2);
         evidence.addProperty("retreat_window_schema_version", 2);

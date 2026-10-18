@@ -25,9 +25,20 @@ import net.minecraft.world.phys.Vec3;
 /** Attached validator for the existing ClientActions mining owner, never another writer. */
 final class ScopedMining {
     static final String PROFILE="mining-local-observed-v2";
-    static final Set<Block> TARGETS=Set.of(Blocks.STONE,Blocks.COBBLESTONE,Blocks.DIRT,Blocks.ANDESITE,
+    static final Set<Block> LEGACY_TARGETS=Set.of(Blocks.STONE,Blocks.COBBLESTONE,Blocks.DIRT,Blocks.ANDESITE,
         Blocks.GRANITE,Blocks.DIORITE,Blocks.SMOOTH_STONE,Blocks.STONE_BRICKS,Blocks.BRICKS,
         Blocks.OAK_PLANKS,Blocks.SPRUCE_PLANKS,Blocks.BIRCH_PLANKS);
+    static final Set<Block> TARGETS=java.util.stream.Stream.concat(LEGACY_TARGETS.stream(),java.util.stream.Stream.of(
+        Blocks.OAK_LOG,Blocks.SPRUCE_LOG,Blocks.BIRCH_LOG,Blocks.JUNGLE_LOG,Blocks.ACACIA_LOG,Blocks.DARK_OAK_LOG,
+        Blocks.IRON_ORE,Blocks.DEEPSLATE_IRON_ORE)).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    private static final Set<Block> CELLS=java.util.stream.Stream.concat(TARGETS.stream(),java.util.stream.Stream.of(
+        Blocks.AIR,Blocks.CAVE_AIR,Blocks.VOID_AIR,Blocks.GRASS_BLOCK,Blocks.BEDROCK,Blocks.DEEPSLATE,
+        Blocks.COAL_ORE,Blocks.DEEPSLATE_COAL_ORE,
+        Blocks.OAK_LEAVES,Blocks.SPRUCE_LEAVES,Blocks.BIRCH_LEAVES,Blocks.JUNGLE_LEAVES,Blocks.ACACIA_LEAVES,Blocks.DARK_OAK_LEAVES,
+        Blocks.SHORT_GRASS,Blocks.FERN,Blocks.TALL_GRASS,Blocks.LARGE_FERN,Blocks.VINE,
+        Blocks.DANDELION,Blocks.POPPY,Blocks.BLUE_ORCHID,Blocks.ALLIUM,Blocks.AZURE_BLUET,Blocks.RED_TULIP,Blocks.ORANGE_TULIP,
+        Blocks.WHITE_TULIP,Blocks.PINK_TULIP,Blocks.OXEYE_DAISY,Blocks.CORNFLOWER,Blocks.LILY_OF_THE_VALLEY))
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
     final LocalPlayer player; final ClientLevel level; final BlockPos target, support;
     final long sourceNano, sourceTick, deadline, navigationEpoch;
     final JsonObject footprint;
@@ -68,7 +79,8 @@ final class ScopedMining {
         require(request.action().equals("break_block") && request.timeoutMs()>0 && request.timeoutMs()<=8000
             && request.hotbarSlot()==-1 && !request.jump() && !request.sneak()
             && request.original().has("expected_block_properties")
-            && request.original().getAsJsonObject("expected_block_properties").size()==0
+            && ScopedMiningCellPolicy.target(ClientActionRequest.string(request.original(),"expected_block_id"),
+                request.original().getAsJsonObject("expected_block_properties"))
             && !request.original().has("capability_descent") && !request.original().has("coordination_step"),
             "mining_request_outside_profile");
         player=mc.player;level=mc.level;server=mc.getSingleplayerServer();gameMode=mc.gameMode;
@@ -82,9 +94,9 @@ final class ScopedMining {
         require(!(target.getX()==support.getX() && target.getZ()==support.getZ()),"mining_player_column_forbidden");
         require(level.hasChunkAt(target),"mining_target_unloaded");
         var state=level.getBlockState(target);expectedTargetState=state;
-        require(TARGETS.contains(state.getBlock()) && state.getBlock().getClass()==Block.class
+        require(TARGETS.contains(state.getBlock()) && exactCellState(state)
             && BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(ClientActionRequest.string(request.original(),"expected_block_id"))
-            && state.getValues().isEmpty(),"mining_exact_target_changed");
+            && properties(state).equals(request.original().getAsJsonObject("expected_block_properties")),"mining_exact_target_changed");
         for(int i=0;i<41;i++)inventory.add(player.getInventory().getItem(i).copy());
         rawMenu=new RawMenu(player,selected);
         require(player.containerMenu.slots.size()==46,"mining_inventory_menu_coverage");
@@ -117,7 +129,7 @@ final class ScopedMining {
         footprint.addProperty("entity_policy","mining-observed-items-v1");
         footprint.addProperty("other_entities",0);footprint.addProperty("passive_items",0);
         footprint.addProperty("entity_limit",1024);footprint.addProperty("closed_inventory",true);
-        footprint.addProperty("target_static_class","net.minecraft.world.level.block.Block");
+        footprint.addProperty("target_static_class",state.getBlock().getClass().getName());
         footprint.addProperty("require_correct_tool",ClientActionRequest.bool(request.original(),"require_correct_tool",false));
         footprint.addProperty("deadline_nano",Long.toString(deadline));footprint.addProperty("maximum_reach",6);
         footprint.add("eye",vector(eye));footprint.add("velocity",vector(player.getDeltaMovement()));
@@ -196,16 +208,17 @@ final class ScopedMining {
     }
     private BlockState readCell(BlockPos p) {
         require(level.hasChunkAt(p),"mining_dependency_unloaded");var state=level.getBlockState(p);var b=state.getBlock();
-        boolean air=b==Blocks.AIR || b==Blocks.CAVE_AIR || b==Blocks.VOID_AIR;
-        boolean solid=(TARGETS.contains(b) && b.getClass()==Block.class) || b==Blocks.GRASS_BLOCK && b.getClass()==GrassBlock.class || b==Blocks.BEDROCK;
-        require(air || solid,"mining_position_dependent_or_hazard_geometry_unsupported");
+        String id=BuiltInRegistries.BLOCK.getKey(b).toString();
+        boolean air=ScopedMiningCellPolicy.AIR.contains(id), plant=ScopedMiningCellPolicy.PLANTS.contains(id);
+        require(exactCellState(state),"mining_position_dependent_or_hazard_geometry_unsupported");
         require(state.getFluidState().isEmpty() && level.getBlockEntity(p)==null,"mining_fluid_or_block_entity_unsupported");
         require(air ? state.getCollisionShape(level,p).isEmpty() && state.getShape(level,p).isEmpty()
+                : plant ? state.getCollisionShape(level,p).isEmpty()
                 : state.isCollisionShapeFullBlock(level,p) && state.getShape(level,p).bounds().equals(new net.minecraft.world.phys.AABB(0,0,0,1,1,1)),
                 "mining_nonstatic_shape");
-        if(p.equals(support))require(!air,"mining_support_missing");
+        if(p.equals(support))require(!air && !plant && !ScopedMiningCellPolicy.LEAVES.contains(id),"mining_support_missing");
         if(p.getX()==support.getX() && p.getZ()==support.getZ() && p.getY()>support.getY() && p.getY()<=support.getY()+2)
-            require(air,"mining_body_not_clear");
+            require(ScopedMiningCellPolicy.bodyClear(id),"mining_body_not_clear");
         return state;
     }
     private void restrictions(Minecraft mc) {
@@ -396,9 +409,18 @@ final class ScopedMining {
     private static JsonObject cell(BlockPos p,BlockState s) {
         JsonObject out=position(p);out.addProperty("id",BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString());
         out.addProperty("state",s.toString());out.addProperty("loaded",true);out.addProperty("fluid","minecraft:empty");
-        out.addProperty("air",s.isAir());out.addProperty("static_full_cube",!s.isAir());out.addProperty("block_class",s.getBlock().getClass().getName());
-        JsonObject props=new JsonObject();for(var entry:s.getValues().entrySet())props.addProperty(entry.getKey().getName(),entry.getValue().toString());
-        out.add("properties",props);return out;
+        out.addProperty("air",s.isAir());out.addProperty("static_full_cube",!s.isAir() && !ScopedMiningCellPolicy.PLANTS.contains(BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString()));out.addProperty("block_class",s.getBlock().getClass().getName());
+        out.add("properties",properties(s));return out;
+    }
+    static JsonObject properties(BlockState state) {
+        JsonObject out=new JsonObject();for(var entry:state.getValues().entrySet())
+            out.addProperty(entry.getKey().getName(),entry.getValue().toString());
+        return out;
+    }
+    static boolean exactCellState(BlockState state) {
+        Block block=state.getBlock();String id=BuiltInRegistries.BLOCK.getKey(block).toString();
+        return CELLS.contains(block) && block.getClass().getClassLoader()==Block.class.getClassLoader()
+            && ScopedMiningCellPolicy.accepts(id,block.getClass().getName(),properties(state));
     }
     static JsonObject position(BlockPos p){JsonObject o=new JsonObject();o.addProperty("x",p.getX());o.addProperty("y",p.getY());o.addProperty("z",p.getZ());return o;}
     static JsonObject vector(Vec3 v){JsonObject o=new JsonObject();o.addProperty("x",v.x);o.addProperty("y",v.y);o.addProperty("z",v.z);return o;}

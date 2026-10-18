@@ -152,6 +152,10 @@ def _partial(skill, outcomes, observation, reason, status, **facts):
         'last_observed_carried': deepcopy(menu.get('carried')),
         'last_observed_menu_state_id': menu.get('state_id'),
         'continuation': 'reconcile_original_id_required' if status == 'unknown' else 'fresh_replan_required',
+        'public_recovery': {'capability': 'recover_cursor', 'automatic': False,
+            'blocked_by_unknown_original': status == 'unknown',
+            'requires': ['known_original_outcome', 'confirmed_owner_release', 'fresh_exact_cursor_and_window',
+                         'native_inventory_recovery_v1']},
         **facts}, observation)
 
 

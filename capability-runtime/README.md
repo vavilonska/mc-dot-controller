@@ -116,3 +116,10 @@ latency guarantee.
 Version3 building and construction preflight now derive the smallest supported centered survey from the explicit blueprint region with its neighbor/support shell, cavity/light acceptance cells, access points, the body/head/up-step sweep above planned walkable blocks, and the current observed player body/support/sweep envelope. A separate state-only sizing read never authorizes a mutation. The survey must retain its actual bounds, full cell inventory, original timing and exact context/navigation epoch/player position. Required collision metadata must be loaded and known. The planner's existing standability, ray and support tests still reject unknown paths; fresh local placement and final per-cell checks are unchanged.
 
 This reduces small-job transport size without promising complete route finding or large-region delivery. Out-of-range jobs stop before survey; in-range large or unusually verbose jobs can still exceed the unchanged 2 MiB queue result cap. There is no larger-scan fallback, sparse terrain synthesis, retry or freshness extension.
+
+## Execution recovery P0
+
+The [offline reliability candidate](docs/EXECUTION-RECOVERY-P0.md) gives leased
+observations durable owner/job identity, preserves errors and final stdio receipts,
+and checks original observation freshness after the last blocking owner check.
+No live acceptance or automatic replay is implied.

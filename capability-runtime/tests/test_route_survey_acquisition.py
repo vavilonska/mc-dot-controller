@@ -3,6 +3,7 @@
 These checks do not execute Minecraft or prove live native geometry/physics.
 Delayed pages and native admission refusals are explicit synthetic inputs.
 """
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import gzip
 import hashlib
@@ -169,13 +170,12 @@ class RouteSurveyMcpTests(unittest.TestCase):
         self.assertEqual(len([r for r in self.records().values() if r['kind'] == 'survey']), 1)
 
     def assert_changed_geometry_refused(self):
+        self.expected_mcp_exit = 2
         result = self.route_once()
-        self.assertEqual(result['state'], 'blocked', result)
-        self.assertEqual(result['effect_certainty'], 'none_proven')
+        assert_unknown_refusal(self, result)
         self.assertEqual(len(self.posts()), 1)
         self.assertFalse(self.bridge.moves)
         self.assertEqual(result['result']['evidence']['completed_segments'], 0)
-        self.assertEqual(result['cleanup_certainty'], 'confirmed')
         self.assertEqual(len([r for r in self.records().values() if r['kind'] == 'survey']), 1)
         self.assertFalse([p for p, _ in self.bridge.posts if p == '/control/action'])
 

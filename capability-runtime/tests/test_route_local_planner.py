@@ -334,8 +334,8 @@ class RouteLocalPlannerTests(unittest.TestCase):
 
     def test_context_station_and_leaf_allowlist_is_separate_from_floor_and_air(self):
         self.assertEqual(route.CONTEXT_LEAVES, {'minecraft:oak_leaves', 'minecraft:birch_leaves'})
-        self.assertEqual(route.CONTEXT_BLOCKS, {'minecraft:barrel', 'minecraft:furnace',
-                                              'minecraft:oak_leaves', 'minecraft:birch_leaves'})
+        self.assertEqual(route.CONTEXT_BLOCKS, {'minecraft:barrel', 'minecraft:furnace', 'minecraft:crafting_table',
+                                              'minecraft:oak_leaves', 'minecraft:birch_leaves'} | route.CONTEXT_LOGS)
         self.assertFalse(route.CONTEXT_BLOCKS & route.FLOORS)
         self.assertFalse(route.CONTEXT_BLOCKS & route.AIR)
         for block in route.CONTEXT_BLOCKS:
@@ -390,7 +390,7 @@ class RouteLocalPlannerTests(unittest.TestCase):
                                  (block, change))
 
     def test_other_station_not_added_to_context_allowlist(self):
-        for block in ('minecraft:blast_furnace', 'minecraft:smoker', 'minecraft:crafting_table',
+        for block in ('minecraft:blast_furnace', 'minecraft:smoker', 'minecraft:cherry_log',
                       'minecraft:chest', 'minecraft:shulker_box'):
             self.assertFalse(route._context_block(cell(1, 64, 1, block)))
 

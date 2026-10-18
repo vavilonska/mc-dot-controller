@@ -36,6 +36,8 @@ if (process.argv[2] === "--fixture-bridge") {
 }
 
 async function runSelfTest() {
+  // The copied --fixture-bridge entry remains a standalone file.
+  const { toolboxSchemas } = await import("./toolbox.mjs");
   const suffix = `${process.pid}-${Date.now().toString(36)}`;
   const namespace = `self-test-${suffix}`;
   const launchRun = `mineclient-launch-${suffix}`;
@@ -102,7 +104,7 @@ async function runSelfTest() {
       clientInfo: { name: "mineclient-bridge-self-test", version: "1.1.5" }
     });
     assert.equal(initialized.result.serverInfo.name, "mineclient-bridge");
-    assert.equal(initialized.result.serverInfo.version, "1.1.7-integrated.1");
+    assert.equal(initialized.result.serverInfo.version, "1.1.8-recovery-test.2.5");
 
     const listed = await client.request("tools/list", {});
     const toolNames = listed.result.tools.map((tool) => tool.name);
@@ -119,9 +121,10 @@ async function runSelfTest() {
     ]);
     for (const tool of listed.result.tools) {
       assert.equal(tool.inputSchema.type, "object", `${tool.name} must declare an object input schema`);
-      // Legacy direct tools keep their flat schema; mdc_job intentionally uses
-      // conditional schemas for its submit/status/cancel operation variants.
-      if (tool.name === "mdc_job") {
+      // Legacy direct tools remain flat. The exact public job variants and
+      // reconciliation-only observation selector use closed conditional schemas.
+      if (tool.name === "mdc_job" || tool.name === "mdc_observe") {
+        assert.deepEqual(tool.inputSchema, toolboxSchemas[tool.name]);
         assert.ok(Array.isArray(tool.inputSchema.allOf));
         assert.ok(tool.inputSchema.allOf.length > 0);
         continue;

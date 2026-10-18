@@ -115,7 +115,7 @@ class NativePlacementWireTests(unittest.TestCase):
 
     def test_real_terminal_predicate_with_java_inventory_samples(self):
         before,after=self.observations();proof=after.state['client_action']['result']['placement']
-        self.assertTrue(scoped_placement._placed(before,after,proof['target'],proof['selected_slot']))
+        self.assertTrue(scoped_placement._placed(before,after,proof['target'],proof['selected_slot'],self.parsed('intent')['expected_block_id']))
         slot=proof['selected_slot']
         for change in ('no_decrement','extra_decrement','protected_other_inventory','wrong_selected_slot'):
             bad=deepcopy(after)
@@ -125,7 +125,7 @@ class NativePlacementWireTests(unittest.TestCase):
             elif change=='wrong_selected_slot':bad.player['selected_slot']=(slot+1)%9
             else:next(r for r in bad.player['inventory'] if r['slot']!=slot)['component_fingerprint']='changed'
             with self.subTest(change=change):
-                self.assertFalse(scoped_placement._placed(before,bad,proof['target'],slot))
+                self.assertFalse(scoped_placement._placed(before,bad,proof['target'],slot,self.parsed('intent')['expected_block_id']))
 
     def test_raw_exports_preserve_exact_full_codec_subtrees(self):
         native=self.parsed('standalone')

@@ -8,7 +8,8 @@ COMBAT_FIELDS = frozenset(('combat_loop_schema_version','target_uuid','target_en
     'initial_player_health','initial_target_health','player_health','target_health','attack_dispatches',
     'target_health_decreases_observed','target_health_lost_observed','player_health_lost_observed',
     'shield_blocking_ticks_observed','blocking','shield_use_ticks','safety_interrupt_reason',
-    'target_dead_observed','requested_min_health','effective_min_health'))
+    'target_dead_observed','requested_min_health','effective_min_health','defensive_completed',
+    'defensive_elapsed_ms','defensive_blocking_samples','defensive_separation_gain','offensive_effects_allowed','physical_safe'))
 
 def active_progress(task, session_id, action_session, now):
     if task is None or task.capability_unknown or task.capability_cancel_attempted:
@@ -27,7 +28,7 @@ def active_progress(task, session_id, action_session, now):
             or not isinstance(scope.get('owner_id'),str) or not scope['owner_id']
             or type(scope.get('owner_generation')) is not int or scope['owner_generation'] <= 0
             or not isinstance(scope.get('job_id'),str) or not scope['job_id']
-            or scope.get('profile') != 'combat-local-observed-v1'
+            or scope.get('profile') not in ('combat-local-observed-v1','combat-defensive-local-v1')
             or type(scope.get('defense_epoch')) is not int or scope['defense_epoch'] < 0
             or task.command.get('action') != 'combat_entity'):
         return None

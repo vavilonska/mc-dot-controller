@@ -37,13 +37,15 @@ def profiles_defense_ready(scoped):
 
 
 class OwnerRuntimeBackend:
-    INITIAL_CAPABILITIES = frozenset({'select_hotbar','ensure_hotbar','equip','consume','close_menu',
-        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','navigate_step_down','navigate_route_local','mine_local','collect_local','place_local','engage'})
+    INITIAL_CAPABILITIES = frozenset({'select_hotbar','ensure_hotbar','equip','consume','close_menu','clear_hand','recover_cursor',
+        'container_move','container_split','container_merge','container_withdraw','container_deposit','craft','smelt','interact','navigate_local','navigate_step_down','navigate_route_local','mine_local','collect_local','place_local','engage','defend_local','evade_local'})
     REQUIRED_ACTIONS = {
+        'clear_hand': {'click_slot'}, 'recover_cursor': {'click_slot'},
         'mine_local': {'break_block'},
         'place_local': {'place_block'},
         'collect_local': {'follow_path'},
         'engage': {'combat_entity'},
+        'defend_local': {'combat_entity'},'evade_local': {'combat_entity'},
         'navigate_local': {'follow_path'},
         'navigate_step_down': {'follow_path'},
         'navigate_route_local': {'follow_path'},
@@ -82,6 +84,8 @@ class OwnerRuntimeBackend:
             features.append('scoped-native-preflight/1')
             if scoped.get('capability_guard_schema_version') == 1:
                 features.append('capability_guard/1')
+            if scoped.get('inventory_recovery_schema_version') == 1:
+                features.append('inventory-recovery/1')
             features.extend('profile:' + name for name in scoped.get('profiles', {}))
             features.extend('action:' + name for name in scoped.get('guarded_actions', []))
         negotiated_actions = set(self._profile_actions({'scoped_profiles': scoped.get('profiles', {}) if isinstance(scoped, dict) else {}}))
@@ -92,7 +96,39 @@ class OwnerRuntimeBackend:
                                      'navigate_route_local':'movement-local-segment-observed-v1'}[name]) == ['follow_path'])
                                 or (name not in ('collect_local','navigate_step_down','navigate_route_local') and self.REQUIRED_ACTIONS[name] <= negotiated_actions))
                            and (name not in ('place_local','navigate_step_down','navigate_route_local') or session.get('execution_policy') == 'request_only')
-                           and 'scoped-native-preflight/1' in features)
+                           and (name!='engage' or isinstance(scoped,dict) and scoped.get('profiles',{}).get('combat-local-observed-v1')==['combat_entity'])
+                           and (name not in ('defend_local','evade_local') or isinstance(scoped,dict) and scoped.get('profiles',{}).get('combat-defensive-local-v1')==['combat_entity'])
+                           and 'scoped-native-preflight/1' in features
+                           and (name not in ('clear_hand', 'recover_cursor') or 'inventory-recovery/1' in features))
+        managed=session.get('managed_navigation',{})
+        if (session.get('managed_navigation_owner_control')=='managed-navigation-owner-control/1'
+                and isinstance(managed,dict) and managed.get('version')=='managed-navigation-owner-control/1'
+                and managed.get('input_fence_ready') is True and session.get('execution_policy')=='request_only'
+                and 'navigate_managed_walk' in self._plugins()):
+            supported.append('navigate_managed_walk');features.append('managed-navigation-owner-control/1')
+        external = session.get('external_navigation', {})
+        external_source = session.get('external_navigation_source', {})
+        external_ready = (session.get('external_navigation_owner_control') == 'external-navigation-owner-control/1'
+            and isinstance(external,dict) and external.get('version') == 'external-navigation-owner-control/1'
+            and external.get('single_owner_fences') is True and isinstance(external_source,dict)
+            and external_source.get('supported') is True and external_source.get('status') in ('idle','busy')
+            and session.get('execution_policy') == 'request_only')
+        if external_ready and 'stop_external_navigation' in self._plugins():
+            supported.append('stop_external_navigation')
+            features.append('external-navigation-owner-control/1')
+        fall = session.get('native_fall_rescue')
+        fall_ready = (session.get('native_fall_rescue_owner_guard') == 'native-fall-rescue-owner-guard/1'
+            and isinstance(fall, dict) and fall.get('schema_version') == 1
+            and fall.get('native_fences_ready') is True and fall.get('external_controller_unknown') is False
+            and session.get('execution_policy') == 'request_only')
+        if fall_ready and 'fall_rescue_guard' in self._plugins():
+            supported.append('fall_rescue_guard')
+            features.append('native-fall-rescue-owner-guard/1')
+        attached_ready = (isinstance(fall,dict) and fall.get('native_fences_ready') is True
+            and fall.get('external_controller_unknown') is False
+            and session.get('native_fall_rescue_attached_policy') == 'native-fall-rescue-attached-policy/1')
+        if attached_ready:
+            features.append('native-fall-rescue-attached-policy/1')
         known = isinstance(session.get('capability_context'), dict) and all(
             isinstance(session['capability_context'].get(k), str) for k in ('world_generation','dimension','player_uuid','action_session'))
         available = (not self._quarantined and session.get('state') in ('ready', 'busy') and known
@@ -105,6 +141,19 @@ class OwnerRuntimeBackend:
                 'supported_policies': {'version': 1, 'execution_mode': ['noncombat','guarded','request_only'], 'reactions': ['stop', 'defend_once'] if profiles_defense_ready(scoped) else ['stop']},
                 'execution_policy': session.get('execution_policy'),
                 'cancellation_supported': session.get('capability_cancel_schema_version') == 1,
+                'fall_rescue_availability': {'standalone_guard': fall_ready, 'concurrent_ordinary_job_protection': attached_ready,
+                    'attached_policy': {'schema_version':1,'water_bucket':True} if attached_ready else None,
+                    'attached_capabilities': [v for v in ('navigate_local','navigate_step_down','navigate_route_local','engage') if v in supported] if attached_ready else [],
+                    'attached_native_actions': ['follow_path', 'combat_entity'],
+                    'managed_walking_protected': False,
+                    'coverage_limit': 'Exact same-owner native actions only; managed Baritone walking refuses attached fall policy.',
+                    'rescue_reserve_ms': 10000, 'max_status_polls': 128, 'renewal': 'none_fixed_original_job_deadline',
+                    'setup_steps_protected': False, 'baritone_route_protected': False,
+                    'interrupted_original': 'unknown_requires_original_id_reconciliation_no_auto_resume',
+                    'automatic_settlement': False,
+                    'operator_adjudication_available': attached_ready and session.get('fall_rescue_original_adjudication') == 'native-fall-rescue-original-adjudication/1',
+                    'operator_adjudication_scope': 'Explicit acknowledgment for a confirmed ended attached rescue only; original effects remain UNKNOWN and never resume automatically.',
+                    'reason': 'available' if fall_ready else 'fall_rescue_external_controller_unknown' if isinstance(fall,dict) and fall.get('external_controller_unknown') is True else 'owner_guard_feature_unavailable'},
                 'scoped_profiles': deepcopy(scoped.get('profiles', {})) if isinstance(scoped, dict) else {},
                 'validation': {'live': 'not_run', 'scope': 'negotiated_features_not_live_acceptance'}}
 
@@ -125,6 +174,8 @@ class OwnerRuntimeBackend:
             output['break_block'] = 'mining-local-observed-v2'
         if profiles.get('combat-local-observed-v1') == ['combat_entity']:
             output['combat_entity'] = 'combat-local-observed-v1'
+        if profiles.get('combat-defensive-local-v1') == ['combat_entity'] and 'combat_entity' not in output:
+            output['combat_entity'] = 'combat-defensive-local-v1'
         return output
 
     def _effect(self):
@@ -148,6 +199,12 @@ class OwnerRuntimeBackend:
                 validate_schema(policy, POLICY)
             except ToolboxError:
                 return self._blocked('unsupported_execution_or_reaction_policy', context)
+            fall_policy = policy.get('fall_rescue')
+            if fall_policy is not None:
+                from resident_controller.fall_rescue_attached import PUBLIC_CAPABILITIES, VERSION as FALL_ATTACHED_VERSION
+                if (capability not in PUBLIC_CAPABILITIES or policy.get('reactions','stop') != 'stop'
+                        or FALL_ATTACHED_VERSION not in description.get('native_features', [])):
+                    return self._blocked('fall_rescue_attached_capability_or_policy_unsupported',context)
             reaction = policy.get('reactions', 'stop')
             if reaction not in description['supported_policies']['reactions']:
                 return self._blocked('unsupported_execution_or_reaction_policy', context)
@@ -160,9 +217,12 @@ class OwnerRuntimeBackend:
             if context.get('budget', {}).get('cleanup_reserve_actions', 1) < 1:
                 return self._blocked('exact_cancel_cleanup_reserve_required', context)
             control = JobControl(context)
+            control.fall_rescue_policy = deepcopy(fall_policy)
             self.runtime.required_execution_policy = expected_policy
             self._active = {'context': _public_context(context), 'control': control}
             profiles = self._profile_actions(description)
+            if capability in ('defend_local','evade_local'):
+                profiles['combat_entity'] = 'combat-defensive-local-v1'
             if capability == 'collect_local':
                 profiles['follow_path'] = 'collect-local-observed-v1'
             if capability == 'navigate_step_down':
@@ -180,7 +240,8 @@ class OwnerRuntimeBackend:
                     profiles['follow_path'] = 'movement-local-segment-spatial-threat-v1'
                     control.route_threat_guard = {'schema_version': 1,
                         'target_uuid': policy['defense']['target_uuid']}
-            self.runtime.begin_job(control, scoped_profiles=profiles)
+            self.runtime.begin_job(control, scoped_profiles=profiles,
+                **({"owner_mode": "external_stop"} if capability == "stop_external_navigation" else {}))
             begun = True
             self._active['owner_context'] = self.runtime.owner_context()
             supervisor = LocalSupervisor(control, policy)
@@ -260,6 +321,19 @@ class OwnerRuntimeBackend:
                 'cleanup_certainty': 'pending', 'request_ids': current['original_request_ids'],
                 'context': {**original, 'owner_context': current}, 'evidence': {}}
 
+    def adjudicate_original(self,job_context,args):
+        from mdc_skills.fall_adjudication import execute
+        with self._lock:
+            known=self._completed.get(job_context.get('job_id'))
+            if known is None or known.get('state')!='unknown':
+                raise ValueError('fall_adjudication_original_unknown_job_required')
+            proof=execute(self.runtime,job_context,args)
+            if (proof.get('authority_released') is True and self._active is not None
+                    and self._active['context'].get('job_id')==job_context['job_id']):
+                # A later duplicate acknowledgment cannot touch a replacement job.
+                self._active=None;self._quarantined=False
+            return proof
+
     def reconcile_original(self, job_context):
         """Exact reads only. Does not release, resume, replay or start a new lease."""
         known = self._completed.get(job_context.get('job_id'))
@@ -298,67 +372,133 @@ class OwnerRuntimeBackend:
                 'cleanup_certainty': 'unknown', 'result': known and known.get('result'),
                 'request_ids': list(ids), 'context': _public_context(job_context), 'evidence': {'original_reads': evidence}}
 
+    def reconciliation_read(self, request_id, session_ref, original_job_id):
+        # No runtime/backend execution lock, begin_job, lease or journal change.
+        from .reconciliation_read import capture
+        return capture(self, request_id, session_ref, original_job_id)
+
     def observe(self, profile, selectors, bounds):
-        if profile == 'memory':
-            from .bindings.memory import read
-            try:
-                context = self.runtime.client.session().get('capability_context')
-            except Exception:
-                context = None
-            return read(self.runtime, selectors, bounds, trusted_context=context)
-        if profile not in ('player','inventory','menu','entities','local_terrain','survey'):
-            raise SkillError('observation_profile_unavailable')
-        if selectors:
-            raise SkillError('observation_selectors_unavailable')
-        if set(bounds) - {'radius','vertical','entity_radius','max_age_ms'}:
-            raise SkillError('observation_bounds_unavailable')
+        """Compatibility read; the public service always supplies a durable job."""
+        context = {'job_id': 'job_' + uuid.uuid4().hex, 'request_id': 'observe_' + uuid.uuid4().hex,
+                   'deadline_at': time.time() + 30, 'budget': {'max_actions': 1, 'max_observations': 3},
+                   'policy': {'version': 1, 'execution_mode': 'noncombat', 'reactions': 'stop'}}
+        outcome = self.observe_job(profile, selectors, bounds, context)
+        if outcome['state'] != 'succeeded':
+            raise SkillError(outcome['reason'], status=outcome['state'],
+                             request_id=outcome['request_ids'][-1] if outcome['request_ids'] else None)
+        return outcome['result']
+
+    def observe_job(self, profile, selectors, bounds, context):
+        """Use the same exact-owner lifecycle as mutations, including failed reads."""
         if not self._lock.acquire(blocking=False):
-            raise SkillError('observation_owner_busy')
+            return self._blocked('observation_owner_busy', context)
         begun = False
+        result = None
+        state, reason = 'blocked', 'observation_runtime_unavailable'
         try:
             description = self.describe()
             if not description.get('available') or not description.get('private_singleplayer'):
-                raise SkillError('observation_runtime_unavailable')
-            context = {'job_id': uuid.uuid4().hex, 'request_id': uuid.uuid4().hex,
-                       'deadline_at': time.time() + 30, 'budget': {'max_actions': 1, 'max_observations': 3},
-                       'policy': {'version': 1, 'execution_mode': 'noncombat', 'reactions': 'stop'}}
-            self.runtime.begin_job(JobControl(context)); begun = True
-            options = {k: bounds[k] for k in ('radius','vertical','entity_radius') if k in bounds}
-            observation = (self.runtime.survey(allow_menu=True, **options) if profile == 'survey' else
-                           self.runtime.observe(terrain=profile == 'local_terrain', allow_menu=True, **options))
-            result = {'profile': profile, 'state': deepcopy(observation.state), 'terrain': deepcopy(observation.terrain),
-                      'request_id': observation.request_id, 'context_ref': _ref(dict(zip(
-                          ('world_generation','dimension','player_uuid','action_session'), observation.context))),
-                      'age_ms': max(0, (self.runtime.clock() - observation.captured_at) * 1000),
-                      'execution_authority': False, 'historical': profile == 'survey',
-                      'source_clock': {'domain': 'native-system-nanotime',
-                          'source_tick': observation.state.get('capability_guard', {}).get('source_tick'),
-                          'source_nano': observation.state.get('capability_guard', {}).get('source_nano')},
-                      'source_times': {'runtime_capture_monotonic': observation.captured_at,
-                          'age_at_response_ms': max(0, (self.runtime.clock() - observation.captured_at) * 1000)},
-                      'provenance': {'original_request_id': observation.request_id,
-                          'world_context': list(observation.context), 'historical_pages':
-                          deepcopy((observation.terrain or {}).get('source_pages', [])),
-                          'grants_dispatch_authority': False},
-                      'coverage': {'profile': profile,
-                          'terrain_complete': (observation.terrain or {}).get('complete') if observation.terrain is not None else None,
-                          'entities_truncated': observation.state.get('nearby', {}).get('truncated'),
-                          'inventory_truncated': observation.player.get('inventory_truncated'),
-                          'menu_slots_truncated': observation.state.get('menu', {}).get('slots_truncated')},
-                      'server_confirmed': False}
-            wire = observation.raw.get('native_capability_wire')
-            if wire is not None:
-                # Raw bytes stay once in the archived receipt/data, not duplicated into public output.
-                result['provenance'].update(state_representation='decoded-semantic-native-siblings',
-                    native_wire_encoding=wire['encoding'], native_wire_bytes=wire['bytes'],
-                    native_wire_sha256=wire['sha256'])
+                return self._blocked(reason, context)
+            if context.get('expected_context') not in (None, description.get('context_ref')):
+                return self._blocked('expected_context_changed', context)
+            if profile == 'memory':
+                from .bindings.memory import read
+                trusted = self.runtime.client.session().get('capability_context')
+                result = read(self.runtime, selectors, bounds, trusted_context=trusted)
+                return {**self._blocked('observation_completed', context), 'state': 'succeeded', 'result': result}
+            if profile not in ('player','inventory','menu','entities','local_terrain','survey','compact'):
+                raise SkillError('observation_profile_unavailable')
+            if selectors:
+                raise SkillError('observation_selectors_unavailable')
+            if set(bounds) - {'radius','vertical','entity_radius','max_age_ms'}:
+                raise SkillError('observation_bounds_unavailable')
+            control = JobControl(context)
+            self._active = {'context': _public_context(context), 'control': control}
+            self.runtime.begin_job(control)
+            begun = True
+            self._active['owner_context'] = self.runtime.owner_context()
+            result = self._capture_observation(profile, bounds)
+            state, reason = 'succeeded', 'observation_completed'
+        except SkillError as exc:
+            state, reason = exc.status, exc.reason
+        except Exception as exc:
+            state = 'unknown' if self.runtime.has_unresolved_execution else 'blocked'
+            reason = 'observation_adapter_error:' + type(exc).__name__
         finally:
-            if begun:
-                release = self.runtime.finish_job()
-                if not release.ok:
-                    self._lock.release()
-                    raise SkillError('observation_owner_release_unconfirmed', status='unknown')
-            self._lock.release()
+            try:
+                if begun:
+                    try:
+                        release = self.runtime.finish_job()
+                    except Exception as exc:
+                        # A broken cleanup callback cannot clear the owner latch.
+                        self.runtime._stop_job_heartbeat()
+                        release = Outcome('unknown', 'observation_owner_release_exception:' + type(exc).__name__)
+                    owner_context = self.runtime.owner_context()
+                    cleanup = 'confirmed' if release.ok else 'unknown'
+                    if result is not None and release.evidence.get('navigation_handoff') is not None:
+                        result['navigation_handoff'] = deepcopy(release.evidence['navigation_handoff'])
+                    if not release.ok:
+                        state, reason = 'unknown', 'observation_owner_release_unconfirmed'
+                        if result is not None and isinstance(result.get('navigation_handoff'), dict):
+                            handoff = result['navigation_handoff']
+                            handoff['ownership_released'] = False
+                            handoff['control_released'] = False
+                            handoff['control_blockers'].append('owner_release_unconfirmed')
+                            handoff['selector'].update(decision='reconcile_original_owner', reason='owner_release_unconfirmed')
+                    outcome = {'state': state, 'reason': reason, 'effect_certainty': self._effect(),
+                               'cleanup_certainty': cleanup, 'result': result,
+                               'request_ids': list(self.runtime._job_request_ids),
+                               'context': {**_public_context(context), 'owner_context': owner_context},
+                               'evidence': {'budget': control.budget.snapshot(),
+                                            'owner_release': serialize_outcome(release),
+                                            'owner_context': owner_context, 'server_confirmed': False}}
+                    self._completed[context['job_id']] = deepcopy(outcome)
+                    if release.ok:
+                        self._active = None
+                    else:
+                        self._quarantined = True
+                elif getattr(self.runtime, '_job_control', None) is None:
+                    self._active = None
+            finally:
+                self._lock.release()
+        return outcome if begun else self._blocked(reason, context)
+
+    def _capture_observation(self, profile, bounds):
+        if profile == "compact":
+            from mdc_skills.compact_observation import capture
+            return capture(self.runtime,bounds)
+        options = {k: bounds[k] for k in ('radius','vertical','entity_radius') if k in bounds}
+        observation = (self.runtime.survey(allow_menu=True, **options) if profile == 'survey' else
+                       self.runtime.observe(terrain=profile == 'local_terrain', allow_menu=True, **options))
+        result = {'profile': profile, 'state': deepcopy(observation.state), 'terrain': deepcopy(observation.terrain),
+                  'request_id': observation.request_id, 'context_ref': _ref(dict(zip(
+                      ('world_generation','dimension','player_uuid','action_session'), observation.context))),
+                  'age_ms': max(0, (self.runtime.clock() - observation.captured_at) * 1000),
+                  'execution_authority': False, 'historical': profile == 'survey',
+                  'source_clock': {'domain': 'native-system-nanotime',
+                      'source_tick': observation.state.get('capability_guard', {}).get('source_tick'),
+                      'source_nano': observation.state.get('capability_guard', {}).get('source_nano')},
+                  'source_times': {'runtime_capture_monotonic': observation.captured_at,
+                      'age_at_response_ms': max(0, (self.runtime.clock() - observation.captured_at) * 1000)},
+                  'provenance': {'original_request_id': observation.request_id,
+                      'world_context': list(observation.context), 'historical_pages':
+                      deepcopy((observation.terrain or {}).get('source_pages', [])),
+                      'grants_dispatch_authority': False},
+                  'coverage': {'profile': profile,
+                      'terrain_complete': (observation.terrain or {}).get('complete') if observation.terrain is not None else None,
+                      'entities_truncated': observation.state.get('nearby', {}).get('truncated'),
+                      'inventory_truncated': observation.player.get('inventory_truncated'),
+                      'menu_slots_truncated': observation.state.get('menu', {}).get('slots_truncated')},
+                  'server_confirmed': False}
+        from mdc_skills.navigation_handoff import report
+        result['navigation_handoff'] = report(observation, now=self.runtime.clock(),
+            max_age=self.runtime.max_age, owner_released=False, unresolved=self.runtime.has_unresolved_execution)
+        wire = observation.raw.get('native_capability_wire')
+        if wire is not None:
+            # Raw bytes stay once in the archived receipt/data, not duplicated into public output.
+            result['provenance'].update(state_representation='decoded-semantic-native-siblings',
+                native_wire_encoding=wire['encoding'], native_wire_bytes=wire['bytes'],
+                native_wire_sha256=wire['sha256'])
         return result
 
 

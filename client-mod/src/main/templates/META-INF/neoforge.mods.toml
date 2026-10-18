@@ -15,6 +15,9 @@ Authenticated loopback control and observation bridge for a Minecraft client.
 [[mixins]]
 config = "mineclient_bridge.mixins.json"
 
+[[mixins]]
+config = "mineclient_bridge.baritone.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId = "neoforge"
 type = "required"

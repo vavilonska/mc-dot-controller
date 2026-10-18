@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonElement;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -110,6 +111,40 @@ final class TerrainReader {
             clockPage(result,sampledClock,response);
         }
         return result;
+    }
+
+    /** ID-only isolated display read. Never invokes collision, properties, fluid, light or block-entity callbacks. */
+    static JsonObject compact(int radius,CompactObservation.Diagnostic diagnostic) {
+        Minecraft mc=Minecraft.getInstance();
+        if(!mc.isSameThread()||mc.level==null||mc.player==null)throw new TerrainScan.Failure(409,"compact_observation_not_in_world");
+        var level=mc.level;var player=mc.player;var before=ObservationClockBridge.sample();
+        BlockPos origin=player.blockPosition();
+        int minimumY=level.getMinBuildHeight(),maximumY=level.getMaxBuildHeight();
+        Map<Long,LevelChunk> chunks=new HashMap<>();
+        var scan=CompactTerrainScan.read(radius,origin.getX(),origin.getY(),origin.getZ(),System::nanoTime,(x,y,z)->{
+            if(y<minimumY||y>=maximumY)return new CompactTerrainScan.Cell(x,y,z,"out_of_world",null);
+            long key=((long)(x>>4)<<32)|((z>>4)&0xffffffffL);
+            if(!chunks.containsKey(key))chunks.put(key,level.getChunkSource().getChunk(x>>4,z>>4,ChunkStatus.FULL,false));
+            LevelChunk chunk=chunks.get(key);
+            if(chunk==null)return new CompactTerrainScan.Cell(x,y,z,"unloaded",null);
+            String id=BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(new BlockPos(x,y,z)).getBlock()).toString();
+            return new CompactTerrainScan.Cell(x,y,z,"loaded",id);
+        });
+        diagnostic.terrain(scan);
+        CompactObservation.require(scan.complete()&&!scan.budgetExhausted(),"terrain_budget_exhausted");
+        var after=ObservationClockBridge.sample();ObservationClockBridge.requireSame(before,after);
+        CompactObservation.require(mc.level==level&&mc.player==player,"context_changed");
+        java.util.List<TerrainScan.Cell<JsonObject>> cells=new java.util.ArrayList<>(scan.total());
+        for(var cell:scan.cells()){
+            JsonObject data=new JsonObject();data.addProperty("known",cell.status().equals("loaded"));
+            if(cell.id()!=null)data.addProperty("id",cell.id());
+            cells.add(new TerrainScan.Cell<>(cell.x(),cell.y(),cell.z(),TerrainScan.Availability.valueOf(cell.status().toUpperCase(Locale.ROOT)),data));
+        }
+        var page=new TerrainScan.Page<JsonObject>(java.util.UUID.randomUUID().toString(),scan.x(),scan.y(),scan.z(),radius,2,
+            0,scan.total(),scan.total(),List.copyOf(cells),null,false,scan.elapsedNanos(),125,false,false);
+        long tick=level.getGameTime();
+        JsonObject result=pageJson(page,WorldGeneration.current(level),level.dimension().location().toString(),tick,tick);
+        return clockPage(result,before,after);
     }
 
     static JsonObject clockPage(JsonObject original,ObservationClientClock.Stamp source,ObservationClientClock.Stamp response) {

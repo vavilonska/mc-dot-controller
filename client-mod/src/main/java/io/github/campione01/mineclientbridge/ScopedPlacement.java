@@ -21,6 +21,10 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.GrassBlock;
+import net.minecraft.world.level.block.CraftingTableBlock;
+import net.minecraft.world.level.block.FurnaceBlock;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.FurnaceBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -47,6 +51,8 @@ final class ScopedPlacement {
     private final RawMenu rawMenu;
     private final ScopedFlatPolicy.Bounds bounds;
     private final JsonObject footprint;
+    private final BlockItem placedItem;
+    private final BlockState placedState;
     private long ownerRevision;
     private ActionRegistry.Entry entry;
     private JsonObject originalWitness;
@@ -78,8 +84,16 @@ final class ScopedPlacement {
         face=Direction.valueOf(request.face().toUpperCase(java.util.Locale.ROOT));target=support.relative(face);standingSupport=BlockPos.containing(x,y-.01,z);
         require(Double.isFinite(x)&&Double.isFinite(y)&&Double.isFinite(z)&&eye.distanceTo(Vec3.atCenterOf(support))<=6
             && !body.intersects(new AABB(target)),"placement_position_or_target_invalid");
-        require(initialCount>=1 && initialCount<=64 && player.getMainHandItem().getItem().getClass()==BlockItem.class
-            && ItemStack.isSameItemSameComponents(player.getMainHandItem(),Items.COBBLESTONE.getDefaultInstance()),"placement_plain_cobblestone_required");
+        String material=ClientActionRequest.string(request.original(),"expected_block_id");
+        placedItem=(BlockItem)switch(material){case "minecraft:crafting_table"->Items.CRAFTING_TABLE;
+            case "minecraft:furnace"->Items.FURNACE;default->Items.COBBLESTONE;};
+        placedState=material.equals("minecraft:furnace")?Blocks.FURNACE.defaultBlockState()
+            .setValue(FurnaceBlock.FACING,Direction.valueOf(request.original().getAsJsonObject("expected_block_properties").get("facing").getAsString().toUpperCase(java.util.Locale.ROOT)))
+            .setValue(FurnaceBlock.LIT,false):placedItem.getBlock().defaultBlockState();
+        require(placedItem.getClass()==BlockItem.class&&exactPlacedClass(placedState)
+            &&CapabilityPlacement.exact(placedState,material,request.original().getAsJsonObject("expected_block_properties"))
+            &&initialCount>=1&&initialCount<=64&&player.getMainHandItem().getItem()==placedItem
+            &&ItemStack.isSameItemSameComponents(player.getMainHandItem(),placedItem.getDefaultInstance()),"placement_plain_material_required");
         for(int i=0;i<41;i++)inventory.add(player.getInventory().getItem(i).copy());
         rawMenu=new RawMenu(player,selected);
         require(body.minX>=standingSupport.getX() && body.maxX<=standingSupport.getX()+1 && body.minZ>=standingSupport.getZ()
@@ -96,12 +110,12 @@ final class ScopedPlacement {
         }
         require(level.getBlockState(target)==Blocks.AIR.defaultBlockState(),"placement_exact_target_air_required");
         require(CapabilityPlacement.exact(level.getBlockState(support),ClientActionRequest.string(request.original(),"expected_support_id"),new JsonObject())
-            && ScopedMining.TARGETS.contains(level.getBlockState(support).getBlock()) && level.getBlockState(support).getBlock().getClass()==Block.class,
+            && ScopedMining.LEGACY_TARGETS.contains(level.getBlockState(support).getBlock()) && level.getBlockState(support).getBlock().getClass()==Block.class,
             "placement_exact_plain_support_required");
         footprint=new JsonObject();footprint.addProperty("profile",PROFILE);footprint.addProperty("source","native-client-loaded-level");
         footprint.add("support",ScopedMining.position(support));footprint.add("target",ScopedMining.position(target));footprint.add("standing_support",ScopedMining.position(standingSupport));
         footprint.addProperty("face",request.face());footprint.addProperty("support_id",ClientActionRequest.string(request.original(),"expected_support_id"));
-        footprint.add("support_properties",new JsonObject());footprint.addProperty("block_id","minecraft:cobblestone");footprint.add("block_properties",new JsonObject());
+        footprint.add("support_properties",new JsonObject());footprint.addProperty("block_id",material);footprint.add("block_properties",request.original().getAsJsonObject("expected_block_properties").deepCopy());
         footprint.addProperty("selected_slot",selected);footprint.addProperty("initial_count",initialCount);
         footprint.addProperty("min_x",minX);footprint.addProperty("max_x",maxX);footprint.addProperty("min_y",minY);footprint.addProperty("max_y",maxY);
         footprint.addProperty("min_z",minZ);footprint.addProperty("max_z",maxZ);footprint.addProperty("expected_cells",count);footprint.add("cells",cells);
@@ -127,10 +141,12 @@ final class ScopedPlacement {
     private BlockState readCell(BlockPos p){
         require(level.hasChunkAt(p),"placement_dependency_unloaded");BlockState s=level.getBlockState(p);Block b=s.getBlock();
         boolean air=b==Blocks.AIR||b==Blocks.CAVE_AIR||b==Blocks.VOID_AIR;
-        boolean solid=ScopedMining.TARGETS.contains(b)&&b.getClass()==Block.class || b==Blocks.GRASS_BLOCK&&b.getClass()==GrassBlock.class || b==Blocks.BEDROCK;
-        require((air||solid)&&s.getFluidState().isEmpty()&&level.getBlockEntity(p)==null,"placement_hazard_or_unknown_geometry");
+        boolean solid=ScopedMining.LEGACY_TARGETS.contains(b)&&b.getClass()==Block.class || b==Blocks.GRASS_BLOCK&&b.getClass()==GrassBlock.class || b==Blocks.BEDROCK;
+        boolean table=b==Blocks.CRAFTING_TABLE&&b.getClass()==CraftingTableBlock.class&&s==Blocks.CRAFTING_TABLE.defaultBlockState();
+        boolean placed=effectCount==1&&p.equals(target)&&s==placedState&&exactPlacedClass(s);
+        require((air||solid||table||placed)&&s.getFluidState().isEmpty()&&blockEntityPermitted(p,s),"placement_hazard_or_unknown_geometry");
         require(air?s.getCollisionShape(level,p).isEmpty()&&s.getShape(level,p).isEmpty():s.isCollisionShapeFullBlock(level,p)&&s.getShape(level,p).bounds().equals(new AABB(0,0,0,1,1,1)),"placement_nonstatic_shape");
-        if(p.equals(standingSupport))require(!air,"placement_standing_support_missing");
+        if(p.equals(standingSupport))require(solid,"placement_standing_support_missing");
         if(p.getX()==standingSupport.getX()&&p.getZ()==standingSupport.getZ()&&p.getY()>standingSupport.getY()&&p.getY()<=standingSupport.getY()+2)require(air,"placement_body_not_clear");
         return s;
     }
@@ -149,7 +165,7 @@ final class ScopedPlacement {
         long began=System.nanoTime(),tick=level.getGameTime();int t=actionTick();float yaw=player.getYRot(),pitch=player.getXRot();
         raw(mc,permitEffect,t,began,tick,yaw,pitch);
         for(int i=0;i<positions.size();i++){BlockPos p=positions.get(i);BlockState s=readCell(p);
-            require(s==states.get(i)||permitEffect&&effectCount==1&&p.equals(target)&&s==Blocks.COBBLESTONE.defaultBlockState(),"placement_footprint_changed");}
+            require(s==states.get(i)||permitEffect&&effectCount==1&&p.equals(target)&&s==placedState,"placement_footprint_changed");}
         entities(t);
         BlockHitResult hit=null;double reach=0;
         if(ray){mc.gameRenderer.pick(1.0F);reach=player.blockInteractionRange();
@@ -170,7 +186,7 @@ final class ScopedPlacement {
             :sameStack(inventory.get(i),player.getInventory().getItem(i),permitEffect&&effectCount==1&&i==selected),"placement_inventory_changed");
         rawMenu.check(player);
         for(int i=0;i<positions.size();i++){BlockPos p=positions.get(i);require(level.hasChunkAt(p),"placement_unloaded_after_hooks");var s=level.getBlockState(p);
-            require((s==states.get(i)||permitEffect&&effectCount==1&&p.equals(target)&&s==Blocks.COBBLESTONE.defaultBlockState())&&s.getFluidState().isEmpty()&&level.getBlockEntity(p)==null,"placement_state_changed_after_hooks");}
+            require((s==states.get(i)||permitEffect&&effectCount==1&&p.equals(target)&&s==placedState)&&s.getFluidState().isEmpty()&&blockEntityPermitted(p,s),"placement_state_changed_after_hooks");}
         entities(t); // Exact vanilla raw readers; no slot or shape callbacks after this fence.
         Vec3 v=player.getDeltaMovement();long now=System.nanoTime();
         require(mc.isSameThread()&&mc.player==player&&mc.level==level&&mc.gameMode==gameMode&&mc.getSingleplayerServer()==server
@@ -216,12 +232,12 @@ final class ScopedPlacement {
         check(Minecraft.getInstance(),false,true);useCount++;
     }
     void beforeEffect(BlockItem item,BlockPlaceContext c,BlockState state){
-        require(attempted&&useCount==1&&effectCount==0&&packetCount==0&&item==Items.COBBLESTONE&&item.getClass()==BlockItem.class
+        require(attempted&&useCount==1&&effectCount==0&&packetCount==0&&item==placedItem&&item.getClass()==BlockItem.class
             &&c.getClass()==BlockPlaceContext.class&&c.getLevel()==level&&c.getPlayer()==player&&c.getHand()==InteractionHand.MAIN_HAND&&c.getClickedPos().equals(target)
-            &&c.getClickedFace()==face&&c.getItemInHand()==player.getMainHandItem()&&state==Blocks.COBBLESTONE.defaultBlockState(),"placement_effect_binding_changed");
+            &&c.getClickedFace()==face&&c.getItemInHand()==player.getMainHandItem()&&state==placedState,"placement_effect_binding_changed");
         check(Minecraft.getInstance(),false,true);
         require(effectCount==0&&packetCount==0&&useCount==1&&c.getClickedPos().equals(target)&&c.getItemInHand()==player.getMainHandItem()
-            &&state==Blocks.COBBLESTONE.defaultBlockState()&&ClientActions.ownsScopedPlacement(this,entry),"placement_effect_context_changed_after_hooks");
+            &&state==placedState&&ClientActions.ownsScopedPlacement(this,entry),"placement_effect_context_changed_after_hooks");
         effectCount++; // Irreversible-attempt latch set immediately before the ordinary Level.setBlock call.
     }
     void packet(net.minecraft.network.protocol.Packet<?> packet,LocalPlayer p,InteractionHand hand,BlockHitResult hit,int sequence){
@@ -256,8 +272,23 @@ final class ScopedPlacement {
         require(effectCount==1&&packetCount==1&&settled(),"placement_dispatch_unconfirmed");
         settling=true;
     }
-    boolean settled(){return level.hasChunkAt(target)&&level.getBlockState(target)==Blocks.COBBLESTONE.defaultBlockState()
-        &&player.getMainHandItem().getCount()==initialCount-1;}
+    private static boolean exactPlacedClass(BlockState state){
+        Block block=state.getBlock();return block==Blocks.COBBLESTONE&&block.getClass()==Block.class
+            ||block==Blocks.CRAFTING_TABLE&&block.getClass()==CraftingTableBlock.class
+            ||block==Blocks.FURNACE&&block.getClass()==FurnaceBlock.class;
+    }
+    private boolean blockEntityPermitted(BlockPos pos,BlockState state){
+        var entity=level.getBlockEntity(pos);
+        if(effectCount!=1||!pos.equals(target)||placedState.getBlock()!=Blocks.FURNACE||state!=placedState)return entity==null;
+        if(entity==null||entity.getClass()!=FurnaceBlockEntity.class)return false;
+        FurnaceBlockEntity furnace=(FurnaceBlockEntity)entity;
+        if(furnace.getType()!=BlockEntityType.FURNACE||furnace.isRemoved()||furnace.getLevel()!=level
+            ||!furnace.getBlockPos().equals(target)||furnace.getBlockState()!=placedState||furnace.getContainerSize()!=3)return false;
+        for(int i=0;i<3;i++)if(!furnace.getItem(i).isEmpty())return false;
+        return true;
+    }
+    boolean settled(){return level.hasChunkAt(target)&&level.getBlockState(target)==placedState
+        &&blockEntityPermitted(target,placedState)&&exactDecrement(inventory.get(selected),player.getMainHandItem());}
     boolean cleanupState(boolean success){
         try {
             Minecraft mc=Minecraft.getInstance();

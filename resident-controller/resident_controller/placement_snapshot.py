@@ -1,7 +1,16 @@
 """Closed placement witness validator. Client observations never prove server acceptance."""
 import math
 from .capability_snapshot import _require, _integer, exact, signed_long_string, validate_movement_entity_guard
-from .mining_snapshot import BLOCKS, AIR, STATIC, coordinate
+from .mining_snapshot import LEGACY_BLOCKS as BLOCKS, AIR, LEGACY_STATIC, coordinate
+
+STATIC = LEGACY_STATIC | {'minecraft:crafting_table'}
+MATERIALS = {'minecraft:cobblestone', 'minecraft:crafting_table', 'minecraft:furnace'}
+
+def exact_material(block_id, properties):
+    return (type(properties) is dict and block_id in MATERIALS
+            and (set(properties) == {'facing', 'lit'}
+                 and properties['facing'] in ('north','south','east','west')
+                 and properties['lit'] == 'false' if block_id == 'minecraft:furnace' else properties == {}))
 
 PROFILE = 'placement-local-observed-v1'
 FACES = {'up':(0,1,0),'down':(0,-1,0),'north':(0,0,-1),'south':(0,0,1),'east':(1,0,0),'west':(-1,0,0)}
@@ -32,16 +41,16 @@ def validate_placement(witness, intent, native):
     support = intent['support']; face = intent['face']
     _require(coordinate(support) and face in FACES and intent['expected_support_id'] in BLOCKS
              and exact(intent['expected_support_properties'],{}) and intent['expected_target_id'] == 'minecraft:air'
-             and exact(intent['expected_target_properties'],{}) and intent['expected_block_id'] == 'minecraft:cobblestone'
-             and exact(intent['expected_block_properties'],{}), 'placement_exact_material_and_support')
+             and exact(intent['expected_target_properties'],{})
+             and exact_material(intent['expected_block_id'], intent['expected_block_properties']), 'placement_exact_material_and_support')
     target = {k:support[k]+FACES[face][i] for i,k in enumerate(('x','y','z'))}
     hit = {k:support[k]+.5+FACES[face][i]*.5 for i,k in enumerate(('x','y','z'))}
     footprint = [{'position':target,'expected_id':'minecraft:air','expected_properties':{},
-                  'block_id':'minecraft:cobblestone','properties':{}}]
+                  'block_id':intent['expected_block_id'],'properties':intent['expected_block_properties']}]
     _require(coordinate(target) and exact(intent['placement_hit'],hit) and exact(intent['placement_footprint'],footprint)
              and exact(p['target'],target) and exact(p['support'],support) and p['face'] == face
              and p['support_id'] == intent['expected_support_id'] and exact(p['support_properties'],{})
-             and p['block_id'] == 'minecraft:cobblestone' and exact(p['block_properties'],{}), 'placement_exact_target_face')
+             and p['block_id'] == intent['expected_block_id'] and exact(p['block_properties'],intent['expected_block_properties']), 'placement_exact_target_face')
     standing = {'x':math.floor(facts['x']),'y':math.floor(facts['y']-.01),'z':math.floor(facts['z'])}
     _require(coordinate(standing) and exact(p['standing_support'],standing)
              and abs(facts['y']-standing['y']-1)<1e-7 and facts['context']['dimension']=='minecraft:overworld'
@@ -66,13 +75,13 @@ def validate_placement(witness, intent, native):
                  and row['loaded'] is True and row['fluid']=='minecraft:empty' and type(row['state']) is str
                  and 0<len(row['state'])<=512 and type(row['properties']) is dict,'placement_cell')
         air=row['id'] in AIR
-        cls='net.minecraft.world.level.block.'+('AirBlock' if air else 'GrassBlock' if row['id']=='minecraft:grass_block' else 'Block')
+        cls='net.minecraft.world.level.block.'+('AirBlock' if air else 'GrassBlock' if row['id']=='minecraft:grass_block' else 'CraftingTableBlock' if row['id']=='minecraft:crafting_table' else 'Block')
         _require(exact(row['air'],air) and exact(row['static_full_cube'],not air) and row['block_class']==cls
                  and (set(row['properties'])=={'snowy'} and row['properties']['snowy'] in ('true','false')
                       if row['id']=='minecraft:grass_block' else row['properties']=={}), 'placement_static_class_state')
         rows[xyz]=row
     def at(pos):return rows[tuple(pos[k] for k in ('x','y','z'))]
-    _require(at(target)['id']=='minecraft:air' and at(support)['id']==p['support_id'] and not at(standing)['air']
+    _require(at(target)['id']=='minecraft:air' and at(support)['id']==p['support_id'] and at(standing)['id'] in LEGACY_STATIC-AIR
              and all(rows[(standing['x'],y,standing['z'])]['air'] for y in (standing['y']+1,standing['y']+2)),
              'placement_support_target_and_body')
     _require(all(p[k] is True for k in ('all_loaded','complete','callbacks_installed'))
@@ -86,7 +95,7 @@ def validate_placement(witness, intent, native):
     selected=facts['selected_slot']; held=facts['inventory'][selected]['item']
     _require(exact(p['selected_slot'],selected) and exact(intent['expected_hotbar_slot'],selected)
              and _integer(p['initial_count'],1,64) and exact(p['initial_count'],held['count'])
-             and held['id']=='minecraft:cobblestone' and held['empty'] is False and exact(held['max_stack_size'],64)
+             and held['id']==intent['expected_block_id'] and held['empty'] is False and exact(held['max_stack_size'],64)
              and type(intent['expected_held_item']) is dict
              and all(exact(intent['expected_held_item'].get(k),held.get(k)) for k in STACK)
              and facts['screen_class']=='' and facts['effects']==[] and facts['hurt_time']==0

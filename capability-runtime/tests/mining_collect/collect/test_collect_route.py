@@ -12,7 +12,7 @@ CTX=('world','minecraft:overworld','player','session')
 def observation(tick=1, count=0, item='minecraft:coal', component=FP):
     rows=[{'slot':i,'empty':True,'id':'','count':0,'max_stack_size':64,'identity_complete':True} for i in range(36)]
     if count:rows[0].update(empty=False,id=item,count=count,component_fingerprint=component,item_fingerprint=FP)
-    stack={'id':'minecraft:coal','count':3,'empty':False,'max_stack_size':64,
+    stack={'id':item,'count':3,'empty':False,'max_stack_size':64,
            'identity_complete':True,'component_fingerprint':FP,'item_fingerprint':FP}
     target={'uuid':UUID,'entity_id':7,'type':'minecraft:item','class':'net.minecraft.world.entity.item.ItemEntity',
             'alive':True,'x':1.5,'y':64.,'z':.5,'item':stack}
@@ -23,13 +23,13 @@ def observation(tick=1, count=0, item='minecraft:coal', component=FP):
 
 class Runtime:
     _job_scoped_profiles={'follow_path':collect.PROFILE}
-    def __init__(self,counts=(3,3,3),status='cancelled',reason='scoped_collect_target_absent',release=True):
-        self.first=observation();self.counts=list(counts);self.status=status;self.reason=reason
+    def __init__(self,counts=(3,3,3),status='cancelled',reason='scoped_collect_target_absent',release=True,item='minecraft:coal'):
+        self.item=item;self.first=observation(item=item);self.counts=list(counts);self.status=status;self.reason=reason
         self.release=release;self.observes=0;self.actions=[];self.modifier=lambda x:x
     def observe(self,**kw):
         self.observes+=1
         if self.observes==1:return self.first
-        sample=observation(self.observes,self.counts[min(self.observes-2,len(self.counts)-1)])
+        sample=observation(self.observes,self.counts[min(self.observes-2,len(self.counts)-1)],item=self.item)
         return self.modifier(sample)
     def sleeper(self,x):pass
     def execute(self,skill,command,verify,**kw):
@@ -39,9 +39,29 @@ class Runtime:
     def result(self,skill,observations,**evidence):
         return Outcome('succeeded','proof',tuple(o.request_id for o in observations),evidence,observations[-1])
 
-def run(rt,**kwargs):return collect.collect_local(rt,UUID,'minecraft:coal',**kwargs)
+def run(rt,**kwargs):return collect.collect_local(rt,UUID,rt.item,**kwargs)
 
 class SkillTests(unittest.TestCase):
+    def test_all_finite_survival_items_keep_single_exact_pickup_proof(self):
+        for item in sorted(collect.ITEMS):
+            with self.subTest(item=item):
+                r=Runtime(item=item);v=run(r)
+                self.assertTrue(v.ok);self.assertEqual(v.evidence['item_id'],item)
+                self.assertEqual(v.evidence['inventory_delta'],3);self.assertFalse(v.evidence['causal_drop_attribution'])
+                self.assertFalse(v.evidence['automatic_replay_allowed']);self.assertEqual(len(r.actions),1)
+                self.assertEqual(r.actions[0]['pickup_target']['item_id'],item)
+    def test_new_items_keep_capacity_component_and_unknown_fences(self):
+        for item in ('minecraft:jungle_log','minecraft:raw_iron','minecraft:furnace','minecraft:cooked_beef'):
+            with self.subTest(item=item):
+                r=Runtime(item=item);r.modifier=lambda o:(o.player['inventory'][0].update(component_fingerprint='wrong') or o)
+                self.assertFalse(run(r).ok)
+                r=Runtime(item=item,status='unknown');self.assertFalse(run(r).ok)
+                self.assertEqual((r.observes,len(r.actions)),(1,1))
+                r=Runtime(item=item)
+                for row in r.first.player['inventory']:row.update(empty=False,id=item,count=64,component_fingerprint=FP)
+                r.first.player['inventory'][0]['count']=63
+                with self.assertRaisesRegex(SkillError,'capacity'):run(r)
+                self.assertFalse(r.actions)
     def test_target_disappearance_with_typed_delta_preserves_cancellation(self):
         r=Runtime();v=run(r)
         self.assertTrue(v.ok);self.assertEqual(v.evidence['inventory_delta'],3)
@@ -90,6 +110,18 @@ class SkillTests(unittest.TestCase):
             r=Runtime();r.first.state['nearby']['entities'][0].update(change)
             with self.assertRaises(SkillError):run(r)
             self.assertFalse(r.actions)
+    def test_new_item_keeps_cardinal_single_step_and_exact_entity_class(self):
+        for change in ({'x':.5},{'x':1.5,'z':1.5},{'y':65.},
+                       {'class':'custom.ItemEntitySubclass'}):
+            r=Runtime(item='minecraft:jungle_log');r.first.state['nearby']['entities'][0].update(change)
+            with self.subTest(change=change),self.assertRaises(SkillError):run(r)
+            self.assertFalse(r.actions)
+    def test_new_item_keeps_finite_full_stack_identity(self):
+        for change in ({'count':65},{'count':True},{'max_stack_size':16},
+                       {'identity_complete':False},{'item_fingerprint':'unknown'},{'empty':True}):
+            r=Runtime(item='minecraft:raw_iron');r.first.state['nearby']['entities'][0]['item'].update(change)
+            with self.subTest(change=change),self.assertRaises(SkillError):run(r)
+            self.assertFalse(r.actions)
     def test_user_cancel_during_verification_cannot_be_success(self):
         class Control:
             count=0
@@ -100,6 +132,24 @@ class SkillTests(unittest.TestCase):
         with self.assertRaisesRegex(SkillError,'owner_cancelled'):run(r,control=Control())
 
 class WitnessTests(unittest.TestCase):
+    def test_all_finite_survival_items_agree_across_public_and_resident_contracts(self):
+        from resident_controller.collect_snapshot import ITEMS as resident_items
+        from mdc_toolbox.bindings.resources import _COLLECT_SCHEMA, definitions
+        self.assertEqual(collect.ITEMS,resident_items)
+        self.assertEqual(collect.ITEMS,set(_COLLECT_SCHEMA['properties']['item_id']['enum']))
+        definition=next(d for d in definitions() if d['capability']=='collect_local')
+        self.assertIn(f'Only {len(collect.ITEMS)} explicitly listed',str(definition['known_limits']))
+        for item in sorted(collect.ITEMS):
+            with self.subTest(item=item):
+                d=collect_fixture(item_id=item);validate_scoped_witness(*d)
+    def test_unsupported_items_remain_rejected_by_both_consumers(self):
+        for item in ('minecraft:diamond','minecraft:mangrove_log','minecraft:carrot','minecraft:potato',
+                     'minecraft:potion','minecraft:bucket','minecraft:iron_pickaxe','mod:bread'):
+            with self.subTest(item=item):
+                r=Runtime(item=item)
+                with self.assertRaises(SkillError):run(r)
+                self.assertFalse(r.actions);self.assertEqual(r.observes,0)
+                with self.assertRaises(ValueError):validate_scoped_witness(*collect_fixture(item_id=item))
     def test_collect_and_old_movement_witnesses_valid(self):
         for flag in (True,False):validate_scoped_witness(*collect_fixture(flag))
     def test_identity_components_and_request_tampering_rejected(self):

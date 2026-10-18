@@ -26,7 +26,7 @@ for part in parts:
 commands.append(('python-toolbox', SOURCE / 'capability-runtime',
                  [sys.executable, '-B', '-m', 'unittest', 'discover', '-s', 'tests/toolbox', '-p', 'test*.py', '-v']))
 mcp = SOURCE / 'client-mod' / 'mcp'
-commands.extend([('node-portable', mcp, ['node', '--test', 'client-action-test.mjs', 'encounter-contract-test.mjs', 'mainline-client-action-test.mjs', 'boat-transfer-test.mjs', 'encounter-pause-flag-test.mjs', 'three-zombie-contract-test.mjs', 'toolbox-test.mjs', 'toolbox-schema-test.mjs', 'toolbox-owner-chain-test.mjs', 'toolbox-placement-owner-chain-test.mjs', 'defend-once-test.mjs']),
+commands.extend([('node-portable', mcp, ['node', '--test', 'client-action-test.mjs', 'encounter-contract-test.mjs', 'mainline-client-action-test.mjs', 'boat-transfer-test.mjs', 'encounter-pause-flag-test.mjs', 'three-zombie-contract-test.mjs', 'toolbox-test.mjs', 'toolbox-bridge-recovery-test.mjs', 'toolbox-schema-test.mjs', 'toolbox-owner-chain-test.mjs', 'toolbox-placement-owner-chain-test.mjs', 'defend-once-test.mjs']),
                  ('node-framing', mcp, ['node', 'ndjson-framing-test.mjs']),
                  ('node-platform', mcp, ['node', 'self-test-platform.mjs'])])
 results = {'started_utc': datetime.now(timezone.utc).isoformat(), 'scope': 'offline only', 'components': []}

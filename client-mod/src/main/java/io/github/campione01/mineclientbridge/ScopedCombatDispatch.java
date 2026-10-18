@@ -17,7 +17,8 @@ public final class ScopedCombatDispatch {
         final CombatCallbackFence fence;
         int effectPackets,swingPackets,selectionPackets;
         Call(ScopedCombat guard,BoundedCombat combat,boolean attack){this.guard=guard;this.combat=combat;this.attack=attack;
-            fence=new CombatCallbackFence(()->ClientActions.ownsScopedCombat(guard,guard.entry),System::nanoTime,()->guard.level.getGameTime());}
+            fence=new CombatCallbackFence(()->ClientActions.ownsScopedCombat(guard,guard.entry)
+                && (guard.defensive==null || guard.exactBound(Minecraft.getInstance())),System::nanoTime,()->guard.level.getGameTime());}
     }
     private static final ThreadLocal<Call> CALL=new ThreadLocal<>();
     private static final ThreadLocal<Cleanup> CLEANUP=new ThreadLocal<>();
@@ -32,6 +33,7 @@ public final class ScopedCombatDispatch {
         ScopedCombat guard=ClientActions.scopedCombat(combat);
         if(guard==null){ScopedCombat.require(ClientActions.ownsCombat(combat),"combat_owner_changed");return vanilla.get();}
         ScopedCombat.require(CALL.get()==null,"scoped_combat_recursive_effect_forbidden");
+        ScopedCombat.require(!attack || guard.defensive==null,"defensive_attack_forbidden");
         Call call=new Call(guard,combat,attack);CALL.set(call);
         boolean entered=false;
         try {check(call);entered=true;T result=vanilla.get();call.fence.raw();return result;}
@@ -57,13 +59,36 @@ public final class ScopedCombatDispatch {
             && mc.player.getYRot()==yaw && mc.player.getXRot()==pitch && mc.hitResult==ray
             && call.guard.target.getX()==tx && call.guard.target.getY()==ty && call.guard.target.getZ()==tz,
             "scoped_combat_effect_geometry_changed_during_hooks");
+        if(call.guard.defensive!=null)call.guard.rawBound(mc);
         });
     }
+    static void cleanupStep(ScopedCombat guard){
+        Cleanup cleanup=CLEANUP.get();ScopedCombat.require(cleanup!=null && cleanup.guard==guard,"defensive_cleanup_scope_missing");
+        guard.cleanupFence(Minecraft.getInstance(),cleanup.terminal);
+    }
+    public static boolean defensiveActive(){return ClientActions.activeDefensiveCombat()!=null;}
+    public static boolean beforeUse(Player player,net.minecraft.world.InteractionHand hand,boolean onBlock){
+        if(CLEANUP.get()!=null)return false; // No use local effects during any release-only callback.
+        ScopedCombat guard=ClientActions.activeDefensiveCombat();if(guard==null)return true;
+        Call call=CALL.get();
+        // Vanilla may attempt another use after shield interruption while keyUse is held.
+        // Cancel that attempt at HEAD, before hooks/local effects; never retry our owned use.
+        if(!DefensiveCombatPolicy.useAllowed(call!=null && call.guard==guard,call!=null && call.attack,
+                player==guard.player,hand==net.minecraft.world.InteractionHand.OFF_HAND,onBlock))return false;
+        check(call);return true;
+    }
     public static void beforeAttack(Player player,Entity target){
+        ScopedCombat.require(CLEANUP.get()==null,"scoped_combat_cleanup_nonrelease_effect");
+        ScopedCombat.require(ClientActions.activeDefensiveCombat()==null,"defensive_attack_forbidden");
         Call call=CALL.get();if(call==null)return;
         ScopedCombat.require(call.attack && player==call.guard.player && target==call.guard.target,"scoped_combat_attack_target_changed");check(call);
     }
     public static void packet(Packet<?> packet){
+        ScopedCombat defensive=ClientActions.activeDefensiveCombat();
+        if(defensive!=null){
+            ScopedCombat.require(!(packet instanceof ServerboundInteractPacket) && !(packet instanceof net.minecraft.network.protocol.game.ServerboundUseItemOnPacket),"defensive_offensive_packet_forbidden");
+            if(packet instanceof ServerboundUseItemPacket)ScopedCombat.require(CALL.get()!=null && CALL.get().guard==defensive && !CALL.get().attack,"defensive_unscoped_use_packet_forbidden");
+        }
         Cleanup cleanup=CLEANUP.get();
         if(cleanup!=null){
             ScopedCombat.require(packet instanceof net.minecraft.network.protocol.game.ServerboundPlayerActionPacket release

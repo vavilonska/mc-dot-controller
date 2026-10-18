@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 import sys
 
+from .runtime_paths import configure_source_dependencies
+configure_source_dependencies()
+
 from .controller import Resident, safe_reason
 from .ipc import QueueClient
 from .transport import Bridge, BridgeError

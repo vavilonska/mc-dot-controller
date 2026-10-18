@@ -187,10 +187,10 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
              and _integer(value.get('defense_epoch')) and _integer(value.get('owner_generation'), 1)
              and value.get('action_id') == action_id and value.get('action_session') == native.get('action_session'),
              'scoped_owner_identity')
-    _require(value.get('profile') in ('state-menu-v1', 'state-use-v1', 'block-menu-v1', 'movement-flat-observed-v2', 'movement-step-down-observed-v1', 'movement-local-segment-observed-v1', 'movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2', 'mining-local-observed-v2', 'placement-local-observed-v1', 'collect-local-observed-v1', 'combat-local-observed-v1')
+    _require(value.get('profile') in ('state-menu-v1', 'state-use-v1', 'block-menu-v1', 'movement-flat-observed-v2', 'movement-step-down-observed-v1', 'movement-local-segment-observed-v1', 'movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2', 'mining-local-observed-v2', 'placement-local-observed-v1', 'collect-local-observed-v1', 'combat-local-observed-v1', 'combat-defensive-local-v1')
              and native_intent.get('action') in {'state-menu-v1': {'click_slot','close_menu','select_hotbar'},
                  'state-use-v1': {'use_item'}, 'block-menu-v1': {'interact_block'},
-                 'movement-flat-observed-v2': {'follow_path'}, 'movement-step-down-observed-v1': {'follow_path'}, 'movement-local-segment-observed-v1': {'follow_path'}, 'movement-local-segment-spatial-threat-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v2': {'follow_path'}, 'collect-local-observed-v1': {'follow_path'}, 'mining-local-observed-v2': {'break_block'}, 'placement-local-observed-v1': {'place_block'}, 'combat-local-observed-v1': {'combat_entity'}}[value['profile']]
+                 'movement-flat-observed-v2': {'follow_path'}, 'movement-step-down-observed-v1': {'follow_path'}, 'movement-local-segment-observed-v1': {'follow_path'}, 'movement-local-segment-spatial-threat-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v2': {'follow_path'}, 'collect-local-observed-v1': {'follow_path'}, 'mining-local-observed-v2': {'break_block'}, 'placement-local-observed-v1': {'place_block'}, 'combat-local-observed-v1': {'combat_entity'}, 'combat-defensive-local-v1': {'combat_entity'}}[value['profile']]
              and value.get('coverage_complete') is True and value.get('admitted') is True
              and value.get('clock_domain') == 'native-system-nanotime'
              and _integer(value.get('source_tick')) and _integer(value.get('native_owner_revision'))
@@ -274,6 +274,9 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
         _require(type(permission) is dict and type(permission.get('may_pickup')) is bool
                  and type(permission.get('may_place_carried')) is bool
                  and _integer(permission.get('max_stack_size'), 0, 2147483647), 'scoped_slot_permissions')
+    if 'inventory_recovery' in native_intent:
+        from .inventory_recovery_snapshot import validate_inventory_recovery
+        validate_inventory_recovery(value, native_intent)
     if value['profile'] == 'block-menu-v1':
         from .block_menu_snapshot import validate
         validate(value, native, native_intent)
@@ -291,7 +294,7 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
     if value['profile'] == 'mining-local-observed-v2':
         from .mining_snapshot import validate_mining
         validate_mining(value, native_intent, native)
-    if value['profile'] == 'combat-local-observed-v1':
+    if value['profile'] in ('combat-local-observed-v1','combat-defensive-local-v1'):
         from .combat_snapshot import validate_combat
         validate_combat(value, native_intent, native)
     if 'route_terrain_rejection' in native.get('result', {}):

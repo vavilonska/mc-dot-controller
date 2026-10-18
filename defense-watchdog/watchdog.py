@@ -61,7 +61,7 @@ class Watchdog(base.Watchdog):
                      if e.get('uuid')==identity and e.get('type') in base.HOSTILES and e.get('alive') is True),None)
 
     def send(self,kind,command):
-        if self.execution_policy in base.EXPLICIT_POLICIES:
+        if (self.execution_policy in base.EXPLICIT_POLICIES or getattr(self,'explicit_after_adjudication',False)):
             return super().send(kind,command)
         if kind=='start_combat':
             state=(self.latest or {}).get('state',{})
@@ -252,7 +252,7 @@ class Watchdog(base.Watchdog):
                     and 0 <= self.clock()-lease.get('observed_at',-math.inf) <= .5)
 
     def submit_owner(self,intent_id,command, *, queue_request_id=None):
-        if (self.execution_policy in base.EXPLICIT_POLICIES or command.get("op") in base.CONTROL_OPS
+        if ((self.execution_policy in base.EXPLICIT_POLICIES or getattr(self,'explicit_after_adjudication',False)) or command.get("op") in base.CONTROL_OPS
                 or self.capability_lease or "_capability_owner_id" in command):
             return super().submit_owner(intent_id, command, queue_request_id=queue_request_id)
         if self.environment.active:return False
@@ -360,7 +360,7 @@ class Watchdog(base.Watchdog):
         self.phase,self.reason='retreating','following_observed_dry_route'
 
     def tick(self):
-        if self.execution_policy in base.EXPLICIT_POLICIES:
+        if (self.execution_policy in base.EXPLICIT_POLICIES or getattr(self,'explicit_after_adjudication',False)):
             return super().tick()
         bridge=getattr(self,'_coordination_owner',None)
         if bridge is not None:return bridge.tick_watchdog()

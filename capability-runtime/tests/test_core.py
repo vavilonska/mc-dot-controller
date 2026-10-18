@@ -274,3 +274,34 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(self.client.action_count, 0)
 
 if __name__ == '__main__': unittest.main()
+
+class UnknownReceiptRetentionTests(unittest.TestCase):
+    def test_uncertain_native_receipt_is_archived_without_settlement_or_replay(self):
+        import gzip
+        with tempfile.TemporaryDirectory() as tmp:
+            clock = Clock(); client = Client(clock)
+            def uncertain(result):
+                if 'action' in result.get('result', {}):
+                    return {**result, 'status':'uncertain', 'reason':'post_hook_unknown',
+                        'unknown_outcome':True, 'native_refusal_diagnostics':{'schema_version':2,
+                            'reason':'scoped_movement_entity_unsupported','diagnostics_only':True}}
+                return result
+            client.patch_result = uncertain
+            runtime = Runtime(client, tmp, clock=clock, sleeper=clock.sleep)
+            try:
+                outcome = runtime.execute('reach', move(), arrived)
+                self.assertEqual(outcome.status, 'unknown')
+                original = runtime.pending_request_id
+                record = runtime._journal['records'][original]
+                reference = record['receipt_ref']
+                path = Path(tmp) / reference['file']; saved = path.read_bytes()
+                receipt = json.loads(gzip.decompress(saved))
+                self.assertEqual(receipt['status'], 'uncertain')
+                self.assertEqual(receipt['native_refusal_diagnostics']['reason'], 'scoped_movement_entity_unsupported')
+                self.assertEqual(outcome.evidence['original_receipt_ref'], reference)
+                self.assertEqual(runtime.audit_evidence()['receipts'], 2)  # Initial observation and uncertain mutation.
+                runtime.execute('again', move(), arrived)
+                self.assertEqual(client.action_count, 1)
+                self.assertEqual(runtime.pending_request_id, original)
+                self.assertEqual(path.read_bytes(), saved)
+            finally: runtime.close()

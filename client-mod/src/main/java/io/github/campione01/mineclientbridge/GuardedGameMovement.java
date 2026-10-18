@@ -72,6 +72,12 @@ final class GuardedGameMovement {
                     "movement_input_changed");
             // These fields are consumed by vanilla later in this same player tick. Do not set
             // KeyMapping state/clickCount or emit a keyboard/mouse event that can outlive the lease.
+            var effectPermit=GuardedGameMovement.LEASES.effectPermit();
+            ExternalControllerGuard.requireIdle(mc);
+            GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
+            effectPermit.checkLive(); // Original ticket and TTL, after all external API callbacks.
+            GuardedAction.require(mc.player!=null && mc.player.input==input,"movement_input_changed");
+            NativeFallRescue.requireOrdinaryAdmission();
             input.up = true;
             input.forwardImpulse = GuardedMovement.FORWARD_IMPULSE;
         }, () -> {
@@ -86,6 +92,7 @@ final class GuardedGameMovement {
         GuardedAction.require(mc.isSameThread(), "minecraft_thread_required");
         GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
         GuardedAction.require(mc.player != null && mc.level != null && mc.gameMode != null, "not_in_world");
+        ExternalControllerGuard.requireIdle(mc);
         var player = mc.player;
         var level = mc.level;
         String generation = WorldGeneration.current(level);

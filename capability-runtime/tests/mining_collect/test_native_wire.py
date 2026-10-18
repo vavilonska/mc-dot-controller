@@ -20,7 +20,11 @@ class NativeCombinedWireTests(unittest.TestCase):
             raise unittest.SkipTest('Supply actual Java-emitted combined-wire files via the bounded runner')
         cls.directory = Path(location).resolve()
         cls.raw = {}
-        for profile in ('collect', 'combat'):
+        from mdc_skills.scoped_collect import ITEMS
+        cls.item_ids=load_strict((cls.directory/'collect-items.json').read_bytes())['item_ids']
+        if len(cls.item_ids)!=len(set(cls.item_ids)) or set(cls.item_ids)!=ITEMS:
+            raise ValueError('Native/public collect vocabulary mismatch')
+        for profile in ('collect', 'combat', *('collect-item-'+i.split(':')[1] for i in cls.item_ids)):
             for suffix in ('standalone', 'coherent', 'request', 'intent'):
                 name = f'{profile}-{suffix}.json'
                 raw = (cls.directory / name).read_bytes()
@@ -48,6 +52,22 @@ class NativeCombinedWireTests(unittest.TestCase):
         self.assertEqual(witness['profile'], scope['profile'])
         self.assertTrue(witness['coverage_complete'])
         return witness
+
+    def test_all_collect_ids_consume_actual_native_standalone_and_coherent_bytes(self):
+        from resident_controller.collect_snapshot import ITEMS as resident_items
+        self.assertEqual(set(self.item_ids),resident_items)
+        for item in self.item_ids:
+            profile='collect-item-'+item.split(':')[1]
+            with self.subTest(item=item):
+                native=self.parsed(profile,'standalone')
+                w=self.validated(profile,native)
+                self.assertEqual(w['facts']['movement']['pickup_target']['item_id'],item)
+                self.assertEqual(self.parsed(profile,'intent')['pickup_target']['item_id'],item)
+                raw=self.raw[profile+'-coherent.json'];encoded=self.parsed(profile,'coherent')
+                before=deepcopy(encoded);semantic=validate_snapshot(encoded,8)
+                self.assertTrue(exact(encoded,before))
+                self.assertTrue(exact(w,self.validated(profile,semantic['action'])))
+                self.assertTrue(exact(validate_retained(retain(raw),semantic,8),semantic))
 
     def test_collect_original_standalone_consumes_exact_native_bytes(self):
         native = self.parsed('collect', 'standalone')

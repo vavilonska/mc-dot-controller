@@ -1,3 +1,5 @@
+> Current publication: [Recovery 2.5 source and bounded acceptance](docs/recovery-2026-10-18/README.md). All records below remain historical to their own checkpoints.
+
 > 历史源码记录：本文各项结论仅适用于其原始截点。2026-10-16 当前交付、安装入口和验证边界见[工具箱交付说明](docs/toolbox-2026-10-16/README.md)。本次 Git 发布不改产品代码或继承旧 JAR 的实机验收。
 
 # Combined local-route, terminal-defense and delivery source

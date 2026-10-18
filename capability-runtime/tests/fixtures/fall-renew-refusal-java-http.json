@@ -1,0 +1,1 @@
+[{"name":"refused","http_status":409,"body":"{\"ok\":false,\"error\":\"fall_rescue_not_armed\"}"},{"name":"wrong_status","http_status":500,"body":"{\"ok\":false,\"error\":\"fall_rescue_not_armed\"}"},{"name":"wrong_reason","http_status":409,"body":"{\"ok\":false,\"error\":\"fall_rescue_owner_changed\"}"}]

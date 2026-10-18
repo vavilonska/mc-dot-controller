@@ -11,8 +11,10 @@ import uuid
 from .transport import json_bytes
 
 MAX_COMMAND_BYTES = 64 * 1024
+MAX_SESSION_BYTES = 1024 * 1024
 MAX_PENDING = 32
 MAX_RESULTS = 256
+RECONCILIATION_PREFIX = 'reconcile_'
 ID = re.compile(r'[A-Za-z0-9_-]{1,80}')
 
 
@@ -47,7 +49,11 @@ class QueueClient:
         self.root = Path(directory)
 
     def session(self):
-        return read_json(self.root / 'session.json')
+        return read_json(self.root / 'session.json', MAX_SESSION_BYTES)
+
+    def session_diagnostic(self, reference):
+        from .session_diagnostics import read_diagnostic
+        return read_diagnostic(self.root, self.session()['session_id'], reference)
 
     def scan_cache(self):
         """Historical observations only; file freshness is not world freshness."""
@@ -60,18 +66,29 @@ class QueueClient:
         request_id = request_id or uuid.uuid4().hex
         if not ID.fullmatch(request_id):
             raise ValueError('invalid_request_id')
+        diagnostic = command.get('op') == 'reconciliation_observe'
+        if diagnostic != request_id.startswith(RECONCILIATION_PREFIX):
+            raise ValueError('reserved_reconciliation_request_id')
         body = dict(command, request_id=request_id, session_id=session['session_id'], submitted_at=time.time())
         if len(json_bytes(body)) > MAX_COMMAND_BYTES:
             raise ValueError('command_too_large')
         name = request_id + '.json'
         # Caller-chosen repeated IDs observe the original result; they never resubmit a mutation.
-        for folder in ('inbox', 'working', 'results'):
+        for folder in ('inbox', 'working', 'reconciliation-results' if diagnostic else 'results'):
             if (self.root / folder / name).exists():
                 return request_id
+        if diagnostic and len(list((self.root / 'reconciliation-results').glob('*.json'))) >= 256:
+            raise ValueError('reconciliation_resident_history_full')
         if len(list((self.root / 'inbox').glob('*.json'))) >= MAX_PENDING:
             raise ValueError('queue_full')
         atomic_json(self.root / 'inbox' / name, body)
         return request_id
+
+    def reconciliation_result(self, request_id):
+        if not isinstance(request_id, str) or not ID.fullmatch(request_id) or not request_id.startswith(RECONCILIATION_PREFIX):
+            raise ValueError('invalid_reconciliation_request_id')
+        path = self.root / 'reconciliation-results' / (request_id + '.json')
+        return read_json(path, 128 * 1024) if path.exists() else None
 
     def result(self, request_id):
         if not ID.fullmatch(request_id):

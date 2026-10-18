@@ -22,6 +22,9 @@ for name in ('resident-controller', 'minecraft-resident-controller'):
     if (candidate / 'resident_controller' / 'ipc.py').is_file():
         sys.path.insert(0, str(candidate))
         break
+from resident_controller.runtime_paths import configure_source_dependencies
+configure_source_dependencies()
+
 from resident_controller.native_combat import HOSTILES, WEAPONS
 from resident_controller.ipc import QueueClient
 from resident_controller.action_safety import task_release_unconfirmed, task_handoff_required, native_release_unconfirmed
@@ -29,7 +32,7 @@ from targeting import TargetPolicy
 from capability_ownership import CapabilityOwnership, CONTROL_OPS, context_of, safe_idle
 
 TERMINAL = {'succeeded', 'failed', 'cancelled', 'uncertain'}
-OWNER_OPS = {'observe', 'direct', 'action', 'walk_to', 'craft_planks', 'pillar',
+OWNER_OPS = {'observe', 'direct', 'action', 'fall_rescue_control', 'external_navigation_control', 'managed_navigation_control', 'walk_to', 'craft_planks', 'pillar',
              'scan_start', 'scan_status', 'scan_cancel', 'recovery_close_menu'} | CONTROL_OPS
 EXECUTION_POLICIES = frozenset({'standard', 'noncombat', 'request_only'})
 EXPLICIT_POLICIES = frozenset({'noncombat', 'request_only'})
@@ -134,6 +137,7 @@ class Watchdog(CapabilityOwnership):
     def status(self):
         return {**self.capability_status(), 'schema_version': 3, 'implementation': 'native-defense-watchdog-v3',
                 'execution_policy_schema_version': 1, 'execution_policy': self.execution_policy,
+                'reconciliation_read_profile': 'lease-free-reconciliation/1',
                 'session_id': self.session_id, 'defense_epoch': self.defense_epoch,
                 'state': ('stopped' if self.stopped else 'paused' if not self.armed else 'busy'
                           if self.owner or self.phase in ('combat', 'engaging', 'retaining_target') else 'ready'),
@@ -154,7 +158,7 @@ class Watchdog(CapabilityOwnership):
                            for k in ('alive', 'health', 'food', 'x', 'y', 'z', 'selected_slot')}}
 
     def send(self, kind, command):
-        if (self.execution_policy in EXPLICIT_POLICIES and command.get('op') != 'observe'
+        if ((self.execution_policy in EXPLICIT_POLICIES or getattr(self,'explicit_after_adjudication',False)) and command.get('op') != 'observe'
                 and not (self.stop_requested and kind == 'stop_cancel' and command == {'op': 'cancel'})):
             # Failure/timeout/death handling may ask for an automatic cancel.
             # This policy pauses instead; only explicit STOP may release input.
@@ -236,8 +240,8 @@ class Watchdog(CapabilityOwnership):
 
     def submit_owner(self, intent_id, command, *, queue_request_id=None):
         """Return False to keep a deferred intent in its inbox during combat."""
-        if (self.execution_policy in EXPLICIT_POLICIES and command.get('op') not in CONTROL_OPS
-                and command.get('op') != 'observe'
+        if ((self.execution_policy in EXPLICIT_POLICIES or getattr(self,'explicit_after_adjudication',False)) and command.get('op') not in CONTROL_OPS
+                and command.get('op') not in ('observe', 'fall_rescue_control', 'external_navigation_control', 'managed_navigation_control')
                 and not (command.get('op') == 'action' and self.capability_lease
                          and self.capability_lease['state'] == 'active'
                          and isinstance(command.get('_capability_owner_id'), str)
@@ -622,13 +626,15 @@ class Watchdog(CapabilityOwnership):
                         return
                     self.armed, self.recover_observation = True, False
                     self.phase, self.reason = 'watching', 'fresh_observations_recovered_no_action_replay'
-                if self.execution_policy in EXPLICIT_POLICIES:
+                if (self.execution_policy in EXPLICIT_POLICIES or getattr(self,'explicit_after_adjudication',False)):
                     # Keep readiness for bounded lease admission without running
                     # hostile, health-loss, retreat or environmental tactics.
-                    if context_of(state) is None or not safe_idle(self.latest):
+                    if context_of(state) is None or not (safe_idle(self.latest) or
+                            self.execution_policy == 'request_only' and self.external_stop_ready()):
                         self.attention(self.execution_policy + '_observation_not_safe_idle')
                         return
-                    self.phase, self.reason = 'watching', self.execution_policy + '_observation_ready'
+                    self.phase, self.reason = 'watching', (self.execution_policy + '_observation_ready'
+                        if safe_idle(self.latest) else 'external_controller_stop_only_ready')
                     return
                 if self.observe_tactics(state, combat, damaged, kind):
                     return
@@ -704,6 +710,13 @@ def cancel_waiting_intents(directory, dog):
             continue
         try:
             command = json.loads(path.read_text())
+            # Controls may arrive after this loop's control scan. Leave them
+            # for that same validated lane on the next iteration; ordinary
+            # inbox cancellation must not publish a false terminal receipt.
+            # This grants no admission: session, stop, owner and operation
+            # checks still run in capability_control before any queue write.
+            if isinstance(command, dict) and command.get('op') in CONTROL_OPS:
+                continue
             session = command.pop('_watchdog_session_id', None)
             epoch = command.pop('_navigation_defense_epoch', None)
             stamp = command.pop('_menu_recovery_requested_at', None)
@@ -807,6 +820,13 @@ def run(queue, directory, watchdog_class=Watchdog, *, coordination_factory=None,
         lock.close()
         raise
     dog.capability_directory = directory
+    explicit_marker=directory/'explicit-after-adjudication.json'
+    if os.path.lexists(explicit_marker):
+        marker=read_policy_checkpoint(explicit_marker,1024)
+        if marker!={'schema_version':1,'explicit_new_job_only':True}:
+            raise ValueError('adjudication_explicit_policy_checkpoint_unconfirmed')
+        dog.explicit_after_adjudication=True
+        if coordination_factory is not None:raise ValueError('adjudication_explicit_only_coordination_unsupported')
     capability_marker = directory/'capability-owner.json'
     previous_state = directory/'state.json'
     if capability_marker.exists():
@@ -841,12 +861,29 @@ def run(queue, directory, watchdog_class=Watchdog, *, coordination_factory=None,
                     control = json.loads(control_path.read_text())
                     if control.get('op') not in CONTROL_OPS:
                         continue
+                    if (control.get('op') == 'external_stop_acquire'
+                            and control.get('_watchdog_session_id') == dog.session_id
+                            and not dog.capability_lease and not dog.owner
+                            and dog.armed and not dog.stop_requested
+                            and not dog.handoff_latched and not dog.input_release_latched
+                            and dog.rpc and dog.rpc.get('kind') in ('observe', 'fresh')):
+                        # Keep this exact request in the inbox while its already-
+                        # issued read drains. No lease or resident mutation is
+                        # installed, and the client's original timeout remains.
+                        continue
                     control_session = control.pop('_watchdog_session_id', None)
                     if control_session != dog.session_id:
                         dog.capability_complete(control_path.stem, 'cancelled', 'stale_watchdog_session')
                     else:
                         dog.capability_control(control_path.stem, control)
                     control_path.rename(directory/'working'/control_path.name)
+                # Diagnostic reads do not enter owner/rpc/capability state and
+                # remain available while those original outcomes are unknown.
+                from reconciliation_read import tick as reconciliation_tick
+                try:
+                    reconciliation_tick(dog, directory)
+                except (ValueError, OSError, KeyError, TypeError):
+                    pass  # Claimed diagnostic stays unknown; never alter owner safety.
                 dog.tick()
                 if coordination is not None:coordination.tick()
                 dog.persist_telemetry(directory)
@@ -867,6 +904,8 @@ def run(queue, directory, watchdog_class=Watchdog, *, coordination_factory=None,
                 if not dog.owner:
                     for path in sorted((directory/'inbox').glob('*.json')):
                         intent = json.loads(path.read_text())
+                        if intent.get('op') in CONTROL_OPS:
+                            continue  # Controls deferred above never enter the owner lane.
                         intent_session = intent.pop('_watchdog_session_id', dog.session_id)
                         if intent_session != dog.session_id:
                             write_json(directory/'results'/path.name, {'request_id': path.stem, 'session_id': dog.session_id,

@@ -2,10 +2,47 @@
 import math
 from .capability_snapshot import _require, _integer, _number, exact, signed_long_string
 
-BLOCKS = frozenset('minecraft:' + b for b in ('stone','cobblestone','dirt','andesite','granite','diorite',
+LEGACY_BLOCKS = frozenset('minecraft:' + b for b in ('stone','cobblestone','dirt','andesite','granite','diorite',
     'smooth_stone','stone_bricks','bricks','oak_planks','spruce_planks','birch_planks'))
 AIR = {'minecraft:air','minecraft:cave_air','minecraft:void_air'}
-STATIC = BLOCKS | AIR | {'minecraft:grass_block','minecraft:bedrock'}
+LEGACY_STATIC = LEGACY_BLOCKS | AIR | {'minecraft:grass_block','minecraft:bedrock'}
+LOGS = frozenset('minecraft:'+name+'_log' for name in ('oak','spruce','birch','jungle','acacia','dark_oak'))
+LEAVES = frozenset(name.removesuffix('_log')+'_leaves' for name in LOGS)
+ORES = frozenset(('minecraft:iron_ore','minecraft:deepslate_iron_ore'))
+BLOCKS = LEGACY_BLOCKS | LOGS | ORES
+ORE_CONTEXT = ORES | {'minecraft:coal_ore','minecraft:deepslate_coal_ore'}
+FLOWERS = frozenset('minecraft:'+name for name in ('dandelion','poppy','blue_orchid','allium','azure_bluet',
+    'red_tulip','orange_tulip','white_tulip','pink_tulip','oxeye_daisy','cornflower','lily_of_the_valley'))
+PLANTS = FLOWERS | {'minecraft:short_grass','minecraft:fern','minecraft:tall_grass','minecraft:large_fern','minecraft:vine'}
+STATIC = LEGACY_STATIC | LOGS | ORE_CONTEXT | LEAVES | PLANTS | {'minecraft:deepslate'}
+
+
+def cell_class(block_id):
+    kind = ('AirBlock' if block_id in AIR else 'GrassBlock' if block_id == 'minecraft:grass_block'
+            else 'RotatedPillarBlock' if block_id in LOGS or block_id == 'minecraft:deepslate'
+            else 'DropExperienceBlock' if block_id in ORE_CONTEXT else 'LeavesBlock' if block_id in LEAVES
+            else 'FlowerBlock' if block_id in FLOWERS else 'TallGrassBlock' if block_id in ('minecraft:short_grass','minecraft:fern')
+            else 'DoublePlantBlock' if block_id in ('minecraft:tall_grass','minecraft:large_fern')
+            else 'VineBlock' if block_id == 'minecraft:vine' else 'Block')
+    return 'net.minecraft.world.level.block.' + kind
+
+
+def valid_properties(block_id, properties):
+    if type(properties) is not dict or block_id not in STATIC or any(type(v) is not str for v in properties.values()):
+        return False
+    if block_id in LOGS or block_id == 'minecraft:deepslate':
+        return set(properties) == {'axis'} and properties['axis'] in ('x','y','z')
+    if block_id == 'minecraft:grass_block':
+        return set(properties) == {'snowy'} and properties['snowy'] in ('true','false')
+    if block_id in LEAVES:
+        return (set(properties) == {'distance','persistent','waterlogged'} and properties['distance'] in tuple(map(str,range(1,8)))
+                and properties['persistent'] in ('true','false') and properties['waterlogged'] == 'false')
+    if block_id in ('minecraft:tall_grass','minecraft:large_fern'):
+        return set(properties) == {'half'} and properties['half'] in ('lower','upper')
+    if block_id == 'minecraft:vine':
+        return set(properties) == {'up','north','south','east','west'} and all(v in ('true','false') for v in properties.values())
+    return properties == {}
+
 
 
 def coordinate(v):
@@ -20,7 +57,7 @@ def validate_mining(witness, intent, native):
              and m.get('source') == 'native-client-loaded-level', 'mining_witness_profile')
     target = intent.get('target')
     _require(coordinate(target) and intent.get('expected_block_id') in BLOCKS
-             and exact(intent.get('expected_block_properties'), {})
+             and valid_properties(intent.get('expected_block_id'), intent.get('expected_block_properties'))
              and type(intent.get('require_correct_tool')) is bool
              and _integer(intent.get('timeout_ms'),50,8000)
              and 'hotbar_slot' not in intent and 'capability_descent' not in intent
@@ -47,18 +84,16 @@ def validate_mining(witness, intent, native):
                  and type(row.get('state')) is str and 0<len(row['state'])<=512
                  and type(row.get('properties')) is dict, 'mining_cell_state')
         air=row['id'] in AIR
-        cls='net.minecraft.world.level.block.'+('AirBlock' if air else 'GrassBlock' if row['id']=='minecraft:grass_block' else 'Block')
-        _require(exact(row.get('air'),air) and exact(row.get('static_full_cube'),not air)
-                 and row.get('block_class')==cls, 'mining_static_geometry_class')
-        if row['id']=='minecraft:grass_block':
-            _require(set(row['properties'])=={'snowy'} and row['properties']['snowy'] in ('true','false'), 'mining_grass_state')
-        else:
-            _require(row['properties']=={},'mining_unknown_properties')
+        full_cube=not air and row['id'] not in PLANTS
+        _require(exact(row.get('air'),air) and exact(row.get('static_full_cube'),full_cube)
+                 and row.get('block_class')==cell_class(row['id']), 'mining_static_geometry_class')
+        _require(valid_properties(row['id'],row['properties']),'mining_unknown_properties')
         rows[xyz]=row
     st=rows[tuple(support[k] for k in ('x','y','z'))]
     t=rows[tuple(target[k] for k in ('x','y','z'))]
-    _require(not st['air'] and t['id']==intent['expected_block_id'] and t['properties']==intent['expected_block_properties']
-             and all(rows[(support['x'],y,support['z'])]['air'] for y in (support['y']+1,support['y']+2)),
+    _require(st['static_full_cube'] and st['id'] not in LEAVES and t['id']==intent['expected_block_id'] and t['properties']==intent['expected_block_properties']
+             and all((rows[(support['x'],y,support['z'])]['id'] in AIR | (PLANTS - {'minecraft:vine'}))
+                     for y in (support['y']+1,support['y']+2)),
              'mining_target_support_body')
     _require(all(m.get(k) is True for k in ('all_loaded','stationary','survival','closed_inventory','callbacks_installed'))
              and m.get('entity_scope')=='all-client-loaded-mining-prism-with-passive-items'
@@ -66,7 +101,7 @@ def validate_mining(witness, intent, native):
              and _integer(m.get('passive_items'),0,1023) and exact(m.get('entity_limit'),1024)
              and _integer(m.get('other_entities'),0,1023)
              and m['passive_items']<=m['other_entities']
-             and exact(m.get('maximum_action_ticks'),160) and exact(m.get('maximum_timeout_ms'),8000) and m.get('target_static_class')=='net.minecraft.world.level.block.Block'
+             and exact(m.get('maximum_action_ticks'),160) and exact(m.get('maximum_timeout_ms'),8000) and m.get('target_static_class')==cell_class(intent['expected_block_id'])
              and exact(m.get('require_correct_tool'),intent['require_correct_tool'])
              and exact(m.get('maximum_reach'),6), 'mining_coverage_restrictions')
     from .mining_entities import validate_mining_entity_guard

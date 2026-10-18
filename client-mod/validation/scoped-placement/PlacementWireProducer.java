@@ -10,9 +10,11 @@ import static io.github.campione01.mineclientbridge.ScopedEntityPolicy.*;
 /** Synthetic captured inputs/readback; actual production witness, Entry, projection and HTTP codec. */
 public final class PlacementWireProducer {
     static int checks;
+    static String material="minecraft:cobblestone";
+    static JsonObject materialProperties(){JsonObject p=new JsonObject();if(material.equals("minecraft:furnace")){p.addProperty("facing","south");p.addProperty("lit","false");}return p;}
     static void check(boolean ok,String message){checks++;if(!ok)throw new AssertionError(message);}
     static JsonObject cell(int x,int y,int z){JsonObject p=new JsonObject();p.addProperty("x",x);p.addProperty("y",y);p.addProperty("z",z);return p;}
-    static JsonObject stack(int count){JsonObject s=emptyStack();s.addProperty("id","minecraft:cobblestone");s.addProperty("count",count);s.addProperty("empty",false);
+    static JsonObject stack(int count){JsonObject s=emptyStack();s.addProperty("id",material);s.addProperty("count",count);s.addProperty("empty",false);
         s.addProperty("item_fingerprint",count==8?"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");s.addProperty("component_fingerprint","cccccccc-cccc-cccc-cccc-cccccccccccc");return s;}
     static JsonObject ordinary(int count){JsonObject p=point(12.5,64,25.5);p.addProperty("selected_slot",0);p.addProperty("inventory_total",36);p.addProperty("inventory_truncated",false);
         JsonArray a=new JsonArray();for(int i=0;i<36;i++){JsonObject row=i==0?stack(count):emptyStack();row.addProperty("slot",i);a.add(row);}p.add("inventory",a);return p;}
@@ -23,7 +25,7 @@ public final class PlacementWireProducer {
         f.getAsJsonObject("menu").getAsJsonArray("slots").get(36).getAsJsonObject().add("item",held.deepCopy());
         JsonObject p=new JsonObject();p.addProperty("profile",ScopedPlacement.PROFILE);p.addProperty("source","native-client-loaded-level");
         p.add("support",cell(12,63,24));p.add("target",cell(12,64,24));p.add("standing_support",cell(12,63,25));p.addProperty("face","up");
-        p.addProperty("support_id","minecraft:stone");p.add("support_properties",new JsonObject());p.addProperty("block_id","minecraft:cobblestone");p.add("block_properties",new JsonObject());
+        p.addProperty("support_id","minecraft:stone");p.add("support_properties",new JsonObject());p.addProperty("block_id",material);p.add("block_properties",materialProperties());
         p.addProperty("selected_slot",0);p.addProperty("initial_count",8);p.addProperty("min_x",11);p.addProperty("max_x",13);p.addProperty("min_y",62);p.addProperty("max_y",66);p.addProperty("min_z",23);p.addProperty("max_z",26);
         JsonArray cells=new JsonArray();for(int x=11;x<=13;x++)for(int y=62;y<=66;y++)for(int z=23;z<=26;z++){
             boolean solid=y<=63;JsonObject c=cell(x,y,z);c.addProperty("id",solid?"minecraft:stone":"minecraft:air");c.addProperty("state",solid?"Block{minecraft:stone}":"Block{minecraft:air}");
@@ -34,9 +36,9 @@ public final class PlacementWireProducer {
     }
     static JsonObject placementIntent(){JsonObject j=intent();for(String k:List.of("waypoints","capability_route","jump","sneak","sprint"))j.remove(k);
         j.addProperty("action","place_block");j.addProperty("timeout_ms",2000);j.add("support",cell(12,63,24));j.addProperty("face","up");
-        j.addProperty("expected_support_id","minecraft:stone");j.addProperty("expected_target_id","minecraft:air");j.addProperty("expected_block_id","minecraft:cobblestone");
-        for(String k:List.of("expected_support_properties","expected_target_properties","expected_block_properties"))j.add(k,new JsonObject());
-        j.add("placement_hit",point(12.5,64,24.5));JsonObject c=new JsonObject();c.add("position",cell(12,64,24));c.addProperty("expected_id","minecraft:air");c.add("expected_properties",new JsonObject());c.addProperty("block_id","minecraft:cobblestone");c.add("properties",new JsonObject());JsonArray cells=new JsonArray();cells.add(c);j.add("placement_footprint",cells);
+        j.addProperty("expected_support_id","minecraft:stone");j.addProperty("expected_target_id","minecraft:air");j.addProperty("expected_block_id",material);
+        for(String k:List.of("expected_support_properties","expected_target_properties","expected_block_properties"))j.add(k,k.equals("expected_block_properties")?materialProperties():new JsonObject());
+        j.add("placement_hit",point(12.5,64,24.5));JsonObject c=new JsonObject();c.add("position",cell(12,64,24));c.addProperty("expected_id","minecraft:air");c.add("expected_properties",new JsonObject());c.addProperty("block_id",material);c.add("properties",materialProperties());JsonArray cells=new JsonArray();cells.add(c);j.add("placement_footprint",cells);
         j.addProperty("expected_hotbar_slot",0);j.add("expected_held_item",stack(8));ScopedPlacementIntent.validate(j);return j;
     }
     static JsonObject action(ActionRegistry.Entry e,boolean running){JsonObject a=e.json(running);a.addProperty("action_session",SESSION);JsonObject budget=new JsonObject();budget.addProperty("active",false);budget.add("reason",JsonNull.INSTANCE);a.add("movement_budget",budget);return a;}
@@ -61,7 +63,7 @@ public final class PlacementWireProducer {
     }
     static String unchecked(JsonObject v){try{return BridgeJson.toJson(v);}catch(Exception e){throw new AssertionError(e);}}
     public static void main(String[] args)throws Exception{
-        Path out=Path.of(args[0]);JsonObject scope=request();scope.addProperty("profile",ScopedPlacement.PROFILE);JsonObject intent=placementIntent(),facts=placementFacts(),compiled=intent.deepCopy();compiled.add("capability_guard",guard(TICK,NANO));
+        Path out=Path.of(args[0]);if(args.length>1)material=args[1];JsonObject scope=request();scope.addProperty("profile",ScopedPlacement.PROFILE);JsonObject intent=placementIntent(),facts=placementFacts(),compiled=intent.deepCopy();compiled.add("capability_guard",guard(TICK,NANO));
         JsonObject witness=ScopedNativePreflight.serializeWitness(scope,ACTION,SESSION,7,SERVER,ScopedNativePreflight.digest(intent),ScopedNativePreflight.digest(compiled),TICK,NANO,ADMITTED,facts,intent.getAsJsonObject("capability_guard"));
         ClientActionRequest request=new ClientActionRequest(ACTION,"place_block",2000,List.of(),null,new ClientActionRequest.Cell(12,63,24),"up",-1,false,false,-1,-1,0,null,compiled);
         ActionRegistry.Entry e=new ActionRegistry.Entry(request);e.result.add("scoped_native_preflight",witness);e.result.addProperty("world_generation",WORLD);
@@ -74,7 +76,7 @@ public final class PlacementWireProducer {
         var receiver=new ScopedPlacementTerminalSlice(request,8,7,0,NANO+2_000_000_000L);
         JsonObject terminal=receiver.terminal(true,true);check(terminal.get("block_placed").getAsBoolean()&&terminal.get("final_count").getAsInt()==7,"production terminal body success fields");
         e.status="succeeded";e.reason="block_placed_observed";e.ticks=6;e.result.add("placement",terminal);e.result.addProperty("input_release_confirmed",true);
-        e.result.addProperty("observed_block","minecraft:cobblestone");e.result.addProperty("client_stable_ticks",5);e.result.addProperty("material_consumption_observed",true);e.result.addProperty("confirmation","client_observed_stable");
+        e.result.addProperty("observed_block",material);e.result.addProperty("client_stable_ticks",5);e.result.addProperty("material_consumption_observed",true);e.result.addProperty("confirmation","client_observed_stable");
         a=action(e,false);standalone=actionEndpoint(a,false);coherent=coherent(a,facts,7);checkEnvelope(standalone,coherent);
         write(out,"placement-terminal.json",terminal);write(out,"placement-terminal-standalone.json",standalone);write(out,"placement-terminal-coherent.json",coherent);
         // Same exact terminal body also demonstrates unknown-after-attempt fields without an engine.

@@ -16,8 +16,17 @@ import net.minecraft.world.item.ItemStack;
 /** Read-only, exact observation binding for one ordinary local pickup. Never removes an entity. */
 final class ScopedCollectTarget {
     static final String PROFILE="collect-local-observed-v1";
-    static final Set<String> ITEMS=Set.of("minecraft:stone","minecraft:cobblestone","minecraft:dirt",
-            "minecraft:oak_planks","minecraft:coal","minecraft:stick","minecraft:iron_nugget");
+    // Explicit plain survival drops only; class/default-component/capacity fences remain unchanged.
+    static final Set<String> ITEMS=Set.of(
+            "minecraft:stone","minecraft:cobblestone","minecraft:dirt","minecraft:coal",
+            "minecraft:stick","minecraft:iron_nugget","minecraft:oak_log","minecraft:spruce_log",
+            "minecraft:birch_log","minecraft:jungle_log","minecraft:acacia_log","minecraft:dark_oak_log",
+            "minecraft:oak_planks","minecraft:spruce_planks","minecraft:birch_planks","minecraft:jungle_planks",
+            "minecraft:acacia_planks","minecraft:dark_oak_planks","minecraft:raw_iron","minecraft:charcoal",
+            "minecraft:crafting_table","minecraft:furnace","minecraft:apple","minecraft:bread",
+            "minecraft:beef","minecraft:cooked_beef","minecraft:porkchop","minecraft:cooked_porkchop",
+            "minecraft:chicken","minecraft:cooked_chicken","minecraft:mutton","minecraft:cooked_mutton",
+            "minecraft:baked_potato");
     private static final Set<String> KEYS=Set.of("entity_id","uuid","item_id","count","item_fingerprint",
             "component_fingerprint","x","y","z");
     final String uuid;

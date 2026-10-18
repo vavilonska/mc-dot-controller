@@ -44,6 +44,8 @@ function fixture() {
 async function settle(f) {
   // The child is purely an EventEmitter; no process handle or kill operation exists.
   f.child.emit('exit', 0, null);
+  f.child.stdout.end(); f.child.stderr.end();
+  f.child.emit('close', 0, null);  // Real ChildProcess closes only after stdio drains.
   const result = await f.bridge.close({waitMs: 10});
   assert.equal(result.exit_code, 0);
   assert.equal(f.bridge.pending.size, 0);

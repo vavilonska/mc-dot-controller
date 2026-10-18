@@ -59,11 +59,15 @@ final class ScopedPlacementTerminalSlice {
  write('TERMINAL-EXTRACTION.json',report);(wires/'TERMINAL-EXTRACTION.json').write_text(json.dumps(report,indent=2)+'\n')
  cp=os.pathsep.join([str(OUT/'native-gate/classes'),CP]);empty=OUT/'empty-sourcepath';empty.mkdir()
  run('compile-wire-fixture',[JDK/'bin/javac','-J-Xmx384m','-J-XX:ActiveProcessorCount=1','-proc:none','--release','21','-encoding','UTF-8','-implicit:none','-sourcepath',empty,'-cp',cp,'-d',classes,receiver,HERE/'PlacementWireProducer.java',HERE.parent/'movement-t13/WireV1Facts.java',HERE.parent/'movement-t13/WireV1Fixture.java'])
- run('emit-placement-wire',[JDK/'bin/java','-Xmx384m','-XX:ActiveProcessorCount=1','-Xlog:class+init=info:file='+str(OUT/'wire-class-init.log'),'-cp',str(classes)+os.pathsep+cp,'io.github.campione01.mineclientbridge.PlacementWireProducer',wires])
- log=(OUT/'wire-class-init.log').read_text()
- if re.search(r"Initializing '(?:net/minecraft/client/Minecraft|net/minecraft/world/entity/Entity|io/github/campione01/mineclientbridge/(?:BridgeServer|ClientActions))'",log):raise AssertionError('unexpected real engine initialization')
+ for material in ('cobblestone','crafting_table','furnace'):
+  destination=wires if material=='cobblestone' else OUT/('wire-'+material)
+  if destination!=wires:destination.mkdir()
+  (destination/'TERMINAL-EXTRACTION.json').write_text(json.dumps(report,indent=2)+'\n') if destination!=wires else None
+  run('emit-placement-wire-'+material,[JDK/'bin/java','-Xmx384m','-XX:ActiveProcessorCount=1','-Xlog:class+init=info:file='+str(OUT/(material+'-class-init.log')),'-cp',str(classes)+os.pathsep+cp,'io.github.campione01.mineclientbridge.PlacementWireProducer',destination,'minecraft:'+material])
+  log=(OUT/(material+'-class-init.log')).read_text()
+  if re.search(r"Initializing '(?:net/minecraft/client/Minecraft|net/minecraft/world/entity/Entity|io/github/campione01/mineclientbridge/(?:BridgeServer|ClientActions))'",log):raise AssertionError('unexpected real engine initialization')
  if frozen!=[{'path':str(p.relative_to(ROOT)),'sha256':sha(p)} for p in inputs]:raise AssertionError('input changed')
- write('WIRE-MANIFEST.json',{'files':[{'path':str(p.relative_to(OUT)),'sha256':sha(p)} for p in sorted(wires.glob('*.json'))]})
+ write('WIRE-MANIFEST.json',{'files':[{'path':str(p.relative_to(OUT)),'sha256':sha(p)} for folder in (wires,OUT/'wire-crafting_table',OUT/'wire-furnace') for p in sorted(folder.glob('*.json'))]})
  status='passed'
 finally:write('RESULT.json',{'status':status,'children':receipts,'terminal_extraction':'TERMINAL-EXTRACTION.json','wire_directory':'wire','game_started':False,'mixins_applied':False,'world_settlement_proven':False,'scope':'Actual compiled production witness/Entry/assembly/projection/HTTP bytes; exact terminal-source slice with synthetic readers. Python consumer must run separately.'})
 print('PASS actual placement Java wire fixture; synthetic facts/readback only')

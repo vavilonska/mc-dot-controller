@@ -254,7 +254,7 @@ class BindingTests(unittest.TestCase):
         self.assertEqual(control.events[0][0], 'container_click_observed')
     def test_catalog_definitions_have_no_live_claim_and_exact_sources(self):
         values = binding.definitions() + interaction.definitions()
-        self.assertEqual(len(values), 11)
+        self.assertEqual(len(values), 13)
         for value in values:
             self.assertEqual(value['input_schema']['additionalProperties'], False)
             self.assertEqual(value['validation']['live'], 'not_run')

@@ -19,6 +19,15 @@ public final class CombatCallbackFenceChecks {
         denied(()->regressed.check(()->clock[0]--));
         f=new CombatCallbackFence(()->owner[0],()->clock[0],()->tick[0]);var late=f;
         late.check(()->{});effects[0]++;owner[0]=false;denied(late::raw);owner[0]=true;denied(late::raw);require(effects[0]==2);
+        boolean[] replaceOnTick={false};owner[0]=true;
+        f=new CombatCallbackFence(()->owner[0],()->clock[0],()->{if(replaceOnTick[0])owner[0]=false;return tick[0];});
+        var lateGetter=f;replaceOnTick[0]=true;denied(lateGetter::raw);owner[0]=true;replaceOnTick[0]=false;denied(lateGetter::raw);require(effects[0]==2);
+        boolean[] throwOnTick={false};owner[0]=true;int[] tickReads={0};
+        f=new CombatCallbackFence(()->owner[0],()->clock[0],()->{tickReads[0]++;if(throwOnTick[0])throw new IllegalStateException("tick_read_fault");return tick[0];});
+        var throwsLate=f;throwOnTick[0]=true;denied(throwsLate::raw);int reads=tickReads[0];throwOnTick[0]=false;denied(throwsLate::raw);require(tickReads[0]==reads);
+        boolean[] slowTick={false};owner[0]=true;
+        f=new CombatCallbackFence(()->owner[0],()->clock[0],()->{if(slowTick[0])clock[0]+=CombatCallbackFence.MAX_NANOS+1;return tick[0];});
+        var slow=f;slowTick[0]=true;denied(slow::raw);
         System.out.println("CombatCallbackFenceChecks passed: "+checks);
     }
 }

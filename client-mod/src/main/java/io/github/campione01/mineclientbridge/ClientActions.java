@@ -2,6 +2,7 @@ package io.github.campione01.mineclientbridge;
 
 import com.google.gson.JsonObject;
 import java.util.Locale;
+import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.Input;
@@ -31,6 +32,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 final class ClientActions {
     private static final ActionRegistry ACTIONS = new ActionRegistry();
     private static RuntimeAction active;
+    private static final FallRescueCleanupScope FALL_CLEANUP=new FallRescueCleanupScope();
     // Call-stack guard only, never an alternative owner; survives hook cancellation until native use unwinds.
     private static RuntimeAction scopedDispatchInFlight;
     private static boolean installed;
@@ -68,8 +70,15 @@ final class ClientActions {
         int settledTicks;
         double bestDistance = Double.POSITIVE_INFINITY;
         Block initialBlock, placedBlock;
+        final PlacementEffectVerification placementVerification = new PlacementEffectVerification();
+        net.minecraft.world.level.block.state.BlockState placementBeforeState;
+        net.minecraft.world.item.Item placementBeforeItem;
+        int placementBeforeSlot;
+        final PlacementOwnerFence placementOwner;
         RuntimeAction(ActionRegistry.Entry entry, Minecraft mc, BoundedCombat combat, BoundedBoatDrive boat, BoundedBoatTransfer transfer, long combatDeadline, CoordinationStepGuard coordinationStep, long coordinationDeadline, CapabilityGuard capabilityGuard, CapabilityTargetAction capabilityTarget) {
             this.entry = entry;
+            placementOwner = new PlacementOwnerFence(this,mc.player,mc.level,mc.gameMode,
+                mc.player.containerMenu,mc.screen,ACTIONS.session,WorldGeneration.current(mc.level));
             this.combat = combat;
             this.boat = boat;
             this.transfer = transfer;
@@ -94,12 +103,14 @@ final class ClientActions {
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> postTick());
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, MovementInputUpdateEvent.class, ClientActions::input);
         NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, event -> {
-            IntegratedServerIdentity.clear();cancel("world_transition");
+            IntegratedServerIdentity.clear();NativeExternalNavigation.contextLost();NativeFallRescue.stop("world_transition");cancel("world_transition");
         });
-        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.Clone.class, event -> cancel("player_changed"));
+        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.Clone.class, event -> { NativeExternalNavigation.contextLost();NativeFallRescue.stop("player_changed"); cancel("player_changed"); });
         NeoForge.EVENT_BUS.addListener(LevelEvent.Unload.class, event -> {
-            if (event.getLevel().isClientSide()) { MovementBudget.interrupt("movement_budget_context_changed"); cancel("world_transition"); }
+            if (event.getLevel().isClientSide()) { NativeExternalNavigation.contextLost();NativeFallRescue.stop("world_transition"); MovementBudget.interrupt("movement_budget_context_changed"); cancel("world_transition"); }
         });
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, true, net.neoforged.neoforge.client.event.ScreenEvent.Opening.class,
+                event -> NativeFallRescue.stop("user_screen_or_pause"));
         installed = true;
     }
 
@@ -110,9 +121,14 @@ final class ClientActions {
         requireThread(mc);
         ActionRegistry.Entry old = ACTIONS.existing(request);
         if (old != null) return status(request.id());
+        if(request.original().has("defensive_policy") && (scoped==null || scoped.combat==null || scoped.combat.defensive==null))
+            throw new ClientActionRequest.Rejected(409,"defensive_scoped_profile_required");
+        NativeFallRescue.requireOrdinaryAdmission();
+        NativeExternalNavigation.requireOrdinaryAdmission();
         if (active != null) throw new ClientActionRequest.Rejected(409, "action_busy");
         if (mc.player == null || mc.level == null || mc.gameMode == null)
             throw new ClientActionRequest.Rejected(409, "not_in_world");
+        NativeAdmission.mark(NativeAdmission.Stage.HOOKS_POSSIBLE);
         if (request.original().has("expected_world_generation")
                 && !ClientActionRequest.string(request.original(),"expected_world_generation").equals(WorldGeneration.current(mc.level)))
             throw new ClientActionRequest.Rejected(409,request.action().equals("combat_entity")
@@ -124,6 +140,7 @@ final class ClientActions {
                 && !ClientActionRequest.string(request.original(),"expected_player_uuid").equals(mc.player.getUUID().toString()))
             throw new ClientActionRequest.Rejected(409,request.action().equals("combat_entity")
                     ? "action_player_changed" : "player_changed");
+        ExternalControllerGuard.requireIdle(mc);
         MovementBudget.admission(mc,request);
         long capabilityOwnerRevision=ownershipRevision;
         CapabilityGuard capabilityGuard=CapabilityGuard.start(mc,request);
@@ -185,6 +202,7 @@ final class ClientActions {
             String denied=capabilityGuard.check(mc,false);
             if(denied!=null)throw new ClientActionRequest.Rejected(409,denied);
         }
+        NativeAdmission.mark(NativeAdmission.Stage.INPUT_TRANSFER);
         // Transfer ownership once. A direct request later releases only this action's inputs.
         if (coordinationStep == null) BridgeServer.releaseAllInputs();
         else CoordinationStepPolicy.transfer(BridgeServer::releaseAllInputs, () -> {
@@ -213,6 +231,16 @@ final class ClientActions {
                 &&(active!=null||ownershipRevision!=capabilityOwnerRevision||mc.player!=coordinationPlayer||mc.level!=coordinationLevel))
             throw new ClientActionRequest.Rejected(409,"movement_budget_owner_changed");
         if (scoped != null) scoped.recheck(mc);
+        ExternalControllerGuard.requireIdle(mc);
+        // Preserve the original freshness deadline after the final external API reads.
+        if(capabilityGuard!=null)capabilityGuard.requireFresh(mc,"external_controller_final");
+        if(coordinationStep!=null)coordinationStep.requireFresh(mc);
+        if(active!=null || ownershipRevision!=capabilityOwnerRevision
+                || mc.player!=coordinationPlayer || mc.level!=coordinationLevel)
+            throw new ClientActionRequest.Rejected(409,"external_controller_owner_changed_during_check");
+        NativeFallRescue.requireOrdinaryAdmission();
+        NativeExternalNavigation.requireOrdinaryAdmission();
+        NativeAdmission.mark(NativeAdmission.Stage.REGISTERED);
         ownershipRevision++;
         active = new RuntimeAction(ACTIONS.begin(request), mc, combat, boat, transfer, combatDeadline, coordinationStep, coordinationDeadline, capabilityGuard, capabilityTarget);
         if (scoped != null) {
@@ -329,7 +357,9 @@ final class ClientActions {
     /** Recheck a coherent read without creating another movement-budget boundary sample. */
     static JsonObject statusWithoutObservation() { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(null);j.add("movement_budget",MovementBudget.snapshot());return j; }
     static String session() { return ACTIONS.session; }
-    static boolean ownsInput() { return active != null; }
+    static long externalOwnerRevision() { return ownershipRevision; } // Pure owner identity fence.
+    static boolean ownsInput() { return active != null || NativeFallRescue.blocksInput() || NativeExternalNavigation.blocksInput(); }
+    static boolean hasRuntimeAction() { return active != null; }
     static long ownershipRevision() { return ownershipRevision; }
     static boolean ownsTransfer(BoundedBoatTransfer transfer) {
         requireThread(Minecraft.getInstance());
@@ -349,15 +379,94 @@ final class ClientActions {
     }
     static void directTakeover() {
         requireThread(Minecraft.getInstance());
+        ExternalControllerGuard.requireIdle(Minecraft.getInstance());
+        NativeFallRescue.requireOrdinaryAdmission();
+        NativeExternalNavigation.requireOrdinaryAdmission();
         ownershipRevision++;
         MovementBudget.interrupt("movement_budget_direct_takeover");
         cancel("direct_takeover");
         GuardedGameMovement.cancelOnGameThread("direct_takeover");
+        NativeFallRescue.requireOrdinaryAdmission();
+        NativeExternalNavigation.requireOrdinaryAdmission();
     }
     static void cancel(String reason) {
         Minecraft mc = Minecraft.getInstance();
         if (!mc.isSameThread()) { mc.execute(() -> cancel(reason)); return; }
         if (active != null) finish("cancelled", reason);
+    }
+
+    /** An exact declared action may be interrupted, but is never resumed or replaced automatically. */
+    static void requireFallRescueAdmission(Set<String> permittedIds) {
+        NativeExternalNavigation.requireOrdinaryAdmission();
+        RuntimeAction a=active;
+        if(a!=null && (!permittedIds.contains(a.entry.request.id())
+                || !FallRescuePolicy.PREEMPTIBLE.contains(a.entry.request.action())))
+            throw new ClientActionRequest.Rejected(409,"fall_rescue_current_action_not_authorized");
+        if(scopedDispatchInFlight!=null)
+            throw new ClientActionRequest.Rejected(409,"fall_rescue_native_dispatch_in_flight");
+    }
+    static boolean terminalCombatCleanup(ScopedCombat guard,ActionRegistry.Entry entry) {
+        // An existing handoff scope never falls back to ordinary cleanup after revocation.
+        return FALL_CLEANUP.active()||guard!=null&&guard.fallPreempted()
+            ?FALL_CLEANUP.permits(guard,entry):!ownsInput();
+    }
+    static JsonObject preemptForFallRescue(Set<String> permittedIds,java.util.function.BooleanSupplier successorBound) {
+        Minecraft mc=Minecraft.getInstance();requireThread(mc);requireFallRescueAdmission(permittedIds);
+        requirePreemptionChannelsAbsent();
+        if(!successorBound.getAsBoolean())throw new ClientActionRequest.Rejected(409,"fall_rescue_preemption_successor_changed");
+        RuntimeAction old=active;JsonObject interrupted=new JsonObject();
+        if(old!=null&&(old.player!=mc.player||old.level!=mc.level))
+            throw new ClientActionRequest.Rejected(409,"fall_rescue_original_context_changed");
+        if(old!=null){
+            interrupted.addProperty("action_id",old.entry.request.id());
+            interrupted.addProperty("action",old.entry.request.action());
+            interrupted.addProperty("effect_outcome","unknown_interrupted");
+            interrupted.addProperty("no_auto_resume",true);
+            interrupted.addProperty("requires_reconciliation_before_retry",true);
+            if(old.scopedCombat!=null)old.scopedCombat.markFallPreempted();
+            old.entry.result.addProperty("preempted_by_native_fall_rescue",true);
+            old.entry.result.addProperty("no_auto_resume",true);
+            // Legacy movement/combat do not consistently maintain dispatched. Absence is not no-effect proof.
+            old.entry.result.addProperty("unknown_outcome",true);old.entry.result.addProperty("requires_handoff",true);
+        }
+        ownershipRevision++;
+        MovementBudget.interrupt("native_fall_rescue_preempted");
+        // ARBITER is already held across every cleanup callback and the final neutral check.
+        if(old!=null){
+            long cleanupRevision=ownershipRevision;
+            var scope=FALL_CLEANUP.open(old,old.scopedCombat,old.entry,
+                ()->active==null&&ACTIONS.active()==old.entry&&ownershipRevision==cleanupRevision
+                    &&old.player==mc.player&&old.level==mc.level&&preemptionChannelsAbsent()&&successorBound.getAsBoolean());
+            try {finish("cancelled","native_fall_rescue_preempted");}
+            catch(RuntimeException failure){
+                releaseDiagnostic(old,"fall_preemption_cleanup_callback","fall_rescue_cleanup_scope_changed");
+                old.entry.result.addProperty("unknown_outcome",true);
+                if(ACTIONS.active()==old.entry)ACTIONS.finishAfterCleanup("cancelled","native_fall_rescue_preempted",false);
+                throw failure;
+            } finally {FALL_CLEANUP.close(scope);}
+            var cleanupInput=old.player.input;
+            requirePreemptionSuccessor(mc,old,successorBound);
+            if(cleanupInput!=null){
+                cleanupInput.forwardImpulse=cleanupInput.leftImpulse=0;
+                cleanupInput.up=cleanupInput.down=cleanupInput.left=cleanupInput.right=cleanupInput.jumping=cleanupInput.shiftKeyDown=false;
+            }
+        }
+        // No authority over independent raw or guarded channels: refuse rather than globally release.
+        requirePreemptionChannelsAbsent();
+        requirePreemptionSuccessor(mc,old,successorBound);
+        return interrupted;
+    }
+
+    private static boolean preemptionChannelsAbsent() {
+        return FallRescueCleanupScope.channelsAbsent(BridgeServer.hasHeldInputs(),
+            ClientInputIsolation.statistics().heldKeys(),GuardedGameMovement.LEASES.status().ownerRequestId());
+    }
+    private static void requirePreemptionChannelsAbsent() {
+        if(!preemptionChannelsAbsent())throw new ClientActionRequest.Rejected(409,"fall_rescue_foreign_input_channel_present");
+    }
+    private static void requirePreemptionSuccessor(Minecraft mc,RuntimeAction old,java.util.function.BooleanSupplier bound) {
+        if(active!=null||(old!=null&&(old.player!=mc.player||old.level!=mc.level))
+                ||!preemptionChannelsAbsent()||!bound.getAsBoolean())throw new ClientActionRequest.Rejected(409,"fall_rescue_preemption_successor_changed");
     }
 
     private static boolean context(Minecraft mc,String phase) {
@@ -372,6 +481,7 @@ final class ClientActions {
     private static boolean contextChecked(Minecraft mc,String phase) {
         if (active == null) return false;
         RuntimeAction enteredOwner = active;
+        if(!externalOwnerCheck(mc,enteredOwner))return false;
         String budgetProblem=MovementBudget.problem(mc);
         if(active!=enteredOwner)return false;
         if(budgetProblem!=null&&!enteredOwner.entry.request.action().equals("movement_budget_finish")){finish("cancelled",budgetProblem);return false;}
@@ -437,6 +547,10 @@ final class ClientActions {
 
     private static void preTick() {
         Minecraft mc = Minecraft.getInstance();
+        NativeExternalNavigation.tick(mc);
+        if(NativeExternalNavigation.blocksInput())return;
+        NativeFallRescue.preTick(mc);
+        if (NativeFallRescue.blocksInput()) return;
         ScopedLocalSegmentDispatch.nextTick();
         MovementBudget.preTick(mc);
         NavigationPositionGuard.tick(mc);
@@ -500,6 +614,7 @@ final class ClientActions {
     }
 
     private static void input(MovementInputUpdateEvent event) {
+        if (event.getEntity() == Minecraft.getInstance().player && NativeFallRescue.input(Minecraft.getInstance(),event.getInput())) return;
         RuntimeAction a = active;
         MovementBudget.checkInput(Minecraft.getInstance(),event.getInput(),a!=null&&event.getEntity()==a.player);
         if(active!=a)return;
@@ -572,6 +687,8 @@ final class ClientActions {
             try {ScopedLocalSegmentDispatch.arm(a.scopedLocalSegment);a.scopedLocalSegment.recordInput(a.jump,a.forward);}
             catch(RuntimeException failed){if(active==a)finish("cancelled",ScopedLocalSegmentMovement.rejection(failed));return;}
         }
+        if(!externalOwnerCheck(Minecraft.getInstance(),a))return;
+        if(active!=a || input!=a.player.input || System.nanoTime()>=a.deadline)return;
         a.input = input;
         input.forwardImpulse = a.forward;
         input.leftImpulse = a.left ? 1 : a.right ? -1 : 0;
@@ -588,6 +705,8 @@ final class ClientActions {
 
     private static void postTick() {
         Minecraft mc = Minecraft.getInstance();
+        NativeFallRescue.postTick(mc);
+        if (NativeFallRescue.blocksInput()) return;
         MovementBudget.observe(mc,true);
         if (!context(mc,"post_tick") || mc.isPaused()) return;
         RuntimeAction entered=active;
@@ -612,6 +731,12 @@ final class ClientActions {
                 default -> { }
             }
         } catch (RuntimeException failure) {
+            if(entered.entry.request.action().equals("place_block")) {
+                placementUnknown(entered,"placement_callback_exception");
+                if(entered.scopedPlacement!=null)entered.scopedPlacement.recordFailure(failure);
+                if(active==entered)finish("failed","placement_callback_exception");
+                return;
+            }
             // A reentrant default-stop callback must never annotate or finish a replacement owner.
             if(entered.scopedLocalSegment!=null&&entered.scopedLocalSegment.spatialStopProfile()&&active!=entered)return;
             // Preserve this already validated, owned, pre-next-effect proof in the post-tick callback too.
@@ -731,12 +856,15 @@ final class ClientActions {
         // Request the ordinary sprint key; the client retains food/item/collision
         // eligibility. Never force sprint-on or write position/velocity.
         if (wanted) {
+            if(FALL_CLEANUP.active())throw new ClientActionRequest.Rejected(409,"fall_rescue_cleanup_nonrelease_effect");
             a.sprintHeld=true;
             SprintKeyState.set(mc.options.keySprint::isDown,mc.options.keySprint::setDown,true);
         }
         else if (a.sprintHeld) {
-            SprintKeyState.set(mc.options.keySprint::isDown,mc.options.keySprint::setDown,false);
-            a.player.setSprinting(false);
+            SprintKeyState.set(()->{boolean down=mc.options.keySprint.isDown();requireCleanupOwner(a);return down;},
+                down->{requireCleanupOwner(a);mc.options.keySprint.setDown(down);},false);
+            requireCleanupOwner(a);a.player.setSprinting(false);
+            requireCleanupOwner(a);
             a.sprintHeld=false;
         }
     }
@@ -788,6 +916,7 @@ final class ClientActions {
 
     static boolean ownsScopedCombat(ScopedCombat guard,ActionRegistry.Entry entry){return active!=null && active.scopedCombat==guard
         && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
+    static ScopedCombat activeDefensiveCombat(){return active!=null && active.scopedCombat!=null && active.scopedCombat.defensive!=null?active.scopedCombat:null;}
     static ScopedCombat scopedCombat(BoundedCombat combat){return active!=null && active.combat==combat?active.scopedCombat:null;}
     static boolean ownsCombat(BoundedCombat combat){return active!=null && active.combat==combat;}
     static boolean ownsScopedPlacement(ScopedPlacement g,ActionRegistry.Entry entry){return active!=null && active.scopedPlacement==g && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
@@ -920,44 +1049,30 @@ final class ClientActions {
         Direction face = Direction.valueOf(a.entry.request.face().toUpperCase(Locale.ROOT));
         BlockPos target = support.relative(face);
         if (a.dispatched) {
-            if (mc.level.getBlockState(target).getBlock() == a.placedBlock
-                    && (a.capabilityGuard==null || CapabilityGuard.blockMatches(mc.level.getBlockState(target),
-                        ClientActionRequest.string(a.entry.request.original(),"expected_block_id"),
-                        a.entry.request.original().has("expected_block_properties")?a.entry.request.original().getAsJsonObject("expected_block_properties"):null))) {
-                a.entry.result.addProperty("observed_block", BuiltInRegistries.BLOCK.getKey(a.placedBlock).toString());
-                a.placedStableTicks++;
-                boolean consumed = mc.gameMode.hasInfiniteItems()
-                        || a.player.getMainHandItem().getCount() == a.placementBeforeCount - 1;
-                a.entry.result.addProperty("client_stable_ticks", a.placedStableTicks);
-                a.entry.result.addProperty("material_consumption_observed", consumed);
-                // Client prediction can roll back; never call a first-frame block a settled result.
-                // This is still client evidence, not a server acknowledgement.
-                if (a.placedStableTicks >= 5 && consumed
-                        && (!a.entry.request.jump() || a.player.onGround())) {
-                    a.entry.result.addProperty("confirmation", "client_observed_stable");
-                    finish("succeeded", "block_placed_observed");
-                }
-            } else {
-                a.placedStableTicks = 0;
-                if (a.entry.ticks - a.dispatchTick >= 10) finish("failed", "placement_not_observed");
-            }
+            verifyPlacementEffect(mc, a, target, false);
             return;
         }
         if (!(a.player.getMainHandItem().getItem() instanceof BlockItem item)) {
-            finish("failed", "held_item_is_not_block"); return;
+            finishPlacement(mc,a,"failed", "held_item_is_not_block"); return;
         }
-        if (a.entry.request.jump() && a.player.getBoundingBox().intersects(new AABB(target))) return;
+        if(!placementFence(mc,a))return;
+        boolean intersects=a.entry.request.jump() && a.player.getBoundingBox().intersects(new AABB(target));
+        if(!placementFence(mc,a)||intersects)return;
         // Re-aim after physics moved the eye position this tick (essential for underfoot placement).
         aim(mc, Vec3.atCenterOf(support).add(face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5));
+        if(!placementFence(mc,a))return;
         BlockHitResult hit = pick(mc, support, face);
-        if (hit == null) { finish("failed", "support_face_not_in_reach_or_visible"); return; }
+        if(!placementFence(mc,a))return;
+        if (hit == null) { finishPlacement(mc,a,"failed", "support_face_not_in_reach_or_visible"); return; }
         BlockPlaceContext placement = new BlockPlaceContext(a.player, InteractionHand.MAIN_HAND, a.player.getMainHandItem(), hit);
         if (!placement.getClickedPos().equals(target) || !placement.canPlace()) {
-            finish("failed", "placement_target_not_available"); return;
+            finishPlacement(mc,a,"failed", "placement_target_not_available"); return;
         }
+        if(!placementFence(mc,a))return;
         var event = ClientHooks.onClickInput(1, mc.options.keyUse, InteractionHand.MAIN_HAND);
-        if (event.isCanceled()) { finish("failed", "use_cancelled_by_mod"); return; }
-        if(a.capabilityGuard!=null){hit=pick(mc,support,face);if(hit==null){finish("failed","support_face_not_in_reach_or_visible");return;}}
+        if(!placementFence(mc,a))return;
+        if (event.isCanceled()) { finishPlacement(mc,a,"failed", "use_cancelled_by_mod"); return; }
+        if(a.capabilityGuard!=null){hit=pick(mc,support,face);if(hit==null){finishPlacement(mc,a,"failed","support_face_not_in_reach_or_visible");return;}}
         if(!capabilityDispatchCheck(mc,a))return;
         // Exactly one ordinary client interaction. A missing response is never an excuse to replay it.
         a.dispatched = true;
@@ -967,33 +1082,117 @@ final class ClientActions {
         a.entry.result.add("target", cellJson(target));
         int beforeCount = a.player.getMainHandItem().getCount();
         a.placementBeforeCount = beforeCount;
+        a.placementBeforeItem = a.player.getMainHandItem().getItem();
+        a.placementBeforeSlot = a.player.getInventory().selected;
+        a.placementBeforeState = mc.level.getBlockState(target);
+        a.entry.result.addProperty("placement_before_count", beforeCount);
+        a.entry.result.addProperty("placement_before_item", BuiltInRegistries.ITEM.getKey(a.placementBeforeItem).toString());
+        a.entry.result.addProperty("placement_before_block", BuiltInRegistries.BLOCK.getKey(a.placementBeforeState.getBlock()).toString());
+        a.entry.result.addProperty("placement_verification_max_ticks", PlacementEffectVerification.MAX_TICKS);
+        if(!placementFence(mc,a))return;
         InteractionResult result = mc.gameMode.useItemOn(a.player, InteractionHand.MAIN_HAND, hit);
+        if(!placementFence(mc,a))return;
         a.entry.result.addProperty("interaction_result", result.name().toLowerCase(Locale.ROOT));
         if (result.shouldSwing() && event.shouldSwingHand()) {
             a.player.swing(InteractionHand.MAIN_HAND);
-            if (a.player.getMainHandItem().getCount() != beforeCount || mc.gameMode.hasInfiniteItems())
-                mc.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
+            if(!placementFence(mc,a))return;
+            boolean itemChanged=a.player.getMainHandItem().getCount() != beforeCount || mc.gameMode.hasInfiniteItems();
+            if(!placementFence(mc,a))return;
+            if(itemChanged)mc.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
+            if(!placementFence(mc,a))return;
         }
-        if (result == InteractionResult.FAIL) finish("failed", "placement_rejected");
+        // Even FAIL can follow packet/hook effects. Preserve it and only observe; never redispatch.
+        a.entry.result.addProperty("placement_effect_verification", "pending_read_only");
+    }
+
+    private static void verifyPlacementEffect(Minecraft mc, RuntimeAction a, BlockPos target, boolean capability) {
+        if(!placementFence(mc,a))return;
+        var state = mc.level.getBlockState(target);
+        var stack = a.player.getMainHandItem();
+        boolean expected = state.getBlock() == a.placedBlock && state != a.placementBeforeState
+            && (a.capabilityGuard == null || CapabilityGuard.blockMatches(state,
+                ClientActionRequest.string(a.entry.request.original(), "expected_block_id"),
+                a.entry.request.original().has("expected_block_properties")
+                    ? a.entry.request.original().getAsJsonObject("expected_block_properties") : null));
+        boolean consumed = a.player.getInventory().selected == a.placementBeforeSlot
+            && (mc.gameMode.hasInfiniteItems()
+                || stack.getCount() == a.placementBeforeCount - 1
+                    && (stack.isEmpty() && a.placementBeforeCount == 1 || stack.getItem() == a.placementBeforeItem));
+        boolean settled = (!a.entry.request.jump() || a.player.onGround())
+            && (!capability || expected && CapabilityPlacement.after(mc, a.entry.request));
+        int afterCount=stack.getCount();
+        String afterBlock=BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+        if(!placementFence(mc,a))return;
+        int elapsed = a.entry.ticks - a.dispatchTick;
+        var decision = a.placementVerification.observe(elapsed, expected, consumed, settled);
+        a.entry.result.addProperty("placement_observation_elapsed_ticks", elapsed);
+        a.entry.result.addProperty("placement_after_count", afterCount);
+        a.entry.result.addProperty("placement_after_block", afterBlock);
+        a.entry.result.addProperty("material_consumption_observed", consumed);
+        a.entry.result.addProperty("client_stable_ticks", a.placementVerification.stableTicks());
+        if(decision == PlacementEffectVerification.Decision.OBSERVED) {
+            a.entry.result.addProperty("observed_block", BuiltInRegistries.BLOCK.getKey(a.placedBlock).toString());
+            a.entry.result.addProperty("confirmation", "client_observed_stable");
+            a.entry.result.addProperty("placement_effect_verification", "observed");
+            finishPlacement(mc,a,"succeeded", "block_placed_observed");
+        } else if(decision == PlacementEffectVerification.Decision.UNKNOWN) {
+            a.entry.result.addProperty("placement_effect_verification", "bounded_observation_inconclusive");
+            finishPlacement(mc,a,"failed", "placement_effect_unconfirmed");
+        }
     }
 
     private static void clickSlot(Minecraft mc, RuntimeAction a) {
         var request = a.entry.request;
         var menu = a.player.containerMenu;
+        if (active != a) return;
         if (menu.containerId != request.containerId()) { finish("failed", "container_changed"); return; }
         if (request.slot() != -999 && (request.slot() < 0 || request.slot() >= menu.slots.size())) {
             finish("failed", "slot_out_of_range"); return;
         }
         if (!a.dispatched) {
+            boolean recovery=request.original().has("inventory_recovery");
             if(!capabilityDispatchCheck(mc,a))return;
+            MovementBudget.beforeClick(mc,request);
+            if(active!=a)return;
+            if(recovery && !capabilityDispatchCheck(mc,a))return;
             a.dispatched = true;
             a.dispatchTick = a.entry.ticks;
             a.entry.result.addProperty("dispatched", true);
-            MovementBudget.beforeClick(mc,request);
-            mc.gameMode.handleInventoryMouseClick(menu.containerId, request.slot(), request.button(),
+            Runnable click=() -> mc.gameMode.handleInventoryMouseClick(menu.containerId, request.slot(), request.button(),
                     ClickType.valueOf(request.clickType().toUpperCase(Locale.ROOT)), a.player);
-            a.entry.result.add("menu", BridgeServer.menuSnapshot(menu));
-            finish("succeeded", "click_dispatched");
+            try {
+                Runnable verify=() -> {};
+                if(recovery) {
+                    long revision=ownershipRevision;
+                    verify=InventoryRecoveryDispatch.run(mc,request,
+                        () -> active==a && ACTIONS.active()==a.entry && a.entry.running() && ownershipRevision==revision
+                            && !NativeFallRescue.blocksInput(),
+                        () -> {ExternalControllerGuard.requireIdle(mc);
+                            NativeFallRescue.requireOrdinaryAdmission();
+        NativeExternalNavigation.requireOrdinaryAdmission();
+                            String denied=a.capabilityGuard.check(mc,true);
+                            if(denied!=null)throw new ClientActionRequest.Rejected(409,denied);},
+                        () -> {ExternalControllerGuard.requireIdle(mc);
+                            a.capabilityGuard.requireFresh(mc,"inventory_recovery_effect");},click);
+                } else click.run();
+                if(active!=a || mc.player!=a.player || mc.level!=a.level || a.player.containerMenu!=menu) {
+                    a.entry.result.addProperty("unknown_outcome",true);
+                    if(active==a)finish("failed","inventory_click_context_unconfirmed"); return;
+                }
+                var snapshot=BridgeServer.menuSnapshot(menu);
+                if(active!=a || mc.player!=a.player || mc.level!=a.level || a.player.containerMenu!=menu) {
+                    a.entry.result.addProperty("unknown_outcome",true);
+                    if(active==a)finish("failed","inventory_click_context_unconfirmed"); return;
+                }
+                verify.run();
+                if(active!=a){a.entry.result.addProperty("unknown_outcome",true);return;}
+                a.entry.result.add("menu",snapshot);
+                finish("succeeded", "click_dispatched");
+            } catch(RuntimeException failure) {
+                // Local menu callbacks may already have run. Never finish a replacement owner or replay.
+                if(recovery || active!=a)a.entry.result.addProperty("unknown_outcome",true);
+                if(active==a)failException(failure);
+            }
         }
     }
 
@@ -1021,32 +1220,12 @@ final class ClientActions {
 
     private static void placeCapability(Minecraft mc, RuntimeAction a) {
         if(a.scopedPlacement!=null)a.scopedPlacement.check(mc,a.dispatched,false);
+        if(!placementFence(mc,a))return;
         BlockPos support = pos(a.entry.request.support());
         Direction face = Direction.valueOf(a.entry.request.face().toUpperCase(Locale.ROOT));
         BlockPos target = support.relative(face);
         if (a.dispatched) {
-            if (mc.level.getBlockState(target).getBlock() == a.placedBlock
-                    && (a.capabilityGuard==null || CapabilityGuard.blockMatches(mc.level.getBlockState(target),
-                        ClientActionRequest.string(a.entry.request.original(),"expected_block_id"),
-                        a.entry.request.original().has("expected_block_properties")?a.entry.request.original().getAsJsonObject("expected_block_properties"):null))) {
-                a.entry.result.addProperty("observed_block", BuiltInRegistries.BLOCK.getKey(a.placedBlock).toString());
-                if(!CapabilityPlacement.after(mc,a.entry.request)){a.placedStableTicks=0;return;}
-                a.placedStableTicks++;
-                boolean consumed = mc.gameMode.hasInfiniteItems()
-                        || a.player.getMainHandItem().getCount() == a.placementBeforeCount - 1;
-                a.entry.result.addProperty("client_stable_ticks", a.placedStableTicks);
-                a.entry.result.addProperty("material_consumption_observed", consumed);
-                // Client prediction can roll back; never call a first-frame block a settled result.
-                // This is still client evidence, not a server acknowledgement.
-                if (a.placedStableTicks >= 5 && consumed
-                        && (!a.entry.request.jump() || a.player.onGround())) {
-                    a.entry.result.addProperty("confirmation", "client_observed_stable");
-                    finish("succeeded", "block_placed_observed");
-                }
-            } else {
-                a.placedStableTicks = 0;
-                if (a.entry.ticks - a.dispatchTick >= 10) finish("failed", "placement_not_observed");
-            }
+            verifyPlacementEffect(mc, a, target, true);
             return;
         }
         if(ClientActionRequest.bool(a.entry.request.original(),"capability_bridge",false)) {
@@ -1054,32 +1233,39 @@ final class ClientActions {
             if(Math.hypot(edge.x-a.player.getX(),edge.z-a.player.getZ())>.04)return;
         }
         if (!(a.player.getMainHandItem().getItem() instanceof BlockItem item)) {
-            finish("failed", "held_item_is_not_block"); return;
+            finishPlacement(mc,a,"failed", "held_item_is_not_block"); return;
         }
-        if (a.entry.request.jump() && a.player.getBoundingBox().intersects(new AABB(target))) return;
+        if(!placementFence(mc,a))return;
+        boolean intersects=a.entry.request.jump() && a.player.getBoundingBox().intersects(new AABB(target));
+        if(!placementFence(mc,a)||intersects)return;
         // Re-aim after physics moved the eye position this tick (essential for underfoot placement).
         aim(mc, CapabilityPlacement.hit(a.entry.request));
+        if(!placementFence(mc,a))return;
         BlockHitResult hit = pick(mc, support, face);
-        if (hit == null) { finish("failed", "support_face_not_in_reach_or_visible"); return; }
+        if(!placementFence(mc,a))return;
+        if (hit == null) { finishPlacement(mc,a,"failed", "support_face_not_in_reach_or_visible"); return; }
         BlockPlaceContext placement = new BlockPlaceContext(a.player, InteractionHand.MAIN_HAND, a.player.getMainHandItem(), hit);
         if (!placement.getClickedPos().equals(target) || !placement.canPlace()) {
-            finish("failed", "placement_target_not_available"); return;
+            finishPlacement(mc,a,"failed", "placement_target_not_available"); return;
         }
         String placementProblem=CapabilityPlacement.predicted(mc,a.entry.request,placement,item);
-        if(placementProblem!=null){finish("failed",placementProblem);return;}
+        if(placementProblem!=null){finishPlacement(mc,a,"failed",placementProblem);return;}
+        if(!placementFence(mc,a))return;
         var event = ClientHooks.onClickInput(1, mc.options.keyUse, InteractionHand.MAIN_HAND);
-        if (event.isCanceled()) { finish("failed", "use_cancelled_by_mod"); return; }
-        if(a.capabilityGuard!=null){hit=pick(mc,support,face);if(hit==null){finish("failed","support_face_not_in_reach_or_visible");return;}}
+        if(!placementFence(mc,a))return;
+        if (event.isCanceled()) { finishPlacement(mc,a,"failed", "use_cancelled_by_mod"); return; }
+        if(a.capabilityGuard!=null){hit=pick(mc,support,face);if(hit==null){finishPlacement(mc,a,"failed","support_face_not_in_reach_or_visible");return;}}
         if(!capabilityDispatchCheck(mc,a))return;
         if(a.capabilityGuard!=null) {
             BlockPlaceContext finalPlacement=new BlockPlaceContext(a.player,InteractionHand.MAIN_HAND,a.player.getMainHandItem(),hit);
-            if(!finalPlacement.getClickedPos().equals(target)||!finalPlacement.canPlace()){finish("failed","placement_target_not_available");return;}
+            if(!finalPlacement.getClickedPos().equals(target)||!finalPlacement.canPlace()){finishPlacement(mc,a,"failed","placement_target_not_available");return;}
             placementProblem=CapabilityPlacement.predicted(mc,a.entry.request,finalPlacement,item);
             if(active!=a)return;
-            if(placementProblem!=null){finish("failed",placementProblem);return;}
+            if(placementProblem!=null){finishPlacement(mc,a,"failed",placementProblem);return;}
             if(!capabilityDispatchCheck(mc,a))return;
         }
         if(a.scopedPlacement!=null)a.scopedPlacement.beforeUse(mc,hit);
+        if(!placementFence(mc,a))return;
         // Exactly one ordinary client interaction. A missing response is never an excuse to replay it.
         a.dispatched = true;
         a.dispatchTick = a.entry.ticks;
@@ -1088,26 +1274,76 @@ final class ClientActions {
         a.entry.result.add("target", cellJson(target));
         int beforeCount = a.player.getMainHandItem().getCount();
         a.placementBeforeCount = beforeCount;
+        a.placementBeforeItem = a.player.getMainHandItem().getItem();
+        a.placementBeforeSlot = a.player.getInventory().selected;
+        a.placementBeforeState = mc.level.getBlockState(target);
+        a.entry.result.addProperty("placement_before_count", beforeCount);
+        a.entry.result.addProperty("placement_before_item", BuiltInRegistries.ITEM.getKey(a.placementBeforeItem).toString());
+        a.entry.result.addProperty("placement_before_block", BuiltInRegistries.BLOCK.getKey(a.placementBeforeState.getBlock()).toString());
+        a.entry.result.addProperty("placement_verification_max_ticks", PlacementEffectVerification.MAX_TICKS);
+        if(!placementFence(mc,a))return;
         final BlockHitResult placementHit=hit;
         InteractionResult result = a.scopedPlacement==null ? mc.gameMode.useItemOn(a.player, InteractionHand.MAIN_HAND, hit)
             : ScopedPlacementDispatch.use(a.scopedPlacement,()->mc.gameMode.useItemOn(a.player,InteractionHand.MAIN_HAND,placementHit));
+        if(!placementFence(mc,a))return;
         a.entry.result.addProperty("interaction_result", result.name().toLowerCase(Locale.ROOT));
         if (a.scopedPlacement==null && result.shouldSwing() && event.shouldSwingHand()) {
             a.player.swing(InteractionHand.MAIN_HAND);
-            if (a.player.getMainHandItem().getCount() != beforeCount || mc.gameMode.hasInfiniteItems())
-                mc.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
+            if(!placementFence(mc,a))return;
+            boolean itemChanged=a.player.getMainHandItem().getCount() != beforeCount || mc.gameMode.hasInfiniteItems();
+            if(!placementFence(mc,a))return;
+            if(itemChanged)mc.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
+            if(!placementFence(mc,a))return;
         }
-        if (result == InteractionResult.FAIL) finish("failed", "placement_rejected");
+        // Even FAIL can follow packet/hook effects. Preserve it and only observe; never redispatch.
+        a.entry.result.addProperty("placement_effect_verification", "pending_read_only");
     }
 
-    private static boolean capabilityDispatchCheck(Minecraft mc,RuntimeAction a) {
+    private static boolean placementFence(Minecraft mc,RuntimeAction a) {
+        boolean same=a.placementOwner.same(active,mc.player,mc.level,mc.gameMode,
+            mc.player==null?null:mc.player.containerMenu,mc.screen,ACTIONS.session,WorldGeneration.current(mc.level));
+        if(same)return true;
+        placementUnknown(a,"placement_callback_context_changed");
+        if(active==a)finish("failed","placement_callback_context_changed");
+        return false;
+    }
+    private static void placementUnknown(RuntimeAction a,String reason) {
+        a.entry.result.addProperty("unknown_outcome",true);
+        a.entry.result.addProperty("requires_handoff",true);
+        a.entry.result.addProperty("effects_none_proven",false);
+        a.entry.result.addProperty("placement_callback_failure",reason);
+    }
+    private static void finishPlacement(Minecraft mc,RuntimeAction a,String status,String reason) {
+        if(placementFence(mc,a))finish(status,reason);
+    }
+
+    private static boolean externalOwnerCheck(Minecraft mc,RuntimeAction a) {
+        boolean idle=ExternalControllerGuard.idle(mc);
         if(active!=a)return false;
+        if(idle)return true;
+        a.entry.result.addProperty("unknown_outcome",true);
+        a.entry.result.addProperty("requires_handoff",true);
+        a.entry.result.addProperty("no_auto_resume",true);
+        finish("failed","external_controller_owner_unconfirmed");
+        return false;
+    }
+    private static boolean capabilityDispatchCheck(Minecraft mc,RuntimeAction a) {
+        if(active!=a || !externalOwnerCheck(mc,a))return false;
         String budgetProblem=MovementBudget.problem(mc);
         if(active!=a)return false;
         if(budgetProblem!=null && !(a.entry.request.action().equals("movement_budget_finish")&&MovementBudget.snapshot().get("status").getAsString().equals("stopping"))){finish("cancelled",budgetProblem);return false;}
-        if(a.capabilityGuard==null)return true;
-        String denied=a.capabilityGuard.check(mc,a.dispatched);
-        if(denied!=null){finish("cancelled",denied);return false;}
+        if(a.capabilityGuard!=null) {
+            String denied=a.capabilityGuard.check(mc,a.dispatched);
+            if(active!=a)return false;
+            if(denied!=null){finish("cancelled",denied);return false;}
+        }
+        // Final supported API query follows every callback-backed policy reader.
+        if(!externalOwnerCheck(mc,a))return false;
+        if(a.capabilityGuard!=null && !a.dispatched)a.capabilityGuard.requireFresh(mc,"external_controller_effect");
+        if(active!=a)return false;
+        if(System.nanoTime()>=a.deadline){finish("failed","deadline_exceeded");return false;}
+        NativeFallRescue.requireOrdinaryAdmission();
+        NativeExternalNavigation.requireOrdinaryAdmission();
         return active==a;
     }
     private static void interactBlock(Minecraft mc,RuntimeAction a) {
@@ -1263,6 +1499,11 @@ final class ClientActions {
     private static void finish(String status, String reason) {
         RuntimeAction a = active;
         if (a == null) return;
+        if(a.entry.request.action().equals("place_block") && a.dispatched && !status.equals("succeeded")) {
+            a.entry.result.addProperty("unknown_outcome",true);
+            a.entry.result.addProperty("requires_handoff",true);
+            a.entry.result.addProperty("effects_none_proven",false);
+        }
         if(a.scopedMining!=null && !status.equals("succeeded") && !reason.equals("cancel_requested")) {
             a.scopedMining.markUnknown();a.entry.result.addProperty("unknown_outcome",true);
         }
@@ -1277,9 +1518,11 @@ final class ClientActions {
         // Preserve legacy terminal timing/fields for recovery, mining, placement
         // and inventory actions. New boat/combat owners require confirmed cleanup.
         if (!managedCleanup) ACTIONS.finish(status, reason);
+        requireCleanupOwner(a);
         a.entry.result.addProperty("x", a.player.getX());
         a.entry.result.addProperty("y", a.player.getY());
         a.entry.result.addProperty("z", a.player.getZ());
+        requireCleanupOwner(a);
         if (a.input != null) {
             a.input.forwardImpulse = a.input.leftImpulse = 0;
             a.input.up = a.input.down = a.input.left = a.input.right = a.input.jumping = a.input.shiftKeyDown = false;
@@ -1288,28 +1531,29 @@ final class ClientActions {
         if (a.attackHeld) {
             Minecraft mc = Minecraft.getInstance();
             if (discontinuityCleanup || a.capabilityGuard!=null) {
-                attackReleased = releaseDiscontinuousAttack(() -> mc.options.keyAttack.setDown(false),
-                        () -> { if (mc.gameMode != null) {
+                attackReleased = releaseDiscontinuousAttack(() -> {requireCleanupOwner(a);mc.options.keyAttack.setDown(false);},
+                        () -> {requireCleanupOwner(a); if (mc.gameMode != null) {
                             if(a.scopedMining!=null)ScopedMiningDispatch.cleanup(a.scopedMining,mc.gameMode::stopDestroyBlock);
                             else mc.gameMode.stopDestroyBlock();
                         } });
             } else {
                 // Existing non-discontinuity ordering/errors remain unchanged.
-                mc.options.keyAttack.setDown(false);
-                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                requireCleanupOwner(a);mc.options.keyAttack.setDown(false);
+                requireCleanupOwner(a);if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
             }
         }
         if (managedCleanup) {
             boolean released = attackReleased;
             if (a.useHeld) {
-                released &= cleanup(() -> Minecraft.getInstance().options.keyUse.setDown(false));
-                released &= cleanup(() -> {if(Minecraft.getInstance().gameMode!=null)Minecraft.getInstance().gameMode.releaseUsingItem(a.player);});
+                released &= cleanupStage(a,"use_key_release",() -> Minecraft.getInstance().options.keyUse.setDown(false));
+                released &= cleanupStage(a,"use_item_release",() -> {if(Minecraft.getInstance().gameMode!=null)Minecraft.getInstance().gameMode.releaseUsingItem(a.player);});
             }
-            if (a.capabilityTarget != null) released &= cleanup(() -> a.capabilityTarget.release(Minecraft.getInstance()));
-            if (a.transfer != null) released &= cleanup(a.transfer::release);
-            if (a.boat != null) released &= cleanup(() -> a.boat.release(Minecraft.getInstance()));
-            if (a.combat != null) released &= cleanup(() -> a.combat.release(Minecraft.getInstance()));
-            released &= cleanup(() -> sprint(Minecraft.getInstance(), a, false));
+            if (a.capabilityTarget != null) released &= cleanupStage(a,"target_release",() -> a.capabilityTarget.release(Minecraft.getInstance()));
+            if (a.transfer != null) released &= cleanupStage(a,"transfer_release",a.transfer::release);
+            if (a.boat != null) released &= cleanupStage(a,"boat_release",() -> a.boat.release(Minecraft.getInstance()));
+            if (a.combat != null) released &= cleanupStage(a,"combat_release",() -> a.combat.release(Minecraft.getInstance()));
+            released &= cleanupStage(a,"sprint_release",() -> sprint(Minecraft.getInstance(), a, false));
+            requireCleanupOwner(a);
             if(a.scopedMovement!=null) {
                 boolean neutral=ScopedFlatMovement.neutral(a.input) && ScopedFlatMovement.neutral(a.player.input)
                         && !ScopedFlatMovement.keysDown(Minecraft.getInstance()) && !BridgeServer.hasHeldInputs();
@@ -1332,8 +1576,10 @@ final class ClientActions {
             }
             // Keep encounter evidence aligned with the terminal cleanup outcome.
             if(a.combat!=null) a.combat.terminal(released?status:"failed",released?reason:"input_release_unconfirmed");
+            requireCleanupOwner(a);
             if(MovementBudget.armed()) {
                 MovementBudget.observe(Minecraft.getInstance(),false);
+                requireCleanupOwner(a);
                 if(!released)MovementBudget.interrupt("movement_budget_input_release_unconfirmed");
                 String budgetFailure=MovementBudget.invalidReason();
                 if(budgetFailure!=null){status="failed";reason=budgetFailure;}
@@ -1367,15 +1613,45 @@ final class ClientActions {
                 a.entry.result.add("placement_diagnostics",a.scopedPlacement.diagnostics(keyNeutral,releaseBinding,semanticContext));
                 a.entry.result.add("placement",a.scopedPlacement.terminal(keyNeutral,status.equals("succeeded")&&released&&semanticContext));
             }
+            if(FALL_CLEANUP.active()) {
+                boolean bound=FALL_CLEANUP.bound(a,a.entry);
+                released &= bound;
+                if(!bound){
+                    releaseDiagnostic(a,"fall_preemption_final_fence","fall_rescue_cleanup_scope_changed");
+                    if(a.combat!=null)a.combat.terminal("failed","input_release_unconfirmed");
+                }
+                // A late callback may retire the old registry entry; never finish a replacement.
+                if(ACTIONS.active()!=a.entry){a.entry.result.addProperty("unknown_outcome",true);return;}
+            }
             ACTIONS.finishAfterCleanup(status, reason, released);
-            if (a.combat != null)
+            if (a.combat != null && !reason.equals("native_fall_rescue_preempted"))
                 EncounterTerminalPause.afterTerminal(a.entry, ACTIONS.session, BridgeServer::pauseEncounterTerminalOnGameThread);
+            else if(a.combat!=null && reason.equals("native_fall_rescue_preempted"))
+                a.entry.result.addProperty("automatic_terminal_pause_deferred_to_fall_rescue",true);
         }
     }
     static boolean releaseDiscontinuousAttack(Runnable keyUp, Runnable stopDestroy) {
         boolean released = cleanup(keyUp);
         released &= cleanup(stopDestroy); // Non-short-circuit: attempt both even after failure.
         return released;
+    }
+    private static void requireCleanupOwner(RuntimeAction a) {
+        if(FALL_CLEANUP.active()&&!FALL_CLEANUP.bound(a,a.entry))
+            throw new ClientActionRequest.Rejected(409,"fall_rescue_cleanup_scope_changed");
+    }
+    private static void releaseDiagnostic(RuntimeAction a,String stage,String reason) {
+        if(a.entry.result.has("input_release_diagnostics"))return;
+        JsonObject value=new JsonObject();value.addProperty("schema_version",1);
+        value.addProperty("failed_stage",stage);value.addProperty("reason",reason);
+        a.entry.result.add("input_release_diagnostics",value);
+    }
+    private static boolean cleanupStage(RuntimeAction a,String stage,Runnable release) {
+        try {requireCleanupOwner(a);release.run();requireCleanupOwner(a);return true;}
+        catch(RuntimeException failure){
+            String reason=failure instanceof ClientActionRequest.Rejected&&failure.getMessage()!=null
+                &&failure.getMessage().matches("[a-z0-9_]{1,100}")?failure.getMessage():"release_callback_failed";
+            releaseDiagnostic(a,stage,reason);return false;
+        }
     }
     private static boolean cleanup(Runnable release) {
         try { release.run(); return true; }

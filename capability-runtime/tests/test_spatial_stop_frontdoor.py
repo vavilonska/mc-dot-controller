@@ -1,4 +1,5 @@
 """Public MCP owner chain with synthetic native rows; no world/physics claim."""
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import unittest
 import json
@@ -108,13 +109,13 @@ class SpatialStopFrontdoorTests(unittest.TestCase):
     def test_far_passive_route(self): self.assert_route(spatial.PROFILE)
     def test_legacy_fallback(self): self.assert_route(route.PROFILE)
     def test_known_native_refusal(self):
+        self.expected_mcp_exit = 2
         result = self.finish(self.submit())
-        self.assertEqual(result['state'], 'blocked', result)
+        receipt = assert_unknown_refusal(self, result)
         self.assertEqual(len(self.posts()), 1)
         self.assertFalse(self.bridge.moves)
-        self.assertEqual(result['cleanup_certainty'], 'confirmed')
-        self.assertIn('minecraft:pufferfish', json.dumps(result))
-        self.assertIn('route_entity_rejection', json.dumps(result))
+        self.assertIn('minecraft:pufferfish', json.dumps(receipt))
+        self.assertIn('route_entity_rejection', json.dumps(receipt))
         self.assertFalse([p for p in self.posts() if p['intent']['action'] == 'combat_entity'])
 
     def test_wrong_terminal_profile(self):

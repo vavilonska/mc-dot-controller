@@ -40,6 +40,14 @@ def definitions():
     for entry in output:
         if entry['capability'] == 'interact':
             entry['native_features'] += ['scoped-native-preflight/1', 'profile:block-menu-v1']
+            entry['requirements'] = {'empty_mainhand': True, 'empty_offhand': True,
+                'closed_inventory': True, 'public_preparation_capability': 'clear_hand',
+                'preparation_arguments': {'hand': 'both'}, 'automatic_preparation': False}
+            entry['blocked_reasons'] = ['block_menu_empty_unchanged_hands_required']
+        else:
+            entry['requirements'] = {'empty_cursor': True, 'public_recovery_capability': 'recover_cursor',
+                'fresh_exact_cursor_and_window_required': True, 'automatic_recovery': False}
+            entry['blocked_reasons'] = ['inventory_cursor_not_empty', 'capability_cursor_not_empty']
         for p in (Path(__file__), root / 'mdc_skills' / 'reach.py'):
             value = {'path': 'capability-runtime/' + str(p.relative_to(root)),
                      'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}

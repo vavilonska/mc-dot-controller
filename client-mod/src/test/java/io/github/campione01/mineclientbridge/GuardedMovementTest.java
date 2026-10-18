@@ -31,6 +31,27 @@ class GuardedMovementTest {
         assertEquals(code, assertThrows(GuardedAction.Rejected.class, task::run).getMessage());
     }
 
+    @Test void finalExternalQueryCannotOutliveExactEffectPermit() throws Exception {
+        var ticket=submit();var writes=new AtomicInteger();
+        core.sample(this::state,()->{
+            var permit=core.effectPermit();
+            clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(101));
+            permit.checkLive();
+            writes.incrementAndGet();
+        },()->{});
+        assertEquals(0,writes.get());assertTrue(ticket.result.isDone());
+    }
+    @Test void finalExternalQueryCancellationInvalidatesEffectPermit() throws Exception {
+        var ticket=submit();var writes=new AtomicInteger();
+        core.sample(this::state,()->{
+            var permit=core.effectPermit();
+            core.cancelAndRelease("external_hook_cancelled");
+            permit.checkLive();
+            writes.incrementAndGet();
+        },()->{});
+        assertEquals(0,writes.get());assertTrue(ticket.result.isDone());
+    }
+
     @Test void singleSampleAlwaysReleasesBeforeAcknowledgement() throws Exception {
         var ticket = submit(); var held = new AtomicBoolean(); var count = new AtomicInteger();
         core.sample(this::state, () -> { held.set(true); count.incrementAndGet(); }, () -> held.set(false));

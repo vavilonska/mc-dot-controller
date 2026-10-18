@@ -1,4 +1,4 @@
-"""Terminal-only reflex transition primitive; deliberately not publicly activated.
+"""Terminal-only reflex transition primitive, activated only by explicit defend_once policy.
 
 The adapter must supply trusted evidence from its exact Runtime native receipt.
 This is not admission, a target selector, a new writer, or a retry mechanism.

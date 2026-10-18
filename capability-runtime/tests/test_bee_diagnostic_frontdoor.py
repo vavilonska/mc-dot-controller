@@ -1,4 +1,5 @@
 """Public MCP refusal diagnostics with synthetic native endpoint; no live claim."""
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import json
 import unittest
@@ -37,12 +38,11 @@ class BeeDiagnosticFrontdoorTests(unittest.TestCase):
         try: v2.SpatialStopV2FrontdoorTests.tearDown(self)
         finally: self.endpoint_patch.stop()
     def test_bee_detail(self):
+        self.expected_mcp_exit = 2
         result = self.finish(self.submit())
-        self.assertEqual(result['state'], 'blocked', result)
-        self.assertEqual(result['cleanup_certainty'], 'confirmed')
+        receipt = assert_unknown_refusal(self, result)
         self.assertEqual(len(self.posts()), 1)
         self.assertFalse(self.bridge.moves)
-        self.assertIsNone(self.client.session()['capability_lease'])
         found = []
         def walk(value):
             if isinstance(value, dict):
@@ -50,7 +50,7 @@ class BeeDiagnosticFrontdoorTests(unittest.TestCase):
                 for child in value.values(): walk(child)
             elif isinstance(value, list):
                 for child in value: walk(child)
-        walk(result)
+        walk(receipt)
         self.assertTrue(found, json.dumps(result))
         self.assertTrue(all(item == self.bridge.refusal for item in found))
         self.assertEqual(found[0]['native_bee_diagnostic']['native']['reason'], 'entity_not_observed')

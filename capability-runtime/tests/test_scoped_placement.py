@@ -73,4 +73,64 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(backend._profile_actions({'scoped_profiles':{p.PROFILE:['place_block']}}),{'place_block':p.PROFILE})
         self.assertEqual(backend._profile_actions({'scoped_profiles':{p.PROFILE:['place_block','follow_path']}}),{})
 
+
+class WorkstationTests(unittest.TestCase):
+    def arguments(self, material, properties):
+        return {**ARGS, 'expected_block_id': material, 'expected_block_properties': properties}
+
+    def test_exact_workstation_intent_material_and_inventory_binding(self):
+        for material, properties in [('minecraft:crafting_table', {})] + [
+                ('minecraft:furnace', {'facing': face, 'lit': 'false'}) for face in p.HORIZONTAL_FACES]:
+            with self.subTest(material=material, properties=properties):
+                args=self.arguments(material, properties)
+                CapabilityCatalog().validate('place_local', 1, args)
+                r=Runtime();r.before.player['inventory'][0]['id']=material
+                p.place_local(r, **args)
+                command=r.calls[1][2]
+                self.assertEqual(command['expected_block_id'],material)
+                self.assertEqual(command['expected_block_properties'],properties)
+                self.assertEqual(command['placement_footprint'][0]['block_id'],material)
+                self.assertEqual(command['placement_footprint'][0]['properties'],properties)
+                properties['extra']='caller-mutation'
+                self.assertNotIn('extra',command['expected_block_properties'])
+                self.assertNotIn('extra',command['placement_footprint'][0]['properties'])
+
+    def test_materials_properties_and_original_support_vocab_are_closed(self):
+        invalid=[('minecraft:furnace', {}), ('minecraft:furnace', {'facing':'up','lit':'false'}),
+                 ('minecraft:furnace', {'facing':'north','lit':False}),
+                 ('minecraft:furnace', {'facing':'north','lit':'true'}),
+                 ('minecraft:furnace', {'facing':'north','lit':'false','extra':'x'}),
+                 ('minecraft:crafting_table', {'facing':'north'}),
+                 ('minecraft:blast_furnace', {'facing':'north','lit':'false'}),
+                 ('minecraft:smoker', {'facing':'north','lit':'false'}), ('minecraft:chest', {})]
+        for material, properties in invalid:
+            args=self.arguments(material,properties);r=Runtime()
+            with self.subTest(args=args), self.assertRaises(SkillError):p.place_local(r,**args)
+            self.assertFalse(r.calls)
+            with self.assertRaises(ToolboxError):CapabilityCatalog().validate('place_local',1,args)
+        for support in ('minecraft:jungle_log','minecraft:iron_ore','minecraft:crafting_table','minecraft:furnace'):
+            args={**ARGS,'expected_support_id':support};r=Runtime()
+            with self.assertRaises(SkillError):p.place_local(r,**args)
+            self.assertFalse(r.calls)
+            with self.assertRaises(ToolboxError):CapabilityCatalog().validate('place_local',1,args)
+
+    def test_wrong_selected_material_cannot_dispatch(self):
+        for material in ('minecraft:crafting_table','minecraft:furnace'):
+            properties={'facing':'north','lit':'false'} if material.endswith('furnace') else {}
+            r=Runtime()
+            with self.assertRaises(SkillError):p.place_local(r,**self.arguments(material,properties))
+            self.assertEqual([call[0] for call in r.calls],['observe'])
+
+    def test_workstation_selected_decrement_accepts_only_same_material(self):
+        for material in ('minecraft:crafting_table','minecraft:furnace'):
+            before,after=observation(),observation(4);target={'x':2,'y':64,'z':0}
+            before.player['inventory'][0]['id']=material;after.player['inventory'][0]['id']=material
+            proof={'profile':p.PROFILE,'target':target,'block_placed':True,'effect_attempted':True,'effect_count':1,
+                'packet_count':1,'input_neutral':True,'unknown_outcome':False,'protected_inventory_unchanged':True,
+                'automatic_replay_allowed':False,'server_confirmed':False,'initial_count':5,'final_count':4,'selected_slot':0}
+            after.state={'client_action':{'action':'place_block','status':'succeeded','result':{'input_release_confirmed':True,'placement':proof}}}
+            self.assertTrue(p._placed(before,after,target,0,material))
+            after.player['inventory'][0]['id']=p.BLOCK
+            self.assertFalse(p._placed(before,after,target,0,material))
+
 if __name__=='__main__':unittest.main()

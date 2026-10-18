@@ -47,6 +47,8 @@ final class ScopedLocalSegmentMovement {
     final long sourceNano, sourceTick, deadline;
     final JsonObject footprint;
     private final Terrain admissionTerrain;
+    static final Set<String> CONTEXT_LOGS=Set.of("minecraft:oak_log","minecraft:spruce_log","minecraft:birch_log",
+        "minecraft:jungle_log","minecraft:acacia_log","minecraft:dark_oak_log");
     private record RawCell(BlockPos pos,Object state,Block block,Map<?,?> properties,JsonObject row) { }
     private record Terrain(JsonObject json,List<RawCell> raw) { }
     private final ClientActionRequest request;
@@ -360,6 +362,9 @@ final class ScopedLocalSegmentMovement {
                     || role==ScopedLocalSegmentPolicy.Role.CONTEXT && !state.isAir();float friction=0;
                 if(floor) {
                     require(allowedSolid(id,block.getClass(),role),"local_segment_floor_unsupported");
+                    if(id.equals("minecraft:crafting_table"))require(state.getValues().isEmpty(),"local_segment_context_state_unsupported");
+                    if(CONTEXT_LOGS.contains(id))require(state.getValues().keySet().equals(Set.of(net.minecraft.world.level.block.RotatedPillarBlock.AXIS))
+                        &&state.getValues().get(net.minecraft.world.level.block.RotatedPillarBlock.AXIS)!=null,"local_segment_context_state_unsupported");
                     boolean full=state.isCollisionShapeFullBlock(level,pos);if(diagnostic!=null){diagnostic.flag("full_cube",full);if(full)diagnostic.flag("collision_empty",false);}
                     require(full,"local_segment_floor_unsupported");
                     friction=state.getFriction(level,pos,player);if(diagnostic!=null)diagnostic.friction(friction);
@@ -432,7 +437,9 @@ final class ScopedLocalSegmentMovement {
         if(role==ScopedLocalSegmentPolicy.Role.CLEAR)return false;
         if(FLOORS.contains(id)&&(type==Block.class||type==GrassBlock.class))return true;
         return role==ScopedLocalSegmentPolicy.Role.CONTEXT
-            && (id.equals("minecraft:barrel")&&type==net.minecraft.world.level.block.BarrelBlock.class
+            && (id.equals("minecraft:crafting_table")&&type==net.minecraft.world.level.block.CraftingTableBlock.class
+                || CONTEXT_LOGS.contains(id)&&type==net.minecraft.world.level.block.RotatedPillarBlock.class
+                || id.equals("minecraft:barrel")&&type==net.minecraft.world.level.block.BarrelBlock.class
                 || id.equals("minecraft:furnace")&&type==net.minecraft.world.level.block.FurnaceBlock.class
                 || (id.equals("minecraft:oak_leaves")||id.equals("minecraft:birch_leaves"))
                     &&type==net.minecraft.world.level.block.LeavesBlock.class);

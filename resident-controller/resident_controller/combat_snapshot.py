@@ -10,11 +10,22 @@ FIELDS = frozenset(('profile', 'target_entity_id', 'target_uuid', 'target_type',
                     'min_health', 'timeout_ms'))
 
 
+def validate_defensive_envelope(native):
+    """Embedded state is raw; HTTP receipts may carry only the exact known pair."""
+    _require(type(native) is dict,'defensive_response_object')
+    if 'protocol' in native or 'schema_version' in native:
+        _require(type(native.get('protocol')) is str and native['protocol']=='mineclient-bridge'
+            and type(native.get('schema_version')) is int and native['schema_version']==2,
+            'defensive_response_envelope')
+
+
 def validate_combat(witness, intent, native):
+    defensive=witness.get('profile')=='combat-defensive-local-v1'
+    if defensive:validate_defensive_envelope(native)
     facts = witness['facts']
     combat = facts.get('combat')
-    _require(type(combat) is dict and set(combat) == FIELDS
-             and combat['profile'] == PROFILE, 'combat_schema')
+    _require(type(combat) is dict and set(combat) == (FIELDS | {'defensive_policy'} if defensive else FIELDS)
+             and combat['profile'] == ('combat-defensive-local-v1' if defensive else PROFILE), 'combat_schema')
     _require(intent.get('action') == native.get('action') == 'combat_entity'
              and _integer(combat['target_entity_id'], 0, 2**31 - 1)
              and type(combat['target_uuid']) is str
@@ -40,6 +51,22 @@ def validate_combat(witness, intent, native):
                 'approach', 'shield', 'min_health', 'timeout_ms', 'capability_guard',
                 'expected_world_generation', 'expected_dimension', 'expected_player_uuid',
                 'expected_action_session', 'expected_hotbar_slot', 'expected_held_item'}
+    if defensive:
+        required.add('defensive_policy')
+        p=combat['defensive_policy']
+        _require(type(p) is dict and set(p)=={'schema_version','mode','window_ms','max_distance','minimum_separation_gain'}
+            and exact(p.get('schema_version'),1) and p.get('mode') in ('shield_only','immediate_evade')
+            and _integer(p.get('window_ms'),300,2500) and _number(p.get('max_distance')) and _number(p.get('minimum_separation_gain'))
+            and (p['max_distance']==0 and p['minimum_separation_gain']==0 if p['mode']=='shield_only' else
+                1<=p['max_distance']<=4 and .1<=p['minimum_separation_gain']<=2 and p['minimum_separation_gain']<p['max_distance'])
+            and type(intent.get('defensive_policy')) is dict and set(intent['defensive_policy'])==set(p)
+            and all(exact(p[k],intent['defensive_policy'].get(k)) for k in ('schema_version','mode','window_ms'))
+            and all(_number(intent['defensive_policy'].get(k)) and p[k]==intent['defensive_policy'][k]
+                for k in ('max_distance','minimum_separation_gain')) and combat['approach'] is False
+            and combat['shield'] is (p['mode']=='shield_only')
+            and p['window_ms']+250<=combat['timeout_ms']<=3000,'defensive_policy_binding')
+        _require(p['mode']!='shield_only' or facts['equipment']['offhand']['id']=='minecraft:shield'
+            and facts['equipment']['offhand']['count']==1,'defensive_offhand_shield')
     navigation = {'expected_navigation_epoch', 'expected_origin'}
     _require(set(intent) in (required, required | navigation), 'combat_closed_intent')
     _require(exact(intent['expected_hotbar_slot'], facts['selected_slot']), 'combat_selected_slot')
@@ -54,7 +81,7 @@ def validate_combat(witness, intent, native):
                  and set(origin) == {'x', 'y', 'z'}
                  and all(_number(origin[k]) and abs(origin[k] - facts[k]) <= .03 for k in origin),
                  'combat_origin_binding')
-    _require(facts['health'] > combat['min_health'] and facts['screen_class'] == ''
+    _require(facts['health'] > (0 if defensive else combat['min_health']) and facts['screen_class'] == ''
              and facts['using_item'] is False
              and facts['menu']['menu_class'] == 'net.minecraft.world.inventory.InventoryMenu'
              and facts['menu']['container_id'] == 0 and facts['menu']['carried']['empty'] is True,

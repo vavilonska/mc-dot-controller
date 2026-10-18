@@ -49,12 +49,13 @@ final class ScopedNativePreflight {
             JsonArray mining=new JsonArray();mining.add("break_block");profiles.add(ScopedMining.PROFILE,mining);
         }
         if(ScopedPlacementDispatch.ready()){JsonArray placement=new JsonArray();placement.add("place_block");profiles.add(ScopedPlacement.PROFILE,placement);}
-        if(ScopedCombatDispatch.ready()){JsonArray combat=new JsonArray();combat.add("combat_entity");profiles.add(ScopedCombat.PROFILE,combat);}
+        if(ScopedCombatDispatch.ready()){JsonArray combat=new JsonArray();combat.add("combat_entity");profiles.add(ScopedCombat.PROFILE,combat);profiles.add(DefensiveCombatPolicy.PROFILE,combat.deepCopy());}
         out.add("profiles", profiles);
         JsonArray supported = new JsonArray();
         ClientActionRequest.ACTIONS.stream().sorted().forEach(supported::add);
         out.add("guarded_actions", supported);
         out.addProperty("capability_guard_schema_version", 1);
+        if(InventoryRecoveryDispatch.ready())out.addProperty("inventory_recovery_schema_version", 1);
         return out;
     }
 
@@ -73,7 +74,7 @@ final class ScopedNativePreflight {
                 || (profile.equals(ScopedStepDownMovement.PROFILE) && action.equals("follow_path") && ScopedMovementEntities.ready())
                 || ((profile.equals(ScopedLocalSegmentMovement.PROFILE)||profile.equals(ScopedRouteThreatPolicy.PROFILE)||profile.equals(ScopedRouteStopPolicy.PROFILE)||profile.equals(ScopedRouteStopPolicy.PROFILE_V2)) && action.equals("follow_path") && ScopedMovementEntities.ready() && ScopedLocalSegmentDispatch.ready())
                 || ((profile.equals(ScopedFlatMovement.PROFILE) || profile.equals(ScopedCollectTarget.PROFILE)) && action.equals("follow_path"))
-                || (profile.equals(ScopedCombat.PROFILE) && action.equals("combat_entity") && ScopedCombatDispatch.ready())
+                || ((profile.equals(ScopedCombat.PROFILE)||profile.equals(DefensiveCombatPolicy.PROFILE)) && action.equals("combat_entity") && ScopedCombatDispatch.ready())
                 || (profile.equals(ScopedMining.PROFILE) && action.equals("break_block") && ScopedMiningDispatch.ready())
                 || (profile.equals(ScopedPlacement.PROFILE) && action.equals("place_block") && ScopedPlacementDispatch.ready()), "scoped_profile_unavailable_for_action");
         require(ClientActionRequest.string(scope, "owner_id").matches("[0-9a-f]{32}"), "invalid_scoped_owner");
@@ -82,11 +83,13 @@ final class ScopedNativePreflight {
         require(ClientActionRequest.string(scope, "job_id").matches("[A-Za-z0-9_-]{1,80}"), "invalid_scoped_job");
         require(intent.has("capability_guard") && intent.get("capability_guard").isJsonObject(), "scoped_expected_guard_required");
         require(!intent.has("observation_clock") && !intent.has("observation_clock_profile"), "scoped_diagnostic_clock_forbidden");
+        // No callback-backed state, slot, shape or permission reader may precede this marker.
+        NativeAdmission.mark(NativeAdmission.Stage.HOOKS_POSSIBLE);
         require(mc.player != null && mc.level != null && mc.gameMode != null && CapabilityGuard.privateSingleplayer(mc), "scoped_private_singleplayer_required");
         if(profile.equals(ScopedStepDownMovement.PROFILE))ScopedStepDownMovement.validateIntent(intent);
         if(profile.equals(ScopedLocalSegmentMovement.PROFILE)||profile.equals(ScopedRouteThreatPolicy.PROFILE)||profile.equals(ScopedRouteStopPolicy.PROFILE)||profile.equals(ScopedRouteStopPolicy.PROFILE_V2))
             ScopedLocalSegmentMovement.validateIntent(intent,profile.equals(ScopedRouteThreatPolicy.PROFILE));
-        if(profile.equals(ScopedCombat.PROFILE))ScopedCombat.validateIntent(intent);
+        if(profile.equals(ScopedCombat.PROFILE)||profile.equals(DefensiveCombatPolicy.PROFILE))ScopedCombat.validateIntent(intent,profile);
         if(profile.equals(ScopedPlacement.PROFILE))ScopedPlacement.validateIntent(intent);
         if (profile.equals(BlockMenuPreflight.PROFILE)) {
             require(ScopedBlockMenuDispatch.ready(), "block_menu_post_hook_fence_unavailable");
@@ -148,8 +151,8 @@ final class ScopedNativePreflight {
             stepDown=ScopedStepDownMovement.PROFILE.equals(profile)?new ScopedStepDownMovement(mc,ClientActionRequest.parse(intent),nano,tick):null;
             localSegment=(ScopedLocalSegmentMovement.PROFILE.equals(profile)||ScopedRouteThreatPolicy.PROFILE.equals(profile)||ScopedRouteStopPolicy.PROFILE.equals(profile)||ScopedRouteStopPolicy.PROFILE_V2.equals(profile))
                 ?new ScopedLocalSegmentMovement(mc,ClientActionRequest.parse(intent),nano,tick,ScopedRouteThreatPolicy.PROFILE.equals(profile),ScopedRouteStopPolicy.PROFILE.equals(profile)||ScopedRouteStopPolicy.PROFILE_V2.equals(profile),ScopedRouteStopPolicy.PROFILE_V2.equals(profile)):null;
-            combat=ScopedCombat.PROFILE.equals(ClientActionRequest.string(scope,"profile"))
-                ? new ScopedCombat(mc,ClientActionRequest.parse(intent),nano) : null;
+            combat=(ScopedCombat.PROFILE.equals(profile)||DefensiveCombatPolicy.PROFILE.equals(profile))
+                ? new ScopedCombat(mc,ClientActionRequest.parse(intent),nano,profile) : null;
             facts = captureFacts(mc);
             blockMenuEntity = blockMenu() ? mc.level.getBlockEntity(BlockMenuPreflight.target(originalIntent)) : null;
             blockMenuRawState = blockMenu() ? new BlockMenuRawState(mc, facts) : null;

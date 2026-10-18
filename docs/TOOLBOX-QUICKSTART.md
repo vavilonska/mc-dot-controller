@@ -1,5 +1,3 @@
-> 历史源码记录：本文各项结论仅适用于其原始截点。2026-10-16 当前交付、安装入口和验证边界见[工具箱交付说明](toolbox-2026-10-16/README.md)。本次 Git 发布不改产品代码或继承旧 JAR 的实机验收。
-
 # Toolbox operator setup and playing-AI calls
 
 This guide describes the current source interface, not a newly deployed or fully

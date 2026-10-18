@@ -1,4 +1,5 @@
 """Production MCP → Owner → Watchdog → Resident → transport, offline bytes only."""
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import hashlib
 import json
@@ -64,40 +65,33 @@ class RouteThreatDiagnosticFrontdoorTests(unittest.TestCase):
         route.RouteLocalFrontdoorTests.tearDown(self)
 
     def assert_refusal(self, *, diagnostic=True, invalid=False):
+        self.expected_mcp_exit = 2
         result = self.defend(); code = self.bridge.diagnostic['rejection_code']
-        self.assertEqual(result['state'],'blocked',result)
-        self.assertEqual(result['result']['reason'],code,result)
-        self.assertEqual(result['effect_certainty'],'none_proven'); self.assertEqual(result['cleanup_certainty'],'confirmed')
+        archived = assert_unknown_refusal(self, result)
+        self.assertIn(code, archived['reason'])
         self.assertEqual(len(self.posts()),1); self.assertEqual(len(self.bridge.wire_calls),1)
         self.assertFalse(self.bridge.moves); self.assertEqual(self.bridge.action['status'],'idle')
-        self.assertIsNone(self.client.session()['capability_lease'])
         self.assertFalse([p for p in self.posts() if p['intent']['action'] == 'combat_entity'])
-        self.assertFalse([p for p,b in self.bridge.posts if p in ('/control/action','/control/action/cancel')])
-        public = list(admissions(result)); self.assertTrue(public,result)
-        for admission in public:
-            self.assertEqual(admission['reason'],code); self.assertFalse(admission['admitted']); self.assertFalse(admission['uncertain'])
-            if diagnostic: self.assertTrue(exact(admission['route_threat_rejection'],self.bridge.diagnostic))
-            else:
-                self.assertNotIn('route_threat_rejection',admission)
-                self.assertEqual(admission.get('route_threat_rejection_status'),'invalid' if invalid else None)
-        # Read the actual Watchdog result through its public client, retaining
-        # the Resident queue receipt and exact original refusal identity.
-        receipts = [self.client.result(p.stem) for p in (self.root/'watchdog'/'results').glob('*.json')]
-        receipts = [r for r in receipts if type(r) is dict and 'action_admission' in r]
-        self.assertEqual(len(receipts),1,receipts); receipt = receipts[0]
-        self.assertEqual(receipt['queue_session_id'],self.resident.session_id)
-        self.assertTrue(receipt['queue_request_id']); self.assertIsNone(receipt['action_id']); self.assertIsNone(receipt['action'])
-        self.assertTrue(exact(receipt['action_admission'],public[0]))
+        self.assertFalse(list(admissions(result)))
+        # The immutable original receipt carries diagnostics, not admission authority.
+        receipt = self.client.result(archived['request_id'])
+        self.assertTrue(exact(receipt, archived))
+        evidence = receipt.get('native_refusal_diagnostics') or {}
+        self.assertNotIn('action_admission', receipt)
         if diagnostic:
-            public[0]['route_threat_rejection']['native']['reason'] = 'changed by caller'
-            self.assertTrue(exact(self.client.result(receipt['request_id'])['action_admission'],receipt['action_admission']))
-            self.assertTrue(exact(self.bridge.refused.route_threat_rejection,self.bridge.diagnostic))
-        repeated = self.call('mdc_job',self.last_submit)
-        self.assertEqual(repeated['job_id'],result['job_id']); self.assertEqual(repeated['state'],'blocked')
+            self.assertTrue(exact(evidence['route_threat_rejection'], self.bridge.diagnostic))
+            self.assertFalse(evidence['effect_free_proven'])
+            evidence['route_threat_rejection']['native']['reason'] = 'changed by caller'
+            self.assertTrue(exact(self.client.result(archived['request_id']), archived))
+            self.assertTrue(exact(self.bridge.refused.route_threat_rejection, self.bridge.diagnostic))
+        else:
+            self.assertNotIn('route_threat_rejection', evidence)
+            self.assertEqual(evidence.get('route_threat_rejection_status'), 'invalid' if invalid else None)
+        repeated = self.call('mdc_job', self.last_submit)
+        self.assertEqual(repeated['job_id'], result['job_id']); self.assertEqual(repeated['state'], 'unknown')
+        self.assertEqual(self.resident.active.action_id, archived['action_id'])
         self.assertEqual(len(self.posts()),1); self.assertEqual(len(self.bridge.wire_calls),1)
-        if diagnostic:
-            for admission in admissions(repeated):
-                self.assertTrue(exact(admission['route_threat_rejection'],self.bridge.diagnostic))
+        self.assertTrue(exact(self.client.result(archived['request_id']), archived))
         return result
 
     def test_valid_refusal(self): self.assert_refusal()

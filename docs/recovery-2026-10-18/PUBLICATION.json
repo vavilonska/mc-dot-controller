@@ -1,0 +1,267 @@
+{
+  "schema": "MDC_PUBLIC_RECOVERY_SOURCE_PUBLICATION_V1",
+  "version": "1.1.8-recovery-test.2.5",
+  "repository_parent_commit": "b0393f9185597cb77d9e7cfcce6b7e6626d5c05f",
+  "repository_parent_tree": "c44bf3e43030f3b590c59a4147baa1bb7bfe608f",
+  "scope": "Save previously delivered Recovery2.5 source/tests and version-qualified acceptance; no product code edits during publication",
+  "frozen_source_files": 1252,
+  "native_classes_integrity_verified": 469,
+  "source_archive_sha256": "3a2f8393eeb8a4ae183b820d7fcb095ae9c68e054f8872e354f194eeea959285",
+  "paired_jar_sha256": "415075adf53fbd8657b14182d5a8006e16b2136fb02b247b37f66db9ffa42953",
+  "delivered_source_manifest_sha256": "6972cd57663ac35a3ff44f656a97d555b6ca150edd48b210255ce33843e69c19",
+  "delivery_archive_sha256": "0f97194d327d435db8978e673c6cd359b7989829c024252563736c9a0388958a",
+  "publication_offline_checks": {
+    "started_utc": "2026-10-18T05:18:11.904450+00:00",
+    "scope": "offline only",
+    "components": [
+      {
+        "component": "toolbox-doc-examples",
+        "exit_code": 0,
+        "summary": []
+      },
+      {
+        "component": "toolbox-package-integrity",
+        "exit_code": 0,
+        "summary": [
+          "Ran 4 tests in 0.004s",
+          "OK"
+        ]
+      },
+      {
+        "component": "capability-runtime",
+        "exit_code": 1,
+        "summary": [
+          "Ran 1552 tests in 729.134s",
+          "FAILED (failures=2, errors=4, skipped=87)"
+        ]
+      },
+      {
+        "component": "resident-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 455 tests in 2.736s",
+          "OK (skipped=2)"
+        ]
+      },
+      {
+        "component": "navigation-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 254 tests in 1.061s",
+          "OK"
+        ]
+      },
+      {
+        "component": "navigation-cursor",
+        "exit_code": 0,
+        "summary": [
+          "Ran 83 tests in 0.115s",
+          "OK"
+        ]
+      },
+      {
+        "component": "defense-watchdog",
+        "exit_code": 0,
+        "summary": [
+          "Ran 166 tests in 1.459s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "component": "gameplay-helpers",
+        "exit_code": 0,
+        "summary": [
+          "Ran 64 tests in 4.402s",
+          "OK"
+        ]
+      },
+      {
+        "component": "building-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 119 tests in 1.295s",
+          "OK"
+        ]
+      },
+      {
+        "component": "external-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 115 tests in 0.102s",
+          "OK"
+        ]
+      },
+      {
+        "component": "multiagent-coordination",
+        "exit_code": 0,
+        "summary": [
+          "Ran 322 tests in 2.458s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "component": "python-toolbox",
+        "exit_code": 0,
+        "summary": [
+          "Ran 125 tests in 0.781s",
+          "OK"
+        ]
+      },
+      {
+        "component": "node-portable",
+        "exit_code": 0,
+        "summary": [
+          "ℹ tests 171",
+          "ℹ pass 171",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ]
+      },
+      {
+        "component": "node-framing",
+        "exit_code": 0,
+        "summary": [
+          "ℹ tests 9",
+          "ℹ pass 9",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ]
+      },
+      {
+        "component": "node-platform",
+        "exit_code": 0,
+        "summary": [
+          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
+          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
+        ]
+      }
+    ],
+    "ended_utc": "2026-10-18T05:31:04.136242+00:00"
+  },
+  "aggregate_passed": false,
+  "failure_triage": {
+    "missing_fixture": [
+      "test_crystal_access_planner: intentionally excluded crystal-tower-worlds.json.gz; generation documented in SOURCE-CHECKPOINT.md"
+    ],
+    "missing_native_harness": [
+      "test_fall_adjudication_canonical_http.test_canonical_owner_release",
+      "test_fall_adjudication_canonical_http.test_pending_error_and_optional_null_codec"
+    ],
+    "native_harness_requirements": [
+      "MDC_ADJUDICATION_JAVA",
+      "MDC_ADJUDICATION_CODEC_CP"
+    ],
+    "test_setup_caveat": "Canonical HTTP setup starts daemon fixtures before checking mandatory Java environment; failure skips teardown and leaves fixture threads. No test or runtime source was changed for publication.",
+    "narrow_unchanged_rerun": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0,
+      "seconds": 0.831,
+      "cases": [
+        "test_noncombat_watchdog.test_focus_loss_stale_publication_refuses_lease_without_input_mutation",
+        "test_observation_latency_adapter.test_actual_adapter_729_cells_two_pages_two_states_passes_point8",
+        "test_observation_latency_adapter.test_actual_adapter_accepts_exact_java_scan_reader_http_pages"
+      ],
+      "interpretation": "Aggregate assertion/temporary-directory failures did not reproduce in a fresh process. Fixture contamination is the source-supported likely cause, not a proved product fix."
+    }
+  },
+  "additional_checks": {
+    "npm_test_passed": true,
+    "extra_defensive_external_managed_storage_node_tests": {
+      "tests": 9,
+      "passed": 9
+    },
+    "new_native_compilation": false,
+    "new_gameplay_test": false
+  },
+  "public_documentation_transformations": [
+    {
+      "path": "COMPACT-CALLBACK-BUDGET-FIX.md",
+      "delivered_sha256": "f504c3d7b49feb88fb4bf4b0c6f1d46968b8e85f366784f7a2bf4f3987c09d0f",
+      "published_sha256": "f5a7967d3c27204e28fd43c1bcb1e79f9d0a04730d0512da51680687783eebbc"
+    },
+    {
+      "path": "COMPACT-READ-COST-FIX.md",
+      "delivered_sha256": "1029820743f5fdf0a68287fe5471d4490b64990db0f239a356b8c00191f5abb4",
+      "published_sha256": "a074ec70d511f820a643e1c76338a5ef668e12d56bc9638ab806fac167474288"
+    },
+    {
+      "path": "FALL-RENEW-PAUSE-RACE.md",
+      "delivered_sha256": "abb79b351a58333a69c0e547f17cda915434902b11ee71376fc8cfde0e96b244",
+      "published_sha256": "6f5347f499f86ee6596c523a0679ddbb0d924dc1c82392d7c74277c9a6d618d7"
+    },
+    {
+      "path": "PAUSED-OWNER-CLEANUP-CONTRACT.md",
+      "delivered_sha256": "a2c12bc74a5d7a8c68533b24e14011fe9517e69f6427696d25b7d909af7208a1",
+      "published_sha256": "804a22455268eb49cf96aa59d1940f4570c17f2b76eb84a3d32c0096580004b0"
+    },
+    {
+      "path": "PUBLICATION-MANIFEST.json",
+      "delivered_sha256": "162a76a321f4e8c8f4499251b8b6bbe3e63a049ac5d553f42516fe50b16ceb94",
+      "published_sha256": "1f4fef28eb9869b00e22e6084f5a07d0b6ab8384b32879aac9da433d243ceb18"
+    },
+    {
+      "path": "QUEUED-CANCEL-TERMINAL.md",
+      "delivered_sha256": "b41e5c62dbadbb109357091ba1a0bac97c229c93940d47366c1db7827d2d6cef",
+      "published_sha256": "bc7ecbb4af094a1dea3e7afe5b0b92c1f3687a53b3e95d1b12cb0f85d19852ea"
+    },
+    {
+      "path": "README.md",
+      "delivered_sha256": "86461bf1b0d97a77bf5575dfc9f24bf5f70c5cebc4f939ea83baac7b704efb70",
+      "published_sha256": "ab5c56a5e3ed1c22535d970d47ab25b467af59e4e2ef9be14988039a2c0fa9e1"
+    },
+    {
+      "path": "RECOVERY-FIRST-TEST-CANDIDATE.md",
+      "delivered_sha256": "66cb50d408e1f912e2bac9accc72a8c0598c10acfd18c71e88c010274a665f14",
+      "published_sha256": "f9116ecc51094e29fbca34ef852ff7bf55d0163f823223cade5037176d8d5658"
+    },
+    {
+      "path": "RECOVERY-TEST2-QUICKSTART.md",
+      "delivered_sha256": "4b1d8e34d18c3100079adcf93ce8bf28424212e273dc2f0b3167cbb613644b79",
+      "published_sha256": "ace6805c959b42e9ea2fd0980f09de940c47e9383ebcfa2ac51115a45c42c913"
+    },
+    {
+      "path": "RECOVERY-TEST2_2-CORRECTIONS.md",
+      "delivered_sha256": "6d0639ad918f382624307080020c62a72f0821778d62b119c3bd1c29b9af5656",
+      "published_sha256": "7ae2168da0918cad2c01fb997b017f505390e201b6fbe3ecb7967125674f77ee"
+    },
+    {
+      "path": "RECOVERY-TEST2_3-CORRECTIONS.md",
+      "delivered_sha256": "7d178d823223fc1be4901332b54f738d6955b8e7d2e69ab31922b306f11f17c9",
+      "published_sha256": "29624e70d0281ac0cd0118bf9705247c30302191dc70e1154fed54adc0b5b7b4"
+    },
+    {
+      "path": "RECOVERY-TEST2_4-CORRECTIONS.md",
+      "delivered_sha256": "affb3501fd1ccd347e870333b721ef8b5517f4e646c9eda551d5f268699aab7f",
+      "published_sha256": "a332c75496692543208c81465c9b0bdb6cdf461945594870580d30778f093367"
+    },
+    {
+      "path": "RECOVERY-TEST2_5-CORRECTIONS.md",
+      "delivered_sha256": "cd00a354f9d43d890467e232c7b7df687e81efd228783c16662a8e8cb8037850",
+      "published_sha256": "254746c433296b884d4fa229579f82d1b5a0693bfb468558558226d956d30be2"
+    },
+    {
+      "path": "SOURCE-CHECKPOINT.md",
+      "delivered_sha256": "d5be480ad1218f4f669d953dfd7c60d3ea36a424131c25a7f6c7752ebfd748b8",
+      "published_sha256": "d86cd6a8737d94aaa26c2cb6339eb099206c3b952f9d3cbb026117c5d223a7a6"
+    },
+    {
+      "path": "SOURCE_SHA256SUMS.txt",
+      "delivered_sha256": "e81ce71d75bf8831a2cc5e4724ba29554cc51255e42799111caffb9f1267c491",
+      "published_sha256": "cb4e951145f069beb767082e71ed81a1cb9f466212bcecae4fffe70c0a50da2e"
+    }
+  ],
+  "preserved_prior_delivery_docs": 14,
+  "preserved_historical_manifests": [
+    "PUBLICATION-MANIFEST.json",
+    "SOURCE_SHA256SUMS.txt"
+  ],
+  "no_game_ops": true,
+  "historical_unknown_unchanged": true,
+  "excluded": [
+    "private runtime evidence and IDs",
+    "world/save files",
+    "credentials",
+    "new JARs and dependency caches"
+  ]
+}

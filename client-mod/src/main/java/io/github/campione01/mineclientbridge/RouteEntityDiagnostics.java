@@ -41,6 +41,8 @@ final class RouteEntityDiagnostics {
             JsonObject detail=RouteBeeDiagnostics.json(beeRow,beeFrame,beeContext);
             if(detail!=null){j.addProperty("schema_version",2);j.add("native_bee_diagnostic",detail);}
         }
-        return new ClientActionRequest.Rejected(409,code,null,null,j);
+        ClientActionRequest.Rejected out=new ClientActionRequest.Rejected(409,code,null,null,j);
+        return failure instanceof ClientActionRequest.Rejected rejected && rejected.nativeEntityDiagnostic!=null
+            ? out.withNativeEntityDiagnostic(rejected.nativeEntityDiagnostic) : out;
     }
 }

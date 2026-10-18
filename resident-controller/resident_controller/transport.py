@@ -17,7 +17,7 @@ from .route_threat_diagnostic import (PROFILE as ROUTE_THREAT_PROFILE,
 
 READS = {'/control/status', '/control/capabilities', '/control/state', '/control/screen',
          '/control/keymaps', '/control/terrain', '/control/action/status', '/control/frame',
-         '/control/scan/status', '/control/capability-snapshot'}
+         '/control/scan/status', '/control/capability-snapshot', '/control/compact-observation'}
 DIRECT = {'key', 'raw-key', 'look', 'mouse', 'text', 'command', 'release-all'}
 WRITES = {'/control/' + x for x in DIRECT} | {
     '/control/pause', '/control/action', '/control/scoped-action', '/control/action/cancel', '/control/scan', '/control/scan/cancel'}
@@ -26,6 +26,74 @@ ACQUISITION_READS = {ACQUISITION_ROOT + k for k in ('status', 'fetch')}
 ACQUISITION_WRITES = {ACQUISITION_ROOT + k for k in ('prepare', 'activate', 'cancel')}
 READS |= ACQUISITION_READS
 WRITES |= ACQUISITION_WRITES
+
+
+MANAGED_ROOT = '/control/managed-navigation/'
+READS.add(MANAGED_ROOT + 'status')
+WRITES |= {MANAGED_ROOT + k for k in ('start','cancel')}
+def _managed_request(method,route,body):
+    if method=='GET' and route.path==MANAGED_ROOT+'status' and not route.query and body is None:return
+    if method!='POST' or route.path not in (MANAGED_ROOT+'start',MANAGED_ROOT+'cancel') or route.query:
+        raise ValueError('invalid_managed_navigation_request')
+    from .managed_navigation_control import validate_native_request
+    validate_native_request(body)
+
+EXTERNAL_ROOT = '/control/external-navigation/' 
+READS.add(EXTERNAL_ROOT + 'status')
+WRITES.add(EXTERNAL_ROOT + 'stop')
+
+def _external_request(method, route, body):
+    if method == 'GET' and route.path == EXTERNAL_ROOT + 'status' and not route.query and body is None:
+        return
+    if method != 'POST' or route.path != EXTERNAL_ROOT + 'stop' or route.query:
+        raise ValueError('invalid_external_navigation_request')
+    from .external_navigation_control import validate_native_request
+    validate_native_request(body)
+
+FALL_ROOT = '/control/fall-rescue/'
+READS.add(FALL_ROOT + 'status')
+WRITES |= {FALL_ROOT + k for k in ('arm', 'renew', 'disarm')}
+READS |= {FALL_ROOT+'adjudication/prepare',FALL_ROOT+'adjudication/status'}
+WRITES.add(FALL_ROOT+'adjudication')
+
+
+def _fall_request(method, route, body):
+    """Closed native rescue wire; ownership authorization remains above transport."""
+    operation = route.path.removeprefix(FALL_ROOT)
+    if operation.startswith('adjudication'):
+        from .fall_rescue_adjudication_wire import native_request,identifier
+        if method=='GET' and body is None:
+            if operation=='adjudication/prepare' and not route.query:return
+            query=parse_qsl(route.query,keep_blank_values=True)
+            if (operation=='adjudication/status' and len(query)==1 and query[0][0]=='adjudication_id'
+                    and identifier(query[0][1]) and route.query=='adjudication_id='+query[0][1]):return
+        if method=='POST' and operation=='adjudication' and not route.query:
+            native_request(body);return
+        raise ValueError('invalid_fall_adjudication_request')
+    if method == 'GET' and operation == 'status' and not route.query and body is None:
+        return
+    fields = {'fall_rescue_schema_version', 'arm_id', 'owner_id'}
+    extras = {'arm': {'expected_action_session', 'expected_world_generation', 'expected_player_uuid',
+                      'ttl_ms', 'max_episodes', 'permitted_action_ids'},
+              'renew': {'ttl_ms', 'expected_arm_revision'}, 'disarm': set()}
+    if (method != 'POST' or operation not in extras or route.query or type(body) is not dict
+            or set(body) != fields | extras[operation]
+            or type(body.get('fall_rescue_schema_version')) is not int or body['fall_rescue_schema_version'] != 1):
+        raise ValueError('invalid_fall_rescue_request')
+    text = lambda v: type(v) is str and bool(v.strip()) and len(v) <= 128
+    if not all(text(body[k]) for k in ('arm_id', 'owner_id')):
+        raise ValueError('invalid_fall_rescue_request')
+    if operation in ('arm', 'renew') and (type(body['ttl_ms']) is not int or not 1000 <= body['ttl_ms'] <= 600000):
+        raise ValueError('invalid_fall_rescue_request')
+    if operation == 'renew' and (type(body['expected_arm_revision']) is not int or not 1 <= body['expected_arm_revision'] <= 2147483647):
+        raise ValueError('invalid_fall_rescue_request')
+    if operation == 'arm':
+        ids = body['permitted_action_ids']
+        if (not all(text(body[k]) for k in ('expected_action_session', 'expected_world_generation', 'expected_player_uuid'))
+                or type(body['max_episodes']) is not int or not 1 <= body['max_episodes'] <= 16
+                or type(ids) is not list or len(ids) > 64 or not all(text(i) for i in ids)
+                or len(set(ids)) != len(ids)):
+            raise ValueError('invalid_fall_rescue_request')
 
 
 def _unique_object(pairs):
@@ -113,7 +181,11 @@ class BridgeError(RuntimeError):
     def __init__(self, code, *, uncertain=False, status=None, capability_source_freshness=None, capability_source_freshness_status=None,
                  scoped_movement_response_size=None, scoped_movement_response_size_status=None,
                  route_entity_rejection=None, route_entity_rejection_status=None,
-                 route_threat_rejection=None, route_threat_rejection_status=None):
+                 route_threat_rejection=None, route_threat_rejection_status=None,
+                 native_admission=None, native_admission_status=None,
+                 native_entity_rejection=None, native_entity_rejection_status=None,
+                 compact_observation_diagnostic=None, compact_observation_diagnostic_status=None,
+                 fall_rescue_refusal=None):
         super().__init__(code)
         self.code, self.uncertain, self.status = code, uncertain, status
         self.capability_source_freshness = capability_source_freshness
@@ -124,6 +196,13 @@ class BridgeError(RuntimeError):
         self.route_entity_rejection_status = route_entity_rejection_status
         self.route_threat_rejection = deepcopy(route_threat_rejection)
         self.route_threat_rejection_status = route_threat_rejection_status
+        self.native_admission = deepcopy(native_admission)
+        self.native_admission_status = native_admission_status
+        self.native_entity_rejection = deepcopy(native_entity_rejection)
+        self.native_entity_rejection_status = native_entity_rejection_status
+        self.compact_observation_diagnostic = deepcopy(compact_observation_diagnostic)
+        self.compact_observation_diagnostic_status = compact_observation_diagnostic_status
+        self.fall_rescue_refusal = deepcopy(fall_rescue_refusal)
 
 
 def json_bytes(value):
@@ -243,6 +322,20 @@ class Bridge:
         route = urlsplit(path)
         if route.scheme or route.netloc or route.fragment or not path.startswith('/control/'):
             raise BridgeError('invalid_route')
+        if route.path.startswith(MANAGED_ROOT):
+            try:_managed_request(method,route,body)
+            except (ValueError,TypeError,KeyError):raise BridgeError('invalid_managed_navigation_request') from None
+        if route.path.startswith(EXTERNAL_ROOT):
+            try:
+                _external_request(method, route, body)
+            except (ValueError, TypeError, KeyError):
+                raise BridgeError('invalid_external_navigation_request') from None
+        fall_rescue = route.path.startswith(FALL_ROOT)
+        if fall_rescue:
+            try:
+                _fall_request(method, route, body)
+            except (ValueError, TypeError, KeyError):
+                raise BridgeError('invalid_fall_rescue_request') from None
         acquisition = route.path.startswith(ACQUISITION_ROOT)
         if acquisition:
             try:
@@ -275,7 +368,7 @@ class Bridge:
                 self.last_response_metadata['sample_timing'] = sample
             is_frame = route.path == '/control/frame'
             bound = 32 * 1024 * 1024 if is_frame else 256 * 1024
-            if acquisition and route.path.rsplit('/', 1)[-1] in ('status', 'activate', 'cancel'):
+            if fall_rescue or acquisition and route.path.rsplit('/', 1)[-1] in ('status', 'activate', 'cancel'):
                 bound = 32 * 1024
             raw = response.read(bound + 1)
             self.last_response_metadata.update(response_bytes_read=len(raw),
@@ -292,11 +385,36 @@ class Bridge:
                 movement_size = None
                 route_entity_rejection = None
                 route_threat_rejection = None
+                native_admission = native_entity_rejection = None
+                native_admission_status = native_entity_rejection_status = None
+                compact_diagnostic = compact_diagnostic_status = None
+                fall_refusal = None
                 try:
-                    value = load_strict(raw) if route.path == '/control/scoped-action' else json.loads(raw)
+                    value = load_strict(raw) if route.path in ('/control/scoped-action','/control/compact-observation') or fall_rescue else json.loads(raw)
                     candidate = value.get('error') if isinstance(value, dict) else None
                     if isinstance(candidate, str) and re.fullmatch(r'[a-z0-9_]{1,80}', candidate):
                         code = candidate
+                    if (method == 'POST' and route.path == FALL_ROOT+'renew' and response.status == 409
+                            and value == {'ok':False,'error':'fall_rescue_not_armed'}
+                            and type(value.get('ok')) is bool):
+                        fall_refusal = {'schema_version':1,'operation':'renew','http_status':409,
+                            'error':'fall_rescue_not_armed','renewal_applied':False,'request':json.loads(payload)}
+                    if method=='GET' and route.path=='/control/compact-observation' and isinstance(value,dict) and 'compact_observation_diagnostic' in value:
+                        from .compact_observation import valid_diagnostic
+                        query=dict(parse_qsl(route.query,strict_parsing=True));reported=value['compact_observation_diagnostic']
+                        valid=valid_diagnostic(reported,query['request_id'],int(query.get('radius','1')))
+                        compact_diagnostic_status='reported' if valid else 'invalid'
+                        if valid:compact_diagnostic=deepcopy(reported)
+                    if method == 'POST' and route.path == '/control/scoped-action' and isinstance(value, dict):
+                        from .native_admission import validate as validate_admission, entity_diagnostic
+                        if 'native_admission' in value:
+                            valid = validate_admission(value['native_admission'], body, code)
+                            native_admission_status = 'reported' if valid else 'invalid'
+                            if valid: native_admission = deepcopy(value['native_admission'])
+                        if 'native_entity_rejection' in value:
+                            valid = entity_diagnostic(value['native_entity_rejection'], code)
+                            native_entity_rejection_status = 'reported' if valid else 'invalid'
+                            if valid: native_entity_rejection = deepcopy(value['native_entity_rejection'])
                     if isinstance(value, dict) and 'capability_source_freshness' in value:
                         valid = source_freshness(value['capability_source_freshness'])
                         self.last_response_metadata['capability_source_freshness_status'] = 'reported' if valid else 'invalid'
@@ -342,6 +460,10 @@ class Bridge:
                                   route_entity_rejection_status=self.last_response_metadata.get('route_entity_rejection_status'),
                                   route_threat_rejection=route_threat_rejection,
                                   route_threat_rejection_status=self.last_response_metadata.get('route_threat_rejection_status'),
+                                  native_admission=native_admission, native_admission_status=native_admission_status,
+                                  native_entity_rejection=native_entity_rejection, native_entity_rejection_status=native_entity_rejection_status,
+                                  compact_observation_diagnostic=compact_diagnostic, compact_observation_diagnostic_status=compact_diagnostic_status,
+                                  fall_rescue_refusal=fall_refusal,
                                   uncertain=method == 'POST' and response.status >= 500)
             if is_frame:
                 if not raw.startswith(b'\x89PNG\r\n\x1a\n'):
@@ -349,9 +471,9 @@ class Bridge:
                 return raw
             strict_route_stop = (route.path == '/control/scoped-action' and type(body) is dict
                 and type(body.get('preflight')) is dict and body['preflight'].get('profile') in ROUTE_STOP_PROFILES)
-            result = (load_strict(raw) if route.path == '/control/capability-snapshot' or strict_route_stop else
+            result = (load_strict(raw) if route.path in ('/control/capability-snapshot','/control/compact-observation') or strict_route_stop else
                       json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()),
-                                 **({'object_pairs_hook': _unique_object} if acquisition else {})))
+                                 **({'object_pairs_hook': _unique_object} if acquisition or fall_rescue or route.path.startswith((EXTERNAL_ROOT,MANAGED_ROOT)) else {})))
             if not isinstance(result, dict):
                 raise ValueError()
             receipt = result.get('result')

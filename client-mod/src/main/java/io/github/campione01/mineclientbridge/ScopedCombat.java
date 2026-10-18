@@ -15,6 +15,7 @@ final class ScopedCombat {
     static final String PROFILE="combat-local-observed-v1";
     static final Set<String> TYPES=Set.of("minecraft:zombie","minecraft:husk","minecraft:zombie_villager",
         "minecraft:skeleton","minecraft:stray","minecraft:bogged");
+    final DefensiveCombatPolicy defensive;
     final LocalPlayer player;
     final ClientLevel level;
     final Object gameMode,server;
@@ -28,16 +29,27 @@ final class ScopedCombat {
     final net.minecraft.world.item.ItemStack held,offhand;
     ActionRegistry.Entry entry;
     private int effects;
+    private boolean fallPreempted;
+    void markFallPreempted(){fallPreempted=true;}
+    boolean fallPreempted(){return fallPreempted;}
     void unknown(){if(entry!=null)entry.result.addProperty("unknown_outcome",true);}
     void cleanupFence(Minecraft mc,boolean terminal){
-        require((terminal?!ClientActions.ownsInput():ClientActions.ownsScopedCombat(this,entry)) && mc.player==player && mc.level==level && mc.gameMode==gameMode
+        require((terminal?ClientActions.terminalCombatCleanup(this,entry):ClientActions.ownsScopedCombat(this,entry)) && mc.player==player && mc.level==level && mc.gameMode==gameMode
             && mc.getSingleplayerServer()==server,"scoped_combat_cleanup_owner_or_context_changed");
         require(!player.isUsingItem() || player.getUsedItemHand()==net.minecraft.world.InteractionHand.OFF_HAND
             && player.getUseItem().is(net.minecraft.world.item.Items.SHIELD),"scoped_combat_cleanup_use_changed");
+        if(defensive!=null)require(player.containerMenu==player.inventoryMenu,"defensive_cleanup_final_owner_context");
+        // Getter callbacks above cannot lend the old cleanup scope to a changed successor/context.
+        boolean serverBound=mc.getSingleplayerServer()==server;
+        require(serverBound&&(terminal?ClientActions.terminalCombatCleanup(this,entry):ClientActions.ownsScopedCombat(this,entry))
+            &&mc.player==player&&mc.level==level&&mc.gameMode==gameMode
+            &&actionSession.equals(ClientActions.session())&&WorldGeneration.matches(level,world),
+            "scoped_combat_cleanup_final_owner_context");
     }
     void chargeEffect(){require(effects<64,"scoped_combat_effect_budget_64");effects++;}
-    ScopedCombat(Minecraft mc,ClientActionRequest command,long nano) {
-        validateIntent(command.original());
+    ScopedCombat(Minecraft mc,ClientActionRequest command,long nano,String profile) {
+        validateIntent(command.original(),profile);
+        defensive=DefensiveCombatPolicy.parseOptional(command.original());
         request=BoundedCombatRequest.parse(command.original());
         require(command.action().equals("combat_entity") && TYPES.contains(request.targetType()) && request.encounter()==null,
             "scoped_combat_explicit_supported_target_required");
@@ -54,14 +66,18 @@ final class ScopedCombat {
         require(old.get("source_tick").getAsLong()<=level.getGameTime() && old.get("source_nano").getAsLong()<=nano,
             "scoped_combat_future_planning_guard");
         identity(mc,true);
-        require(player.getHealth()>request.minHealth() && !player.isUsingItem() && player.containerMenu==player.inventoryMenu
+        require(Float.isFinite(player.getHealth()) && player.getHealth()>(defensive==null?request.minHealth():0) && !player.isUsingItem() && player.containerMenu==player.inventoryMenu
             && player.containerMenu.getCarried().isEmpty(),"scoped_combat_admission_player_unavailable");
         captured=factsNow();
     }
-    static void validateIntent(JsonObject body){
+    static void validateIntent(JsonObject body){validateIntent(body,PROFILE);}
+    static void validateIntent(JsonObject body,String profile){
+        boolean defensive=DefensiveCombatPolicy.PROFILE.equals(profile);
+        require(defensive==body.has("defensive_policy"),"defensive_profile_mode_binding");
         Set<String> required=Set.of("action","action_id","target_entity_id","target_uuid","target_type","approach","shield",
             "min_health","timeout_ms","capability_guard","expected_world_generation","expected_dimension","expected_player_uuid",
             "expected_action_session","expected_hotbar_slot","expected_held_item");
+        if(defensive){java.util.HashSet<String> expanded=new java.util.HashSet<>(required);expanded.add("defensive_policy");required=Set.copyOf(expanded);DefensiveCombatPolicy.parseOptional(body);}
         java.util.HashSet<String> withNavigation=new java.util.HashSet<>(required);
         withNavigation.add("expected_navigation_epoch");withNavigation.add("expected_origin");
         require(body.keySet().equals(required)||body.keySet().equals(withNavigation),"scoped_combat_closed_intent_required");
@@ -81,7 +97,8 @@ final class ScopedCombat {
     }
     JsonObject facts(){return captured.deepCopy();}
     private JsonObject factsNow(){
-        JsonObject f=new JsonObject();f.addProperty("profile",PROFILE);
+        JsonObject f=new JsonObject();f.addProperty("profile",defensive==null?PROFILE:DefensiveCombatPolicy.PROFILE);
+        if(defensive!=null)f.add("defensive_policy",defensive.json());
         f.addProperty("target_entity_id",request.targetId());f.addProperty("target_uuid",request.targetUuid());
         f.addProperty("target_type",request.targetType());f.addProperty("target_health",target.getHealth());
         f.addProperty("x",target.getX());f.addProperty("y",target.getY());f.addProperty("z",target.getZ());
@@ -98,12 +115,20 @@ final class ScopedCombat {
             && actionSession.equals(ClientActions.session()) && world.equals(WorldGeneration.current(level))
             && ClientActions.ownsScopedCombat(this,entry),"scoped_combat_callback_context_changed");
     }
+    boolean exactBound(Minecraft mc){
+        return ClientActions.ownsScopedCombat(this,entry) && mc.player==player && mc.level==level && mc.gameMode==gameMode
+            && mc.screen==null && player.containerMenu==player.inventoryMenu && System.nanoTime()<deadline
+            && actionSession.equals(ClientActions.session()) && WorldGeneration.matches(level,world);
+    }
+    void rawBound(Minecraft mc){require(exactBound(mc),"defensive_final_owner_context_deadline");}
     void check(Minecraft mc,boolean alive){
         require(ClientActions.ownsScopedCombat(this,entry),"scoped_combat_owner_changed");
         identity(mc,alive);
         require(ClientActions.ownsScopedCombat(this,entry),"scoped_combat_owner_changed_after_hooks");
+        if(defensive!=null)rawBound(mc);
     }
     private void identity(Minecraft mc,boolean alive){
+        if(defensive!=null)ExternalControllerGuard.requireIdle(mc);
         require(mc.isSameThread() && mc.player==player && mc.level==level && mc.gameMode==gameMode && mc.getSingleplayerServer()==server
             && actionSession.equals(ClientActions.session()) && world.equals(WorldGeneration.current(level))
             && CapabilityGuard.privateSingleplayer(mc) && mc.screen==null && !mc.isPaused() && mc.isWindowActive()
@@ -123,8 +148,13 @@ final class ScopedCombat {
         require(Double.isFinite(player.getX()) && Double.isFinite(player.getY()) && Double.isFinite(player.getZ())
             && player.position().distanceTo(new net.minecraft.world.phys.Vec3(x,y,z))<=12,
             "scoped_combat_area_limit");
-        require(player.getMainHandItem().getItem() instanceof SwordItem || player.getMainHandItem().getItem() instanceof AxeItem,
+        require(defensive!=null || player.getMainHandItem().getItem() instanceof SwordItem || player.getMainHandItem().getItem() instanceof AxeItem,
             "scoped_combat_selected_weapon_required");
+        if(defensive!=null){
+            require(player.containerMenu==player.inventoryMenu && player.containerMenu.getCarried().isEmpty(),"defensive_menu_or_cursor_changed");
+            require(Float.isFinite(player.getHealth()) && player.getHealth()>0 && player.onGround() && !player.isInWater() && !player.isInLava() && !player.isOnFire() && !player.isInPowderSnow,"defensive_grounded_dry_living_required");
+            if(defensive.shieldOnly())require(player.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD),"defensive_exact_offhand_shield_required");
+        }
     }
     private static boolean unchanged(net.minecraft.world.item.ItemStack live,net.minecraft.world.item.ItemStack original){
         var current=live.copy();

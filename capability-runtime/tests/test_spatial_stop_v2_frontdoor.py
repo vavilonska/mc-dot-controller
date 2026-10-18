@@ -1,4 +1,5 @@
 """Public MCP v2 negotiation and bee rows; synthetic native, no live claim."""
+from native_unknown_fixture import assert_unknown_refusal
 from copy import deepcopy
 import unittest
 import json
@@ -126,24 +127,23 @@ class SpatialStopV2FrontdoorTests(unittest.TestCase):
     def test_v1_fallback(self): self.assert_route(v1.PROFILE)
     def test_legacy_fallback(self): self.assert_route(route.PROFILE)
     def test_known_native_refusal(self):
+        self.expected_mcp_exit = 2
         result = self.finish(self.submit())
-        self.assertEqual(result['state'], 'blocked', result)
+        receipt = assert_unknown_refusal(self, result)
         self.assertEqual(len(self.posts()), 1)
         self.assertFalse(self.bridge.moves)
-        self.assertEqual(result['cleanup_certainty'], 'confirmed')
-        self.assertIn('minecraft:pufferfish', json.dumps(result))
-        self.assertIn('route_entity_rejection', json.dumps(result))
+        self.assertIn('minecraft:pufferfish', json.dumps(receipt))
+        self.assertIn('route_entity_rejection', json.dumps(receipt))
         self.assertFalse([p for p in self.posts() if p['intent']['action'] == 'combat_entity'])
 
     def assert_bee_refusal(self, code):
+        self.expected_mcp_exit = 2
         result = self.finish(self.submit())
-        self.assertEqual(result['state'], 'blocked', result)
+        receipt = assert_unknown_refusal(self, result)
         self.assertEqual(len(self.posts()), 1)
         self.assertFalse(self.bridge.moves)
-        self.assertIn(code, json.dumps(result))
-        self.assertIn('minecraft:bee', json.dumps(result))
-        self.assertEqual(result['cleanup_certainty'], 'confirmed')
-        self.assertIsNone(self.client.session()['capability_lease'])
+        self.assertIn(code, json.dumps(receipt))
+        self.assertIn('minecraft:bee', json.dumps(receipt))
 
     def test_angry_bee_refused(self): self.assert_bee_refusal('route_bee_not_calm')
     def test_stale_bee_refused(self): self.assert_bee_refusal('route_bee_native_stale')

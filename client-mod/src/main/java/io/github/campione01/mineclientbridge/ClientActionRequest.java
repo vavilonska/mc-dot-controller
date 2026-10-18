@@ -151,6 +151,8 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         final JsonObject routeEntityRejection;
         final JsonObject routeTerrainRejection;
         final JsonObject routeThreatRejection;
+        final JsonObject nativeAdmission;
+        final JsonObject nativeEntityDiagnostic;
         Rejected(int httpStatus, String reason) { this(httpStatus, reason, null); }
         Rejected(int httpStatus, String reason, JsonObject freshness) {
             this(httpStatus,reason,freshness,null);
@@ -165,13 +167,26 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             this(httpStatus,reason,freshness,movementSize,routeEntityRejection,routeTerrainRejection,null);
         }
         Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection,JsonObject routeThreatRejection) {
+            this(httpStatus,reason,freshness,movementSize,routeEntityRejection,routeTerrainRejection,routeThreatRejection,null,null);
+        }
+        private Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection,JsonObject routeThreatRejection,JsonObject nativeAdmission,JsonObject nativeEntityDiagnostic) {
             super(reason); this.httpStatus = httpStatus;
+            this.nativeAdmission=nativeAdmission==null?null:nativeAdmission.deepCopy();
+            this.nativeEntityDiagnostic=nativeEntityDiagnostic==null?null:nativeEntityDiagnostic.deepCopy();
             this.routeThreatRejection=routeThreatRejection==null?null:routeThreatRejection.deepCopy();
             this.routeTerrainRejection=routeTerrainRejection==null?null:routeTerrainRejection.deepCopy();
             this.routeEntityRejection=routeEntityRejection==null?null:routeEntityRejection.deepCopy();
             capabilitySourceFreshness = freshness == null ? null : freshness.deepCopy();
             scopedMovementResponseSize = httpStatus==409 && reason.equals("scoped_movement_response_evidence_too_large")
                     && movementSize!=null ? movementSize.deepCopy() : null;
+        }
+        Rejected withNativeAdmission(JsonObject proof) {
+            return new Rejected(httpStatus,getMessage(),capabilitySourceFreshness,scopedMovementResponseSize,
+                routeEntityRejection,routeTerrainRejection,routeThreatRejection,proof,nativeEntityDiagnostic);
+        }
+        Rejected withNativeEntityDiagnostic(JsonObject diagnostic) {
+            return new Rejected(httpStatus,getMessage(),capabilitySourceFreshness,scopedMovementResponseSize,
+                routeEntityRejection,routeTerrainRejection,routeThreatRejection,nativeAdmission,diagnostic);
         }
         JsonObject response() {
             JsonObject body = new JsonObject();
@@ -181,6 +196,8 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             if(scopedMovementResponseSize!=null)body.add("scoped_movement_response_size",scopedMovementResponseSize.deepCopy());
             if(routeEntityRejection!=null)body.add("route_entity_rejection",routeEntityRejection.deepCopy());
             if(routeThreatRejection!=null)body.add("route_threat_rejection",routeThreatRejection.deepCopy());
+            if(nativeAdmission!=null)body.add("native_admission",nativeAdmission.deepCopy());
+            if(nativeEntityDiagnostic!=null)body.add("native_entity_rejection",nativeEntityDiagnostic.deepCopy());
             return body;
         }
     }

@@ -16,6 +16,7 @@ class JobStore:
     MAX_EVENTS=512
     def __init__(self,directory):
         path=Path(directory)
+        self.directory=path
         path.mkdir(parents=True,exist_ok=True,mode=0o700)
         if path.is_symlink(): raise ToolboxError('journal_unavailable','Journal symlink prohibited',stage='storage')
         self._lock=threading.RLock(); self._closed=False
@@ -77,6 +78,11 @@ class JobStore:
 
     def all(self):
         with self._lock: return [json.loads(row[0]) for row in self._db.execute('SELECT record FROM jobs')]
+
+    def event_history_bytes(self):
+        """Exact serialized diagnostic history accounting; no eviction or identity edit."""
+        with self._lock:
+            return int(self._db.execute('SELECT COALESCE(SUM(length(CAST(event AS BLOB))),0) FROM events').fetchone()[0])
 
     def event_page(self,job_id,cursor=0):
         with self._lock:

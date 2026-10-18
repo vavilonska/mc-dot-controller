@@ -20,6 +20,11 @@ final class GuardedGameTurning {
                     // The shared lease monitor spans the full fresh state check and these synchronous setters.
                     GuardedAction.require(mc.isSameThread() && mc.player != null && enabled() && BridgeServer.isRunning(),
                             "guarded_turning_disabled");
+                    var effectPermit=GuardedGameMovement.LEASES.effectPermit();
+                    ExternalControllerGuard.requireIdle(mc);
+                    GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
+                    effectPermit.checkLive(); // Original ticket and TTL, after all external API callbacks.
+                    NativeFallRescue.requireOrdinaryAdmission();
                     mc.player.setYRot((float) yaw);
                     mc.player.setYHeadRot((float) yaw);
                     mc.player.setYBodyRot((float) yaw);

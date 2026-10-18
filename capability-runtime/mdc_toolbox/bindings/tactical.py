@@ -50,7 +50,7 @@ def definition(name, schema, *, group, level, profile, sources, actions=(),
         'implementation_status': 'experimental' if experimental else 'implemented',
         'adapter_status': 'legacy_limited',
         'known_limits': [
-            'Only engage is enabled when combat-local-observed-v1 is negotiated; cross-action reactions remain stop.',
+            'Engage requires combat-local-observed-v1. Explicit defend_once exists only for supported tasks after a known released terminal stop.',
             'Existing guarded legacy skill path only; no scoped entity/terrain/transition admission is implemented here.',
             'Registration and offline fixtures do not imply live readiness; private singleplayer only.',
             'Shared Runtime charges every nested action/observation. No new writer, callbacks, retry or auto-resume.',
@@ -132,6 +132,12 @@ def definitions():
     engage = next(value for value in values if value['capability'] == 'engage')
     engage['native_features'] += ['scoped-native-preflight/1', 'profile:combat-local-observed-v1']
     engage['adapter_status'] = 'scoped_native'
+    engage['combat_coverage'] = {'target_types':sorted(threats.NATIVE_COMBAT_TYPES),'modes':['engage'],
+        'dimension_policy':'same_bound_private_singleplayer_dimension_dry_loaded_geometry',
+        'campaign_targets_supported':[],'projectile_prediction_supported':False}
+    for value in values:
+        value['public_support']='negotiated_profile_required' if value['capability']=='engage' else 'legacy_binding_not_enabled'
+        if value['capability']!='engage':value['known_limits'].append('Source implementation only; unavailable in the production scoped Runtime allowlist.')
     engage['bounds'].update(native_timeout_ms=30000, native_area_radius=12,
         native_attack_dispatches=16, native_effect_packets=64, callback_budget_ms=50)
     engage['known_limits'] = [line for line in engage['known_limits']
@@ -140,7 +146,7 @@ def definitions():
         'Explicit target only: zombie, husk, zombie_villager, skeleton, stray or bogged. Allies are forbidden.',
         'Caller min_health is explicitly 14..20, default 14. No silent weakening of requested reserve.',
         'One native controller action uses the original job ledger; internal effects have native finite limits.',
-        'Cross-action reactions remain stop. No suspended ordinary task is resumed after combat.',
+        'Explicit defend_once is terminal-only and separately opted in. No suspended ordinary task is resumed after combat.',
         'Native checks are same-callback current evidence; future safety and hard real-time scheduling are not guaranteed.']
     return values
 

@@ -1,0 +1,85 @@
+{
+  "schema": "MDC_PUBLIC_RECOVERY_ACCEPTANCE_SUMMARY_V1",
+  "version": "1.1.8-recovery-test.2.5",
+  "prepared_utc": "2026-10-18T01:36:02.753861+00:00",
+  "status": "agreed_bounded_live_acceptance_passed",
+  "offline_test_provenance": {
+    "current_version_application_python": 164,
+    "current_version_reuse_checks": 7,
+    "current_version_node": 182,
+    "current_version_framing": 9,
+    "current_version_schema_platform_passed": true,
+    "current_component_affected_tests": 239,
+    "counts_overlap_do_not_sum": true,
+    "all_tests_rerun_for_current_version": false,
+    "production_java_sources": 198,
+    "production_classes": 469,
+    "native_compile_and_both_mixin_gates_carried_from": "TEST2.3",
+    "current_version_native_byte_changes": false,
+    "compiler_executed_for_current_version": false
+  },
+  "offline_only_additional_scope": [
+    "external_navigation_stop",
+    "lease_free_reconciliation",
+    "storage_reserve_and_lossless_closed_diagnostics_archive"
+  ],
+  "source_manifest_sha256": "6972cd57663ac35a3ff44f656a97d555b6ca150edd48b210255ce33843e69c19",
+  "paired_manifest_sha256": "fe684563cde219b9b705b58d97b73a8f66dfd70ebd0d3f8ca5a8ebf03e790478",
+  "source_archive_sha256": "3a2f8393eeb8a4ae183b820d7fcb095ae9c68e054f8872e354f194eeea959285",
+  "jar_sha256": "415075adf53fbd8657b14182d5a8006e16b2136fb02b247b37f66db9ffa42953",
+  "scope": "Version-qualified historical acceptance, not a new live run during publication.",
+  "live_claims": [
+    {
+      "feature": "clear_both_hands_and_offhand_unequip",
+      "live_version": "TEST1.2",
+      "observed": "Six verified vanilla clicks;66stone+65torches conserved, empty hands/cursor; separate cold-save verification."
+    },
+    {
+      "feature": "standalone_bucket_rescue",
+      "live_versions": [
+        "TEST1.2",
+        "TEST2.1"
+      ],
+      "observed": "One bucket use with correlated integrated-server water/bucket/alive landing; TEST2.1 automatically selected bucket from initially empty selected slot."
+    },
+    {
+      "feature": "gui_pause_and_renewal_race_cleanup",
+      "live_version": "TEST2.3",
+      "observed": "Original guard interrupted with none_proven effects and confirmed cleanup; exact lease released while paused; operator latch retained."
+    },
+    {
+      "feature": "attached_native_combat_rescue_and_explicit_adjudication",
+      "live_version": "TEST2.4",
+      "observed": "12 strikes, original action release, one rescue episode; exact original digest adjudication released authority, distinct new read succeeded and full handoff. Original job/effects/cleanup UNKNOWN remain retained."
+    },
+    {
+      "feature": "managed_walk_arrival_and_cancel",
+      "live_version": "TEST2.3",
+      "observed": "Arrival plus separately requested in-flight cancellation; settings restored, two idle samples, neutral input and confirmed owner cleanup."
+    },
+    {
+      "feature": "shield_window_and_bounded_evade",
+      "live_versions": [
+        "TEST2.1",
+        "TEST2.3"
+      ],
+      "observed": "1008ms shield window/15blocking samples;1.191467m separation gain/1.365956m total retreat below2m. Zero attacks, bothhealth20. Incoming-hit mitigation not tested."
+    },
+    {
+      "feature": "cancelled_transfer_explicit_cursor_recovery",
+      "live_version": "TEST2.5",
+      "observed": "One semantically verified pickup and a second completed native click; queued cancel proof made no native cancel dispatch. Transfer semantics remain incomplete. Separate full menu showed15cursor+1chest; explicit recovery made one verified click, ticks94365→94368, cursor empty, player15+chest1, unrelated state unchanged, confirmed cleanup/full handoff."
+    }
+  ],
+  "limits": [
+    "pinned single-player Minecraft1.21.1/NeoForge pinned environment only",
+    "managed walking has no attached fall protection",
+    "attached protection only same-owner native follow_path/combat_entity, not setup steps",
+    "bucket rescue tested controlled vertical fall/combat interruption, not arbitrary dragon knockback/void/Nether",
+    "no incoming-hit damage mitigation claim",
+    "no production/modded-menu or armor-unequip expansion",
+    "bed/torch/portal and broader hazard arbitration remain pending scope"
+  ],
+  "historical_unknown_retained": true,
+  "publication_starts_game": false
+}

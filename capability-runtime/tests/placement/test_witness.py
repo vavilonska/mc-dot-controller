@@ -55,4 +55,45 @@ class WireTests(unittest.TestCase):
         self.assertTrue(wire.valid_size_diagnostic(diag))
         self.assertFalse(wire.valid_size_diagnostic({**diag,'schema_version':2}))
 
+
+class WorkstationWitnessTests(unittest.TestCase):
+    def fixture(self,material='minecraft:furnace',properties=None):
+        properties=({'facing':'north','lit':'false'} if material=='minecraft:furnace' else {}) if properties is None else properties
+        intent=placement_fixture()[3]
+        intent.update(expected_block_id=material,expected_block_properties=deepcopy(properties))
+        intent['placement_footprint'][0].update(block_id=material,properties=deepcopy(properties))
+        intent['expected_held_item']['id']=material
+        return placement_fixture(intent_override=intent)
+
+    def test_workstation_witnesses_retain_exact_material_facing_and_empty_admission_target(self):
+        for material in ('minecraft:crafting_table','minecraft:furnace'):
+            validate_scoped_witness(*self.fixture(material))
+        for facing in ('north','south','east','west'):
+            validate_scoped_witness(*self.fixture(properties={'facing':facing,'lit':'false'}))
+        for material,properties in [('minecraft:smoker',{}),('minecraft:furnace',{}),
+                ('minecraft:furnace',{'facing':'up','lit':'false'}),('minecraft:furnace',{'facing':'north','lit':False}),
+                ('minecraft:furnace',{'facing':'north','lit':'true'}),('minecraft:crafting_table',{'axis':'y'})]:
+            with self.subTest(material=material,properties=properties),self.assertRaises(ValueError):
+                validate_scoped_witness(*self.fixture(material,properties))
+
+    def test_existing_table_is_context_only_and_exact_class(self):
+        d=self.fixture();p=d[0]['result']['scoped_native_preflight']['facts']['placement']
+        row=p['cells'][0];row.update(id='minecraft:crafting_table',block_class='net.minecraft.world.level.block.CraftingTableBlock')
+        validate_scoped_witness(*d)
+        row['block_class']='net.minecraft.world.level.block.Block'
+        with self.assertRaises(ValueError):validate_scoped_witness(*d)
+        d=self.fixture();p=d[0]['result']['scoped_native_preflight']['facts']['placement']
+        row=next(c for c in p['cells'] if all(c[k]==p['standing_support'][k] for k in ('x','y','z')))
+        row.update(id='minecraft:crafting_table',block_class='net.minecraft.world.level.block.CraftingTableBlock')
+        with self.assertRaises(ValueError):validate_scoped_witness(*d)
+
+    def test_preexisting_furnace_and_mining_only_support_are_rejected(self):
+        d=self.fixture();p=d[0]['result']['scoped_native_preflight']['facts']['placement']
+        p['cells'][0].update(id='minecraft:furnace',block_class='net.minecraft.world.level.block.FurnaceBlock',
+                             properties={'facing':'north','lit':'false'})
+        with self.assertRaises(ValueError):validate_scoped_witness(*d)
+        for support in ('minecraft:jungle_log','minecraft:iron_ore','minecraft:crafting_table'):
+            intent=self.fixture()[3];intent['expected_support_id']=support
+            with self.assertRaises(ValueError):validate_scoped_witness(*placement_fixture(intent_override=intent))
+
 if __name__=='__main__':unittest.main()

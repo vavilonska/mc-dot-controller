@@ -18,8 +18,14 @@ from mdc_toolbox.contracts import ToolboxError, obj, integer, validate_schema, j
 
 _PLACE_SCHEMA = obj({'support': COORDINATE, 'face': {'enum': sorted(scoped_placement.reach.FACES)},
     'expected_support_id': {'enum': list(scoped_placement.BLOCKS)}, 'expected_support_properties': obj(),
-    'expected_block_id': {'const': scoped_placement.BLOCK}, 'expected_block_properties': obj()},
+    'expected_block_id': {'enum': list(scoped_placement.MATERIALS)},
+    'expected_block_properties': {'oneOf': [obj(), obj({'facing': {'enum': list(scoped_placement.HORIZONTAL_FACES)},
+        'lit': {'const': 'false'}}, ('facing','lit'))]}},
     ('support','face','expected_support_id','expected_support_properties','expected_block_id','expected_block_properties'))
+_PLACE_SCHEMA['allOf'] = [{'if': {'properties': {'expected_block_id': {'const': 'minecraft:furnace'}}},
+    'then': {'properties': {'expected_block_properties': obj({'facing': {'enum': list(scoped_placement.HORIZONTAL_FACES)},
+        'lit': {'const': 'false'}}, ('facing','lit'))}},
+    'else': {'properties': {'expected_block_properties': obj()}}}]
 
 MAX_CELLS = 512
 MAX_REGION_VOLUME = 8192
@@ -90,11 +96,11 @@ def _sources():
 
 def definitions():
     local = _definition('place_local', _PLACE_SCHEMA, group='building', level='primitive', profile='player',
-        description='Place one selected plain cobblestone against an explicit full-cube support face while stationary.',
+        description='Place one selected plain cobblestone, crafting table or unlit furnace against an explicit full-cube support face while stationary.',
         source='scoped_placement.py', actions=['place_block'], bounds={'placement_items':1,'native_timeout_ms':2000,
             'maximum_action_ticks':40,'max_mutations':1},
         limits=['Requires request_only and negotiated placement-local-observed-v1; no legacy fallback.',
-            'Exact support, face and empty target; selected plain cobblestone only, no hotbar switch or procurement.',
+            'Exact support, face and empty target; selected plain cobblestone/table/furnace only, exact furnace facing, no hotbar switch or procurement.',
             'No movement, bridge/pillar jump, retries, blueprint automation or whole-building execution.',
             'Exact one-item decrement and protected other inventory plus stable native target-state proof.'])
     local['native_features'] += ['scoped-native-preflight/1','profile:placement-local-observed-v1']

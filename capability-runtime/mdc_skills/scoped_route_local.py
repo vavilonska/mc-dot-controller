@@ -22,7 +22,8 @@ FLOORS = frozenset('minecraft:' + name for name in (
     'granite', 'diorite', 'cobbled_deepslate', 'smooth_stone', 'stone_bricks', 'bricks'))
 AIR = frozenset(('minecraft:air', 'minecraft:cave_air'))
 CONTEXT_LEAVES = frozenset(('minecraft:oak_leaves', 'minecraft:birch_leaves'))
-CONTEXT_BLOCKS = frozenset(('minecraft:barrel', 'minecraft:furnace')) | CONTEXT_LEAVES
+CONTEXT_LOGS = frozenset('minecraft:'+name+'_log' for name in ('oak','spruce','birch','jungle','acacia','dark_oak'))
+CONTEXT_BLOCKS = frozenset(('minecraft:barrel', 'minecraft:furnace', 'minecraft:crafting_table')) | CONTEXT_LEAVES | CONTEXT_LOGS
 _DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 

@@ -82,7 +82,10 @@ final class GuardedGameActions {
         Entity finalCrosshair = mc.hitResult instanceof EntityHitResult hit ? hit.getEntity() : null;
         GuardedAction.require(finalCrosshair == crosshair && target.isAlive() && !target.isRemoved()
                 && target.level() == mc.level, "target_changed");
+        ExternalControllerGuard.requireIdle(mc);
+        GuardedAction.require(!ClientActions.ownsInput(), "action_input_owned");
         ticket.checkLive();
+        NativeFallRescue.requireOrdinaryAdmission();
         if (request.action().equals("look")) {
             mc.player.setYRot((float) request.yaw());
             mc.player.setXRot((float) request.pitch());

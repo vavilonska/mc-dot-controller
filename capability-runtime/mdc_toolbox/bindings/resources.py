@@ -36,6 +36,15 @@ _COLLECT_SCHEMA = _object({'target_uuid': {'type':'string', 'pattern':'^' + scop
     'item_id':_enum(scoped_collect.ITEMS), 'minimum':_integer(1,64), 'min_health':_number(8,20)},
     ('target_uuid','item_id'))
 _MOB_SOURCES = ('minecraft:ender_pearl', 'minecraft:blaze_rod', 'minecraft:gunpowder', 'minecraft:string')
+_MINE_LOCAL_SCHEMA = _object({'target': _COORD, 'expected_block_id': _enum(scoped_mining.BLOCKS),
+    'expected_block_properties': {'type': 'object'}, 'require_correct_tool': {'type': 'boolean'}},
+    ('target', 'expected_block_id', 'expected_block_properties'))
+_MINE_LOCAL_SCHEMA['allOf'] = [{
+    'if': {'properties': {'expected_block_id': _enum(scoped_mining.LOGS)}},
+    'then': {'properties': {'expected_block_properties': _object({'axis': _enum(('x','y','z'))}, ('axis',))}},
+    'else': {'properties': {'expected_block_properties': _object({})}},
+}]
+
 
 
 def acquisition_metadata(item_id):
@@ -78,14 +87,13 @@ def definitions():
     for row in rows:
         row['planner_available'] = row['capability'] in ('ensure_items', 'acquire_nearby')
     local = _definition('mine_local','resources','local_controller',
-        _object({'target':_COORD,'expected_block_id':_enum(scoped_mining.BLOCKS),
-                 'expected_block_properties':_object({}), 'require_correct_tool':{'type':'boolean'}},
-                ('target','expected_block_id','expected_block_properties')),
+        _MINE_LOCAL_SCHEMA,
         (scoped_mining,), prerequisites=('Negotiated mining-local-observed-v2 with exact native callback fences.',
             'Private Overworld survival; stationary supported player and selected ordinary tool.'),
         limits=('Observed-profile v2: at most 8 seconds / 160 native action ticks; longer native requests refused.',
             'Distant supported passives use observed projection; ordinary items allowed; no future-dynamics guarantee.',
-            'Exactly one explicit static full-cube target; no movement, hotbar switch, search or pickup.',
+            'Exactly one explicit full-cube target, including six plain log species with exact axis and iron ores; no movement, hotbar switch, search or pickup.',
+            'Coal/XP-bearing ore extraction, bamboo cells and changed foliage remain unsupported; use carried fuel or charcoal.',
             'Full original catalog is preserved. Legacy mine keeps its separate terrain-limited contract.',
             'Block absence proves removal only; no causal attribution of drops or inventory acquisition.'),
         features=('scoped-native-preflight/1','profile:mining-local-observed-v2','action:break_block'),
@@ -99,7 +107,7 @@ def definitions():
         prerequisites=('Negotiated collect-local-observed-v1 and same original runtime owner/context.',
             'One explicit observed plain item UUID in an adjacent cardinal cell; entire stack inventory capacity.'),
         limits=('Exactly one flat one-block movement; no search, replan, retry, jump or sprint.',
-            'Only seven ordinary item IDs with exact default components; native target identity and stack rechecked.',
+            f'Only {len(scoped_collect.ITEMS)} explicitly listed ordinary item IDs with exact default components; native target identity and stack rechecked.',
             'All other corridor entities remain excluded; unsupported entities and projectiles refuse.',
             'Only known target-absence cancellation may proceed to independent inventory verification.',
             'Stable typed inventory gain proves observed acquisition, never causal loot attribution.',

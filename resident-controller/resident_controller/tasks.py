@@ -61,7 +61,8 @@ def click(menu, slot, button=0, click_type='pickup'):
 def basic(command):
     body = {key: value for key, value in command.items()
             if key not in ('op', 'session_id', 'request_id', 'submitted_at', '_coordination',
-                           '_navigation_defense_epoch', '_capability_owner_id', '_capability_expected_dimension')}
+                           '_navigation_defense_epoch', '_capability_owner_id', '_capability_expected_dimension',
+                           'fall_rescue_policy','fall_rescue_binding')}
     body.pop('action_id', None)  # The resident owns stable per-request step IDs.
     encounter_request = validate_encounter_request(body)
     post_observation = observe()

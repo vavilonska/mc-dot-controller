@@ -22,16 +22,23 @@ from resident_controller.transport import BridgeError
 from placement_fixture import placement_fixture
 
 PROFILE='placement-local-observed-v1'
-MODE=sys.argv[1] if len(sys.argv)>1 else 'success'
+CASE=sys.argv[1] if len(sys.argv)>1 else 'success'
+MODE='success' if CASE in ('table_success','furnace_success') else CASE
+MATERIAL='minecraft:crafting_table' if CASE=='table_success' else 'minecraft:furnace' if CASE=='furnace_success' else 'minecraft:cobblestone'
+PROPERTIES={'facing':'south','lit':'false'} if MATERIAL=='minecraft:furnace' else {}
 PUBLIC_ARGUMENTS={'support':{'x':2,'y':63,'z':0},'face':'up',
     'expected_support_id':'minecraft:stone','expected_support_properties':{},
-    'expected_block_id':'minecraft:cobblestone','expected_block_properties':{}}
+    'expected_block_id':MATERIAL,'expected_block_properties':PROPERTIES}
 
 class PlacementEndpoint(owners.CombatEndpoint):
     def __init__(self):
         super().__init__()
         self.placement_mode=MODE
-        template=placement_fixture()[0]
+        base=placement_fixture()[3]
+        base.update(expected_block_id=MATERIAL,expected_block_properties=deepcopy(PROPERTIES))
+        base['expected_held_item']['id']=MATERIAL
+        base['placement_footprint'][0].update(block_id=MATERIAL,properties=deepcopy(PROPERTIES))
+        template=placement_fixture(intent_override=base)[0]
         self.facts=deepcopy(template['result']['scoped_native_preflight']['facts'])
         self.initial_count=self.facts['inventory'][0]['item']['count']
         self.placed=False;self.decrements=0;self.fixture_error=None

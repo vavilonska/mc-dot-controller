@@ -1,13 +1,13 @@
 {
   "name": "mineclient-bridge",
-  "version": "1.1.7-integrated.1",
+  "version": "1.1.8-recovery-test.2.5",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs && node self-test-platform.mjs && npm run test:toolbox",
     "test:portable": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs",
     "test:windows": "node --test client-action-test.mjs encounter-contract-test.mjs mainline-client-action-test.mjs && node ndjson-framing-test.mjs && node self-test.mjs",
-    "test:toolbox": "node --test toolbox-test.mjs toolbox-schema-test.mjs toolbox-owner-chain-test.mjs toolbox-placement-owner-chain-test.mjs defend-once-test.mjs"
+    "test:toolbox": "node --test toolbox-test.mjs toolbox-bridge-recovery-test.mjs toolbox-schema-test.mjs toolbox-owner-chain-test.mjs toolbox-placement-owner-chain-test.mjs defend-once-test.mjs toolbox-inventory-recovery-test.mjs && node --test toolbox-fall-rescue-owner-chain-test.mjs"
   },
   "engines": {
     "node": ">=20"

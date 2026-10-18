@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientCommonPacketListenerImpl.class)
 public abstract class ScopedPlacementSendMixin {
     @Inject(method="<init>",at=@At("RETURN"),require=1)
-    private void mineclientBridge$placementSendInstalled(CallbackInfo ci){ScopedPlacementDispatch.sendInstalled();}
+    private void mineclientBridge$placementSendInstalled(CallbackInfo ci){ScopedPlacementDispatch.sendInstalled();io.github.campione01.mineclientbridge.NativeFallRescueDispatch.sendInstalled();}
     @Inject(method="send",at=@At(value="INVOKE",target="Lnet/minecraft/network/Connection;send(Lnet/minecraft/network/protocol/Packet;)V"),require=1)
-    private void mineclientBridge$placementSend(Packet<?> packet,CallbackInfo ci){ScopedPlacementDispatch.send(packet);}
+    private void mineclientBridge$placementSend(Packet<?> packet,CallbackInfo ci){ScopedPlacementDispatch.send(packet);io.github.campione01.mineclientbridge.NativeFallRescueDispatch.send(packet);}
 }

@@ -7,8 +7,16 @@ from .core import Outcome, require
 from . import inventory, scoped_mobility
 
 PROFILE = 'collect-local-observed-v1'
-ITEMS = frozenset('minecraft:' + name for name in
-                  ('stone', 'cobblestone', 'dirt', 'oak_planks', 'coal', 'stick', 'iron_nugget'))
+# Finite vanilla Item/BlockItem vocabulary; native default-component and 64-stack
+# checks still apply independently to every admitted target.
+ITEMS = frozenset('minecraft:' + name for name in (
+    'stone', 'cobblestone', 'dirt', 'coal', 'stick', 'iron_nugget',
+    'oak_log', 'spruce_log', 'birch_log', 'jungle_log', 'acacia_log', 'dark_oak_log',
+    'oak_planks', 'spruce_planks', 'birch_planks', 'jungle_planks', 'acacia_planks', 'dark_oak_planks',
+    'raw_iron', 'charcoal', 'crafting_table', 'furnace', 'apple', 'bread',
+    'beef', 'cooked_beef', 'porkchop', 'cooked_porkchop', 'chicken', 'cooked_chicken',
+    'mutton', 'cooked_mutton', 'baked_potato',
+))
 _UUID = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 

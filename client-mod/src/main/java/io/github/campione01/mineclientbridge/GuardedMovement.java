@@ -177,6 +177,13 @@ final class GuardedMovement {
         return age < 0 || age >= TimeUnit.MILLISECONDS.toNanos(Math.min(ticket.request.ttlMs(), ticket.request.durationMs()))
                 || observationAge < 0 || observationAge >= TimeUnit.MILLISECONDS.toNanos(MAX_OBSERVATION_AGE_MS);
     }
+    /** Capture the exact in-flight ticket before any external mod query. */
+    synchronized Ticket effectPermit() {
+        require(active!=null,"movement_owner_missing");
+        checkLive(active);
+        return active;
+    }
+
     private void checkLive(Ticket ticket) {
         require(active == ticket && ticket.reason == null && !expired(ticket), "movement_expired");
         require(open && session.equals(ticket.request.session()), "movement_session_changed");
@@ -227,6 +234,10 @@ final class GuardedMovement {
         Runnable cleanup;
         String reason;
         Ticket(Request request, long receivedNanos, long observedNanos, Double turnYaw) { this.request = request; this.receivedNanos = receivedNanos; this.observedNanos = observedNanos; this.turnYaw = turnYaw; }
+
+        void checkLive() {
+            synchronized (GuardedMovement.this) { GuardedMovement.this.checkLive(this); }
+        }
 
         Outcome await() throws InterruptedException, ExecutionException {
             try {

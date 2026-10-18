@@ -16,7 +16,7 @@ from urllib.parse import quote
 from .coordination_contract import check_resident as check_coordination, native_action_id
 from .entity_aim_lock import EntityAimLock, MAX_SAMPLE_SECONDS
 from .native_combat import NativeCombat
-from .ipc import ID, MAX_PENDING, MAX_RESULTS, atomic_json, read_json
+from .ipc import ID, MAX_PENDING, MAX_RESULTS, RECONCILIATION_PREFIX, atomic_json, read_json
 from .prospecting import ProspectingCache, SCAN_OPS, scan_id, start_body, validate_scan
 from .tasks import make_task
 from .action_safety import native_release_unconfirmed, native_handoff_required
@@ -25,6 +25,7 @@ from .encounter_contract import (validate_encounter_command, validate_encounter_
                                  validate_encounter_receipt)
 from .pause_contract import pause_body, validate_pause_receipt
 from .transport import BridgeError, DIRECT
+from . import fall_rescue_attached as attached_fall
 from .capability_snapshot import source_freshness
 from .movement_wire import valid_size_diagnostic
 from .route_spatial_stop_snapshot import valid_rejection_diagnostic
@@ -40,6 +41,9 @@ def action_rejection_admission(exc):
     """Only called for an actual definite POST rejection; diagnostics add no authority."""
     result = {'schema_version': 1, 'http_status': exc.status,
               'admitted': False, 'uncertain': False, 'reason': exc.code}
+    if getattr(exc, 'native_admission_status', None) == 'reported':
+        result['schema_version'] = 2
+        result['native_admission'] = deepcopy(exc.native_admission)
     freshness = getattr(exc, 'capability_source_freshness', None)
     if freshness is not None and source_freshness(freshness):
         result['capability_source_freshness'] = deepcopy(freshness)
@@ -66,17 +70,25 @@ def action_rejection_admission(exc):
 
 
 def scoped_uncertain_diagnostics(exc):
-    """Reported preview stage/size only. Does not establish effect-free execution or release ownership."""
-    if not isinstance(exc, BridgeError) or exc.status != 409 or exc.code not in (
-            'scoped_movement_response_evidence_too_large','scoped_movement_response_preview_failed'):
+    """Bounded native stage/class evidence only. Original uncertainty is never rewritten."""
+    if not isinstance(exc, BridgeError):
         return None
-    result={'schema_version':1,'http_status':409,'reason':exc.code,
-            'reported_stage':'preview_before_native_action_registration','diagnostics_only':True,
-            'effect_free_proven':False,'input_release_proven':False}
-    size=getattr(exc,'scoped_movement_response_size',None)
-    if valid_size_diagnostic(size):result['scoped_movement_response_size']=deepcopy(size)
-    elif size is not None or getattr(exc,'scoped_movement_response_size_status',None)=='invalid':
-        result['scoped_movement_response_size_status']='invalid'
+    result = {'schema_version': 2, 'http_status': exc.status, 'reason': exc.code,
+        'diagnostics_only': True, 'effect_free_proven': False, 'input_release_proven': False}
+    for name in ('native_admission', 'native_entity_rejection', 'route_entity_rejection',
+                 'route_threat_rejection', 'scoped_movement_response_size'):
+        status = getattr(exc, name + '_status', None)
+        value = getattr(exc, name, None)
+        validated = (status == 'reported' and value is not None
+            or name == 'scoped_movement_response_size' and valid_size_diagnostic(value)
+            or name == 'route_entity_rejection' and valid_rejection_diagnostic(value)
+            or name == 'route_threat_rejection' and valid_threat_rejection(value))
+        if validated:
+            result[name] = deepcopy(value)
+        elif status == 'invalid':
+            result[name + '_status'] = 'invalid'
+    if len(result) == 6 and exc.code not in ('scoped_movement_response_evidence_too_large', 'scoped_movement_response_preview_failed'):
+        return None
     return result
 
 
@@ -95,6 +107,8 @@ class Running:
     encounter_request: dict | None = None
     capability_cancel_attempted: bool = False
     capability_unknown: bool = False
+    fall_rescue: dict | None = None
+    fall_rescue_cleanup: dict | None = None
     coordination_cancel_attempted: bool = False
     coordination_unknown: bool = False
     coordination_result_published: bool = False
@@ -106,6 +120,7 @@ class Resident:
         self.bridge, self.root = bridge, Path(directory)
         self.session_id = uuid.uuid4().hex
         self.pending, self.active = deque(), None
+        self._capability_terminal_candidate = None
         self.cache = WorldCache()
         self.paused = False
         self.reason = None
@@ -129,7 +144,8 @@ class Resident:
                    or any(any(k in c for k in ('encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal'))
                           for c in pending)
                    or getattr(self, 'paused', False) and getattr(self, 'reason', None) in (
-                       'encounter_requires_handoff', 'encounter_pause_requested', 'encounter_pause_unknown'))
+                       'encounter_requires_handoff', 'encounter_pause_requested', 'encounter_pause_unknown',
+                       'fall_rescue_original_outcome_unknown','fall_rescue_control_outcome_unknown'))
         return {'schema_version': 1, 'requires_handoff': bool(handoff),
                 'input_release_unconfirmed': bool(getattr(self, 'paused', False)
                     and getattr(self, 'reason', None) == 'input_release_unconfirmed')}
@@ -153,7 +169,8 @@ class Resident:
             saved = self._terrain_acquisition_unknown
             data['terrain_acquisition_unknown'] = {key: deepcopy(saved[key]) for key in
                 ('job_id', 'owner_id', 'outcome_unknown', 'ownership_unresolved')}
-        atomic_json(self.root / 'session.json', data)
+        from .session_diagnostics import compact_session
+        atomic_json(self.root / 'session.json', compact_session(self.root, data))
         self.last_publish = time.monotonic()
 
     def start(self):
@@ -173,7 +190,10 @@ class Resident:
         # A prior process may have crashed after sending a request. Never replay it.
         for path in list((self.root / 'working').glob('*.json')) + list((self.root / 'inbox').glob('*.json')):
             self.finish({'request_id': path.stem}, 'uncertain', reason='previous_session_not_replayed')
-            path.unlink(missing_ok=True)
+            # Saturated diagnostic history leaves the original claimed bytes as
+            # evidence. Restart cannot erase them merely because finish returned.
+            if not path.stem.startswith(RECONCILIATION_PREFIX) or (self.root / 'reconciliation-results' / path.name).exists():
+                path.unlink(missing_ok=True)
         status = self.bridge.request('GET', '/control/status')
         if status.get('protocol') != 'mineclient-bridge' or status.get('schema_version') != 2:
             raise ValueError('unsupported_bridge_protocol')
@@ -213,17 +233,33 @@ class Resident:
         self.last_status = status
 
     def finish(self, command, status, **fields):
+        if command.get('op') == 'reconciliation_observe' or str(command.get('request_id', '')).startswith(RECONCILIATION_PREFIX):
+            from .reconciliation_read import finish
+            return finish(self, command, status, **fields)
         request_id = command['request_id']
         if not ID.fullmatch(request_id):
             return
+        # A request's first terminal/uncertain receipt is immutable. Later STOP or
+        # cleanup has its own request receipt and cannot rewrite the old outcome.
+        receipt_path = self.root / 'results' / (request_id + '.json')
+        if receipt_path.exists():
+            (self.root / 'working' / (request_id + '.json')).unlink(missing_ok=True)
+            return
         if any(k in command for k in ('encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal')):
             fields.update(risk_remaining=True, requires_handoff=True, safety_assured=False)
-        atomic_json(self.root / 'results' / (request_id + '.json'),
+        atomic_json(receipt_path,
                     {'request_id': request_id, 'session_id': command.get('session_id', self.session_id),
                      'status': status, 'finished_at': time.time(), **fields})
         (self.root / 'working' / (request_id + '.json')).unlink(missing_ok=True)
         files = sorted((self.root / 'results').glob('*.json'), key=lambda p: p.stat().st_mtime)
         for path in files[:-MAX_RESULTS]:
+            try:
+                retained = read_json(path, 2 * 1024 * 1024)
+            except (OSError, ValueError):
+                continue  # Unreadable evidence is not permission to discard it.
+            if retained.get('status') in ('uncertain', 'unknown') or any(
+                    retained.get(key) is True for key in ('unknown_outcome', 'input_release_unconfirmed', 'requires_handoff')):
+                continue
             path.unlink(missing_ok=True)
 
     def discard_pending(self, reason):
@@ -231,20 +267,35 @@ class Resident:
             self.finish(self.pending.popleft(), 'cancelled', reason=reason)
 
     def end_active(self, status, **fields):
+        if self.active is not None and getattr(self.active,'fall_rescue',None) is not None:
+            attached_fall.unknown(self,self.active,BridgeError('fall_rescue_unexpected_terminal_path',uncertain=True))
+            return
         if self.active:
-            self.finish(self.active.command, status, **fields)
-            self.active = None
+            ended = self.active
+            cleanup = getattr(ended,'fall_rescue_cleanup',None)
+            if cleanup is not None:
+                fields['fall_rescue_cleanup'] = deepcopy(cleanup)
+            self.finish(ended.command, status, **fields)
+            if self.active is ended:
+                from .queued_cancel_terminal import remember
+                remember(self, ended, status)
+                self.active = None
         if status != 'succeeded':
             self.discard_pending('prior_task_stopped')
         self.publish()
 
     def interrupt_local(self, reason):
+        if self.active is not None and getattr(self.active,'fall_rescue',None) is not None:
+            attached_fall.unexpected_interrupt(self,self.active,reason)
         # Caller follows this with the single atomic mod takeover POST.
         self.discard_pending(reason)
         if self.active:
             self.end_active('cancelled', reason=reason, mod_cancel_confirmed=False)
 
     def snapshot(self, command):
+        if "compact_observation" in command:
+            from .compact_observation import snapshot
+            return snapshot(self,command)
         clock_profile=command.get('observation_clock')
         if 'observation_clock' in command:
             if (clock_profile != 'client-pre-tick-v1' or command.get('op') != 'observe'
@@ -414,6 +465,14 @@ class Resident:
                     resident_policy=policy, requires_handoff=policy['requires_handoff'], gameplay_effect_confirmed=False)
 
     def command(self, command):
+        if command.get("op") != "capability_cancel_exact":
+            self._capability_terminal_candidate = None
+        if str(command.get('request_id', '')).startswith(RECONCILIATION_PREFIX) and command.get('op') != 'reconciliation_observe':
+            raise ValueError('reserved_reconciliation_request_id')
+        if command.get('op') == 'reconciliation_observe':
+            from .reconciliation_read import execute
+            execute(self, command)
+            return
         if 'observation_clock' in command and (command.get('op') != 'observe'
                 or command['observation_clock'] != 'client-pre-tick-v1'
                 or command.get('capability_observation') is not True
@@ -429,6 +488,32 @@ class Resident:
         validate_route_stop_request(command.get('scoped_native_preflight'), command)
         validate_encounter_command(command)  # Reject before any read, cancellation or takeover.
         operation = command.get('op')
+        if 'fall_rescue_policy' in command or 'fall_rescue_binding' in command:
+            if operation != 'action' or attached_fall.validate_binding(command,self.session_id) is None:
+                raise ValueError('fall_rescue_attached_binding_required')
+            if (self.paused or self.active is not None or self.pending or self.combat.active
+                    or self.combat.held or self.aim.active or getattr(self,'_fall_rescue_owner',None) is not None):
+                raise ValueError('fall_rescue_attached_original_owner_busy')
+        if operation == 'fall_rescue_adjudicate':
+            from .fall_rescue_adjudication import execute
+            execute(self,command)
+            return
+        if attached_fall.lifecycle_command(self,command):
+            return
+        if operation == 'managed_navigation_control':
+            from .managed_navigation_control import execute
+            execute(self, command)
+            return
+        if getattr(self, '_managed_navigation_owner', None) is not None:
+            raise ValueError('managed_navigation_original_route_unsettled')
+        if operation == 'external_navigation_control':
+            from .external_navigation_control import execute
+            execute(self, command)
+            return
+        if operation == 'fall_rescue_control':
+            from .fall_rescue_control import execute
+            execute(self, command)
+            return
         if operation == 'capability_cancel_exact':
             self.capability_cancel_exact(command)
             return
@@ -720,6 +805,11 @@ class Resident:
         """No release-all, takeover, or retry; one bound native cancellation only."""
         fields = {'op', 'expected_request_id', 'expected_resident_session', 'expected_action_session', 'expected_action_id'}
         metadata = {'request_id', 'session_id', 'submitted_at'}
+        if 'terminal_proof_binding' in command:
+            from .queued_cancel_terminal import valid_body
+            if not valid_body({k:v for k,v in command.items() if k not in metadata}):
+                raise ValueError('exact_cancel_terminal_binding_invalid')
+            fields = fields | {'terminal_proof_binding'}
         if (set(command) - metadata != fields or command['expected_resident_session'] != self.session_id
                 or command['expected_action_session'] != (self.bridge_identity or {}).get('action_session')
                 or not ID.fullmatch(command['expected_request_id'])
@@ -745,11 +835,17 @@ class Resident:
                 or not isinstance(task.command.get('capability_guard'), dict)
                 or task.step_number != 1
                 or (task.action_id or (task.last_action_result or {}).get('action_id')) != command['expected_action_id']):
+            from .queued_cancel_terminal import attempt
+            if attempt(self, command):
+                return
             raise ValueError('exact_cancel_target_not_active')
         if task.capability_cancel_attempted:
             raise ValueError('exact_cancel_already_attempted')
         # Commit attempt before side effects; an ambiguous receipt leaves the task frozen.
         task.capability_cancel_attempted = True
+        if task.fall_rescue is not None:
+            attached_fall.cancel_exact(self,task,command)
+            return
         try:
             if task.action_id is None:
                 terminal = task.last_action_result
@@ -990,9 +1086,12 @@ class Resident:
                 command = read_json(destination)
                 if command.get('request_id') != path.stem or not ID.fullmatch(path.stem):
                     raise ValueError('invalid_request_id')
+                if path.stem.startswith(RECONCILIATION_PREFIX) != (command.get('op') == 'reconciliation_observe'):
+                    raise ValueError('reserved_reconciliation_request_id')
                 if command.get('session_id') != self.session_id:
                     raise ValueError('stale_controller_session_not_replayed')
-                if (self.root / 'results' / path.name).exists():
+                receipt_folder = 'reconciliation-results' if path.stem.startswith(RECONCILIATION_PREFIX) else 'results'
+                if (self.root / receipt_folder / path.name).exists():
                     destination.unlink(missing_ok=True)
                     continue
                 if path.stem in self.seen:
@@ -1001,7 +1100,7 @@ class Resident:
                 self.seen.add(path.stem)
                 commands.append(command)
             except Exception:
-                self.finish({'request_id': path.stem}, 'failed', reason='invalid_or_stale_command')
+                self.finish({**command, 'request_id': path.stem}, 'failed', reason='invalid_or_stale_command')
         # Direct/cancel commands preempt tasks already admitted this turn too.
         for command in commands:
             if not self.running:
@@ -1081,9 +1180,40 @@ class Resident:
             return
 
     def command_error(self, command, exc):
+        if command.get('op') == 'reconciliation_observe' or str(command.get('request_id', '')).startswith(RECONCILIATION_PREFIX):
+            # Even malformed/failed diagnostic reads cannot cancel, release,
+            # acknowledge or change the original execution owner's state.
+            from .reconciliation_read import failure_fields
+            fields=failure_fields({'compact_observation_diagnostic':getattr(exc,'compact_observation_diagnostic',None),
+                'compact_observation_diagnostic_status':getattr(exc,'compact_observation_diagnostic_status',None),
+                'read_failure_reason':safe_reason(exc)},command.get('request_id'))
+            self.finish(command, 'failed', reason='reconciliation_read_unconfirmed',
+                        read_only=True, execution_authority=False, settles_original=False,**fields)
+            return
         uncertain = isinstance(exc, BridgeError) and exc.uncertain
         reason = safe_reason(exc)
-        if command.get('op') == 'capability_cancel_exact':
+        if getattr(exc,'attached_fall_owner',False):
+            self.finish(command,'uncertain',reason=reason,resident_policy=self.observation_policy())
+            return
+        if 'fall_rescue_policy' in command or 'fall_rescue_binding' in command:
+            self.finish(command,'uncertain' if uncertain else 'failed',reason=reason,
+                resident_policy=self.observation_policy(),unknown_outcome=uncertain)
+            return
+        if command.get('op')=='observe' and command.get('compact_observation') is True:
+            # A failed diagnostic read cannot stop/release a gameplay owner.
+            fields={'resident_policy':self.observation_policy()}
+            diagnostic=getattr(exc,'compact_observation_diagnostic',None)
+            if diagnostic is not None:fields['compact_observation_diagnostic']=deepcopy(diagnostic)
+            status=getattr(exc,'compact_observation_diagnostic_status',None)
+            if status is not None:fields['compact_observation_diagnostic_status']=status
+            self.finish(command,'uncertain' if uncertain else 'failed',reason=reason,**fields)
+            return
+        if command.get('op')=='fall_rescue_adjudicate':
+            from .fall_rescue_adjudication import attempt_evidence
+            self.finish(command,'uncertain' if uncertain else 'failed',reason=reason,
+                fall_adjudication_attempt=attempt_evidence(self,command),resident_policy=self.observation_policy())
+            return
+        if command.get('op') in ('capability_cancel_exact', 'fall_rescue_control', 'external_navigation_control', 'managed_navigation_control'):
             self.finish(command, 'uncertain' if uncertain else 'failed', reason=reason,
                         resident_policy=self.observation_policy())
             return
@@ -1223,7 +1353,7 @@ class Resident:
                     check_coordination(command, self, before_post=True)
                 else:
                     self.check_identity(self.bridge.request('GET', '/control/status'))
-                self.active = Running(command, make_task({k: v for k, v in command.items() if k != 'scoped_native_preflight'}, self.cache, self.bridge))
+                self.active = Running(command, make_task({k: v for k, v in command.items() if k not in ('scoped_native_preflight','fall_rescue_policy','fall_rescue_binding')}, self.cache, self.bridge))
             except (BridgeError, ValueError, KeyError, TypeError) as exc:
                 self.command_error(command, exc)
                 if '_coordination' not in command:
@@ -1231,6 +1361,8 @@ class Resident:
                 return
         task = self.active
         if task.capability_unknown or task.capability_cancel_attempted and self.paused:
+            return
+        if attached_fall.advance_waiting(self,task):
             return
         if '_coordination' in task.command:
             self.advance_coordination(task)
@@ -1258,12 +1390,13 @@ class Resident:
                 task.encounter_request = validate_encounter_request(step['body'])
                 task.step_number += 1
                 task.action_id = uuid.uuid5(uuid.UUID(self.session_id), task.command['request_id'] + ':' + str(task.step_number)).hex
+                if 'fall_rescue_policy' in task.command:
+                    attached_fall.arm(self,task)
                 sending_action = True
                 if task.encounter_request is not None:
                     self.publish()  # Publish the new bounded owner before a possibly blocking POST.
                 if 'scoped_native_preflight' in task.command:
-                    if task.command['scoped_native_preflight'].get('profile') in ('movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2'):
-                        task.scoped_original_intent = deepcopy({**step['body'], 'action_id': task.action_id})
+                    task.scoped_original_intent = deepcopy({**step['body'], 'action_id': task.action_id})
                     result = self.bridge.request('POST', '/control/scoped-action', {
                         'preflight': task.command['scoped_native_preflight'],
                         'intent': {**step['body'], 'action_id': task.action_id}})
@@ -1281,17 +1414,26 @@ class Resident:
             else:
                 raise ValueError('invalid_recipe_step')
         except StopIteration as done:
+            if task.fall_rescue is not None:
+                attached_fall.unknown(self,task,BridgeError('fall_rescue_unsettled_recipe_end',uncertain=True))
+                return
             self.end_active('succeeded', result=done.value)
         except (BridgeError, ValueError, KeyError, TypeError) as exc:
-            # This profile can fail after local use/slot-sync hooks have run. HTTP
-            # status alone cannot prove admission phase; retain the original ID.
-            # No pre-admission proof envelope is currently defined for block-menu-v1.
-            block_menu_submission = (sending_action and
-                task.command.get('scoped_native_preflight', {}).get('profile') == 'block-menu-v1')
-            definite_rejection = (sending_action and not block_menu_submission and isinstance(exc, BridgeError)
-                                  and not exc.uncertain and exc.status is not None and 400 <= exc.status < 500)
-            if task.command.get('scoped_native_preflight', {}).get('profile') in ('mining-local-observed-v2','placement-local-observed-v1'):
-                definite_rejection = False  # No native proof that earlier hooks/input were effect-free.
+            if task.fall_rescue is not None:
+                attached_fall.unknown(self,task,exc)
+                return
+            # A 4xx is not an effects-none proof: even capture/permission hooks can mutate.
+            scoped_submission = 'scoped_native_preflight' in task.command
+            from .native_admission import no_effect, validate as validate_admission
+            proof = getattr(exc, 'native_admission', None)
+            proved_before_hooks = (getattr(exc, 'native_admission_status', None) == 'reported'
+                and no_effect(proof) and validate_admission(proof,
+                    {'preflight': task.command.get('scoped_native_preflight'), 'intent': task.scoped_original_intent}, exc.code)
+                and proof.get('action_id') == task.action_id
+                and proof.get('action_session') == (self.bridge_identity or {}).get('action_session'))
+            definite_rejection = (sending_action and isinstance(exc, BridgeError)
+                and not exc.uncertain and exc.status is not None and 400 <= exc.status < 500
+                and (not scoped_submission or proved_before_hooks))
             admission = {}
             if definite_rejection and exc.status == 409 and exc.code in NAVIGATION_REJECTIONS:
                 self.cache.native_binding.seen = True
@@ -1349,6 +1491,11 @@ class Resident:
                 or result.get('action_session') != self.bridge_identity['action_session']):
             raise BridgeError('action_status_mismatch', uncertain=True)
         route_profile = task.command.get('scoped_native_preflight', {}).get('profile')
+        if route_profile == 'combat-defensive-local-v1':
+            from .combat_snapshot import validate_defensive_envelope
+            try: validate_defensive_envelope(result)
+            except (ValueError,KeyError,TypeError) as exc:
+                raise BridgeError('defensive_action_receipt_invalid',uncertain=True) from exc
         if route_profile in ('movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2'):
             detail = 'route_spatial_stop' if route_profile in ('movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2') else 'route_threat'
             try:
@@ -1373,6 +1520,8 @@ class Resident:
             return
         if status not in TERMINAL:
             raise BridgeError('unknown_action_status', uncertain=True)
+        if task.fall_rescue is not None and attached_fall.terminal(self,task,result):
+            raise TaskEnded()
         task.action_id = None
         if native_release_unconfirmed(result):
             # Raw native failed evidence is retained; this is not an ordinary
@@ -1420,6 +1569,8 @@ class Resident:
                 self._terrain_acquisition_unknown['unexpected_cleanup_blocked'] = True
                 self.reason = 'unexpected_cleanup_blocked'
                 raise
+            if attached_fall.lifecycle_command(self,{'op':'shutdown','request_id':uuid.uuid4().hex,'session_id':self.session_id}):
+                return
             # Explicit owner Ctrl-C stops input only, never disconnects or quits Minecraft.
             self.interrupt_local('controller_stopped')
             self.combat.stop(self, 'controller_stopped', release=False)

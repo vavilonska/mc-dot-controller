@@ -16,3 +16,5 @@ import "./toolbox-schema-test.mjs";
 import "./toolbox-owner-chain-test.mjs";
 
 import "./toolbox-placement-owner-chain-test.mjs";
+
+import "./toolbox-inventory-recovery-test.mjs";

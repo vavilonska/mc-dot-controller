@@ -22,7 +22,7 @@ async function fixture(mode,body){
 function submit(ready,mode){return {api_version:'mdc.toolbox/1',operation:'submit',request_id:'offline-place-'+mode,session_ref:ready.session_ref,expected_context_ref:ready.context_ref,
  capability:'place_local',capability_version:1,arguments:ready.arguments,policy:{version:1,execution_mode:'request_only',reactions:'stop'},
  budgets:{max_actions:3,max_observations:24,deadline_seconds:10,cleanup_reserve_actions:1,reflex_reserve_actions:0},wait_ms:0};}
-for(const mode of ['success','cancel','lost','late409','effect_unknown','profile_missing','no_decrement','invalid_arguments']){
+for(const mode of ['success','table_success','furnace_success','cancel','lost','late409','effect_unknown','profile_missing','no_decrement','invalid_arguments']){
  test('placement production wrapper to Python owner-chain: '+mode,{timeout:20000},async()=>fixture(mode,async(ready,request)=>{
   const args=submit(ready,mode);if(mode==='invalid_arguments')args.arguments={...args.arguments,face:'diagonal'};
   const original=structuredClone(args),forwarded=[];
@@ -40,8 +40,10 @@ for(const mode of ['success','cancel','lost','late409','effect_unknown','profile
   const dispatch=proof.scoped_posts[0];assert.equal(dispatch.preflight.profile,'placement-local-observed-v1');
   assert.equal(dispatch.intent.action,'place_block');assert.equal(dispatch.intent.placement_footprint.length,1);
   assert.deepEqual(dispatch.intent.support,ready.arguments.support);assert.equal(dispatch.intent.face,ready.arguments.face);
+  assert.equal(dispatch.intent.expected_block_id,ready.arguments.expected_block_id);
+  assert.deepEqual(dispatch.intent.expected_block_properties,ready.arguments.expected_block_properties);
   assert.deepEqual(dispatch.intent.placement_hit,{x:2.5,y:64,z:.5});
-  if(mode==='success'){
+  if(['success','table_success','furnace_success'].includes(mode)){
    assert.equal(result.state,'succeeded',JSON.stringify(result));assert.equal(result.effect_certainty,'known');assert.equal(result.cleanup_certainty,'confirmed');
    assert.equal(proof.placed,true);assert.equal(proof.decrements,1);assert.equal(proof.final_count,proof.initial_count-1);assert.equal(proof.cancel_posts.length,0);assert.equal(proof.capability_lease,null);
   }else if(mode==='cancel'){

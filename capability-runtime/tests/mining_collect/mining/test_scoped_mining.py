@@ -31,8 +31,8 @@ class WitnessTests(unittest.TestCase):
         for value in (True,-1,1024):
             self.bad(lambda d,value=value:d[0]['result']['mining'].update(observed_passive_items=value))
     def test_t13_movement_source_preserved_and_mining_budgeted(self):
-        # Collect intentionally extends T13 movement. Pin the accepted collect
-        # delta byte-for-byte instead of silently weakening this to a subset.
+        # Collect and the bounded native entity diagnostic extend T13 movement.
+        # Pin their exact source; no geometry/type guard is weakened.
         reference=Path(__file__).resolve().parents[1]/'references/accepted_movement_sha256.json'
         expected=json.loads(reference.read_text())
         self.assertEqual(set(expected),{'ScopedFlatMovement.java','ScopedMovementEntities.java','ScopedEntityPolicy.java'})

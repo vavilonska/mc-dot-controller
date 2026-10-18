@@ -4,10 +4,24 @@ from . import reach
 from .core import Outcome, require
 
 PROFILE = 'mining-local-observed-v2'
-# Exact Block-class full-cube families only. Native identity/class/shape checks remain authoritative.
-BLOCKS = ('minecraft:stone', 'minecraft:cobblestone', 'minecraft:dirt', 'minecraft:andesite',
+# Original placement support vocabulary is deliberately frozen independently of mining.
+LEGACY_BLOCKS = ('minecraft:stone', 'minecraft:cobblestone', 'minecraft:dirt', 'minecraft:andesite',
           'minecraft:granite', 'minecraft:diorite', 'minecraft:smooth_stone', 'minecraft:stone_bricks',
           'minecraft:bricks', 'minecraft:oak_planks', 'minecraft:spruce_planks', 'minecraft:birch_planks')
+LOGS = tuple('minecraft:' + name + '_log' for name in
+             ('oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak'))
+ORES = ('minecraft:iron_ore', 'minecraft:deepslate_iron_ore')
+BLOCKS = LEGACY_BLOCKS + LOGS + ORES
+
+
+def valid_target_properties(block_id, properties):
+    """Exact public target state; native registry, class and shape are still authoritative."""
+    if type(properties) is not dict or block_id not in BLOCKS:
+        return False
+    if block_id in LOGS:
+        return set(properties) == {'axis'} and type(properties['axis']) is str and properties['axis'] in ('x', 'y', 'z')
+    return properties == {}
+
 
 
 def _removed(observation, target):
@@ -26,7 +40,7 @@ def mine_local(runtime, target, expected_block_id, expected_block_properties, *,
     require(getattr(runtime, '_job_scoped_profiles', {}).get('break_block') == PROFILE,
             'scoped_mining_profile_not_negotiated')
     target = reach.coordinate(target)
-    require(expected_block_id in BLOCKS and expected_block_properties == {}, 'scoped_mining_static_block_required')
+    require(valid_target_properties(expected_block_id, expected_block_properties), 'scoped_mining_static_block_required')
     require(type(require_correct_tool) is bool, 'scoped_mining_tool_policy_invalid')
     before = runtime.observe(terrain=False)
     command = {'op':'action', 'action':'break_block', 'target':target, 'expected_block_id':expected_block_id,

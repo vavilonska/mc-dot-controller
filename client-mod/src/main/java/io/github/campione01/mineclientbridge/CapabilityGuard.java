@@ -32,6 +32,7 @@ final class CapabilityGuard {
     static boolean requested(JsonObject body) {return body.has("capability_guard");}
     static void validate(ClientActionRequest r) {
         JsonObject b=r.original();
+        InventoryRecoveryGuard.validate(r);
         if(!requested(b)) {
             ClientActionRequest.require(java.util.Collections.disjoint(b.keySet(),Set.of("capability_route","encounter_route_guard","capability_bridge","capability_descent","placement_hit","placement_yaw","placement_footprint","require_pumpkin")),"capability_guard_required");
             ClientActionRequest.require(!Set.of("interact_block","use_item","select_hotbar","close_menu","attack_entity","shoot_entity","gateway_pearl","movement_budget_start","movement_budget_finish").contains(r.action()),"capability_guard_required");
@@ -129,7 +130,8 @@ final class CapabilityGuard {
                 if(entity instanceof net.minecraft.world.entity.AreaEffectCloud && entity.distanceToSqr(player)<36)return "capability_nearby_effect_cloud";
             }
         }
-        if(b.has("min_health") && !CapabilityCombatSafety.healthy(player.getHealth(),b.get("min_health").getAsDouble()))return "capability_health_guard";
+        if(b.has("min_health") && !(request.action().equals("combat_entity") && b.has("defensive_policy"))
+                && !CapabilityCombatSafety.healthy(player.getHealth(),b.get("min_health").getAsDouble()))return "capability_health_guard";
         String encounterProblem=CapabilityEncounterRoute.check(mc,request);
         if(encounterProblem!=null)return encounterProblem;
         String shellProblem=dispatched?null:CapabilityTargetAction.shulkerAdmission(mc,request);
@@ -176,6 +178,8 @@ final class CapabilityGuard {
             return null;
         }
         if(menuAction) {
+            String recoveryProblem = InventoryRecoveryGuard.check(mc, request);
+            if(recoveryProblem != null)return recoveryProblem;
             var menu=player.containerMenu;
             int expectedContainer=request.action().equals("click_slot")?request.containerId():ClientActionRequest.integer(b,"container_id",-1);
             if(menu!=capturedMenu || !menu.getClass().getName().equals(ClientActionRequest.string(b,"expected_menu_class"))

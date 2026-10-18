@@ -10,7 +10,7 @@ export const TOOLBOX_NAMES = Object.freeze(['mdc_catalog','mdc_observe','mdc_pla
 export const LEGACY_MUTATORS = Object.freeze(['minecraft_client_launch','minecraft_client_register','minecraft_client_action','minecraft_client_input','minecraft_client_close']);
 const MAX_BYTES=1024*1024, MAX_PENDING=32;
 const exact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
-const fail=(code,reason,effect='none_proven')=>({api_version:'mdc.toolbox/1',state:effect==='unknown'?'unknown':'blocked',effect_certainty:effect,cleanup_certainty:effect==='unknown'?'unknown':'not_needed',error:{code,stage:'toolbox_transport',reason,effect_certainty:effect,affected_ids:[],suggested_next_operation:effect==='unknown'?'status_original_request':'inspect_configuration'},continuation:effect==='unknown'?'reconcile_original_id_required':'none'});
+const fail=(code,reason,effect='none_proven',identity={})=>({...identity,api_version:'mdc.toolbox/1',state:effect==='unknown'?'unknown':'blocked',effect_certainty:effect,cleanup_certainty:effect==='unknown'?'unknown':'not_needed',error:{code,stage:'toolbox_transport',reason,effect_certainty:effect,affected_ids:[],suggested_next_operation:effect==='unknown'?'status_original_request':'inspect_configuration'},continuation:effect==='unknown'?'reconcile_original_id_required':'none'});
 function finite(value,depth=0){
   if(depth>40)return false;
   if(typeof value==='number')return Number.isFinite(value);
@@ -25,7 +25,13 @@ export function loadToolboxConfiguration(filename,sourceRoot){
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size>65536)throw new Error('invalid_operator_configuration_file');
   const config=JSON.parse(fs.readFileSync(filename,'utf8'));
   const keys=['schema_version','python_executable','python_sha256','control_directory','journal_directory','runtime_journal_directory'];
-  if(!exact(config,keys)||config.schema_version!==1||!(/^[a-f0-9]{64}$/).test(config.python_sha256))throw new Error('invalid_operator_configuration');
+  const expected=Object.hasOwn(config,'storage_policy')?[...keys,'storage_policy']:keys;
+  if(!exact(config,expected)||config.schema_version!==1||!(/^[a-f0-9]{64}$/).test(config.python_sha256))throw new Error('invalid_operator_configuration');
+  if(Object.hasOwn(config,'storage_policy')){
+    const p=config.storage_policy,fields=['warn_free_bytes','min_free_bytes','event_history_admission_bytes'];
+    if(!exact(p,fields)||fields.some(k=>!Number.isSafeInteger(p[k])||p[k]<1)||p.warn_free_bytes<p.min_free_bytes)throw new Error('invalid_storage_policy');
+    config.storage_policy=Object.freeze({...p});
+  }
   for(const key of keys.filter(k=>k.endsWith('_directory')||k==='python_executable'))if(typeof config[key]!=='string'||!path.isAbsolute(config[key])||config[key].includes('\0'))throw new Error('invalid_operator_path');
   const dirs=keys.filter(k=>k.endsWith('_directory')).map(k=>path.resolve(config[k]));
   for(let i=0;i<dirs.length;i++)for(let j=i+1;j<dirs.length;j++)if(dirs[i]===dirs[j]||dirs[i].startsWith(dirs[j]+path.sep)||dirs[j].startsWith(dirs[i]+path.sep))throw new Error('operator_directories_must_be_disjoint');
@@ -34,19 +40,29 @@ export function loadToolboxConfiguration(filename,sourceRoot){
   return Object.freeze({...config,python_executable:executable,source_root:fs.realpathSync(sourceRoot)});
 }
 export class ToolboxBridge {
-  constructor(child,{requestTimeoutMs=15000}={}){
-    this.child=child;this.requestTimeoutMs=requestTimeoutMs;this.pending=new Map();this.sequence=0;this.buffer=Buffer.alloc(0);this.terminal=false;this.closed=false;this.protocolFailure=false;this.terminalResult=null;
+  constructor(child,{requestTimeoutMs=15000,drainTimeoutMs=2000}={}){
+    this.child=child;this.requestTimeoutMs=requestTimeoutMs;this.drainTimeoutMs=drainTimeoutMs;this.draining=false;this.drainTimer=null;this.pending=new Map();this.sequence=0;this.buffer=Buffer.alloc(0);this.terminal=false;this.closed=false;this.protocolFailure=false;this.terminalResult=null;
     this.exitPromise=new Promise(resolve=>{this.resolveExit=resolve;});
     child.stdout.on('data',chunk=>this.onData(chunk));
     child.stderr?.on('data',()=>{}); // No private runtime diagnostics are copied to public results.
-    child.on('error',()=>this.onTerminal(null,'service_process_error'));
-    child.on('exit',(code,signal)=>this.onTerminal(code,signal?'service_signalled':'service_exited'));
-    child.stdin.on('error',()=>this.onTerminal(null,'service_input_closed'));
+    child.on('error',()=>this.beginDrain(null,'service_process_error'));
+    // 'exit' precedes stdio closure: final receipts can still be in the pipe.
+    child.on('exit',(code,signal)=>this.beginDrain(code,signal?'service_signalled':'service_exited'));
+    child.on('close',(code,signal)=>this.onTerminal(code,signal?'service_signalled':'service_exited'));
+    child.stdin.on('error',()=>this.beginDrain(null,'service_input_closed'));
+  }
+  beginDrain(code,reason){
+    if(this.terminal)return;
+    if(!this.terminalResult||code!==null)this.terminalResult={exit_code:code,reason};
+    if(this.draining)return;
+    this.draining=true;
+    this.drainTimer=setTimeout(()=>this.onTerminal(code,'service_stdio_drain_unconfirmed'),this.drainTimeoutMs);
   }
   onTerminal(code,reason){
     if(this.terminal)return;
+    clearTimeout(this.drainTimer);
     this.terminal=true;this.terminalResult={exit_code:code,reason};
-    for(const [id,p] of this.pending){clearTimeout(p.timer);p.resolve(fail('outcome_unknown',reason,'unknown'));}
+    for(const [id,p] of this.pending){clearTimeout(p.timer);p.resolve(fail('outcome_unknown',reason,'unknown',p.identity));}
     this.pending.clear();this.resolveExit(this.terminalResult);
   }
   onData(chunk){
@@ -64,29 +80,31 @@ export class ToolboxBridge {
       // Timed-out or already consumed IDs are never reused and cannot alter later calls.
       if(!p)continue;
       this.pending.delete(message.id);clearTimeout(p.timer);
-      p.resolve(Object.hasOwn(message,'result')?message.result:fail('outcome_unknown','service_error_response','unknown'));
+      p.resolve(Object.hasOwn(message,'result')?message.result:fail('outcome_unknown','service_error_response','unknown',p.identity));
     }
   }
   protocolError(){
     this.protocolFailure=true;
-    for(const [id,p] of this.pending){clearTimeout(p.timer);p.resolve(fail('outcome_unknown','malformed_service_response','unknown'));}
+    for(const [id,p] of this.pending){clearTimeout(p.timer);p.resolve(fail('outcome_unknown','malformed_service_response','unknown',p.identity));}
     this.pending.clear();
     // EOF invokes the service's owner-aware stop. Never kill/restart/replay here.
     this.child.stdin.end();
   }
   call(tool,args){
     if(!TOOLBOX_NAMES.includes(tool))return Promise.resolve(fail('invalid_request','unknown_toolbox_tool'));
-    if(this.closed||this.terminal||this.protocolFailure)return Promise.resolve(fail('capability_unavailable','toolbox_service_unavailable'));
+    if(this.closed||this.draining||this.terminal||this.protocolFailure)return Promise.resolve(fail('capability_unavailable','toolbox_service_unavailable'));
     if(this.pending.size>=MAX_PENDING)return Promise.resolve(fail('owner_busy','toolbox_transport_capacity'));
     if(!finite(args))return Promise.resolve(fail('invalid_request','invalid_json_arguments'));
+    const identity={};
+    for(const key of ['request_id','job_id','session_ref'])if(typeof args?.[key]==='string')identity[key]=args[key];
     const id='tb_'+(++this.sequence);
     let body;
     try{body=JSON.stringify({id,tool,arguments:args})+'\n';}catch{return Promise.resolve(fail('invalid_request','invalid_json_arguments'));}
     if(Buffer.byteLength(body)>MAX_BYTES)return Promise.resolve(fail('invalid_request','toolbox_request_too_large'));
     return new Promise(resolve=>{
-      const timer=setTimeout(()=>{if(!this.pending.has(id))return;this.pending.delete(id);resolve(fail('outcome_unknown','toolbox_transport_wait_expired','unknown'));},this.requestTimeoutMs);
-      this.pending.set(id,{resolve,timer});
-      try{this.child.stdin.write(body,error=>{if(error&&this.pending.has(id)){const p=this.pending.get(id);this.pending.delete(id);clearTimeout(p.timer);p.resolve(fail('outcome_unknown','toolbox_write_outcome_unknown','unknown'));}});}catch{const p=this.pending.get(id);this.pending.delete(id);clearTimeout(p.timer);p.resolve(fail('outcome_unknown','toolbox_write_outcome_unknown','unknown'));}
+      const timer=setTimeout(()=>{if(!this.pending.has(id))return;this.pending.delete(id);resolve(fail('outcome_unknown','toolbox_transport_wait_expired','unknown',identity));},this.requestTimeoutMs);
+      this.pending.set(id,{resolve,timer,identity});
+      try{this.child.stdin.write(body,error=>{if(error&&this.pending.has(id)){const p=this.pending.get(id);this.pending.delete(id);clearTimeout(p.timer);p.resolve(fail('outcome_unknown','toolbox_write_outcome_unknown','unknown',p.identity));}});}catch{const p=this.pending.get(id);if(p){this.pending.delete(id);clearTimeout(p.timer);p.resolve(fail('outcome_unknown','toolbox_write_outcome_unknown','unknown',p.identity));}}
     });
   }
   async close({waitMs=10000}={}){
@@ -100,7 +118,9 @@ export function startConfiguredToolbox(config,{spawnFunction=spawn}={}){
   const root=config.source_root;
   const names=['capability-runtime','resident-controller','defense-watchdog','building-controller','navigation-controller','navigation-cursor','external-controller','multiagent-coordination','gameplay-helpers'];
   const env={PATH:path.dirname(config.python_executable),PYTHONDONTWRITEBYTECODE:'1',PYTHONNOUSERSITE:'1',PYTHONPATH:names.map(n=>path.join(root,n)).join(path.delimiter),LANG:'C.UTF-8'};
-  const child=spawnFunction(config.python_executable,['-B','-m','mdc_toolbox','--control',config.control_directory,'--journal',config.journal_directory,'--runtime-journal',config.runtime_journal_directory],{cwd:root,env,stdio:['pipe','pipe','pipe'],windowsHide:true,shell:false});
+  const args=['-B','-m','mdc_toolbox','--control',config.control_directory,'--journal',config.journal_directory,'--runtime-journal',config.runtime_journal_directory];
+  if(config.storage_policy)args.push('--storage-warn-free-bytes',String(config.storage_policy.warn_free_bytes),'--storage-min-free-bytes',String(config.storage_policy.min_free_bytes),'--event-history-admission-bytes',String(config.storage_policy.event_history_admission_bytes));
+  const child=spawnFunction(config.python_executable,args,{cwd:root,env,stdio:['pipe','pipe','pipe'],windowsHide:true,shell:false});
   return new ToolboxBridge(child);
 }
 export function legacyMutationRefusal(name,configured){

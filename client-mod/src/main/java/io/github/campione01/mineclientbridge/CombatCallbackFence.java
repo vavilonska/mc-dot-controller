@@ -19,10 +19,14 @@ final class CombatCallbackFence implements AutoCloseable {
         } catch(RuntimeException failure){closed=true;throw failure;}
     }
     void raw(){
-        long elapsed=clock.getAsLong()-started;
-        if(closed || !owner.getAsBoolean() || elapsed<0 || elapsed>MAX_NANOS || tick.getAsLong()!=sourceTick){
-            closed=true;throw new IllegalStateException("combat_callback_owner_clock_or_tick_changed");
-        }
+        try {
+            if(closed || !owner.getAsBoolean())throw new IllegalStateException("combat_callback_owner_clock_or_tick_changed");
+            long currentTick=tick.getAsLong();
+            long elapsed=clock.getAsLong()-started;
+            // Callback-backed reads finish before the pure exact-owner predicate.
+            if(elapsed<0 || elapsed>MAX_NANOS || currentTick!=sourceTick || !owner.getAsBoolean())
+                throw new IllegalStateException("combat_callback_owner_clock_or_tick_changed");
+        } catch(RuntimeException failure){closed=true;throw failure;}
     }
     public void close(){closed=true;}
 }

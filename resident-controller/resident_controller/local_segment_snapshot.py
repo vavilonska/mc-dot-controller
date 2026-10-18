@@ -6,9 +6,10 @@ from .capability_snapshot import (_require, _integer, _number, _text, signed_lon
 PROFILE = 'movement-local-segment-observed-v1'
 FLOORS = {'minecraft:'+name for name in ('stone','cobblestone','dirt','grass_block','oak_planks',
     'andesite','granite','diorite','cobbled_deepslate','smooth_stone','stone_bricks','bricks')}
-CONTEXT_STATIONS = {'minecraft:barrel','minecraft:furnace'}
+CONTEXT_STATIONS = {'minecraft:barrel','minecraft:furnace','minecraft:crafting_table'}
+CONTEXT_LOGS = {'minecraft:'+name+'_log' for name in ('oak','spruce','birch','jungle','acacia','dark_oak')}
 CONTEXT_LEAVES = {'minecraft:oak_leaves','minecraft:birch_leaves'}
-CONTEXT_BLOCKS = CONTEXT_STATIONS | CONTEXT_LEAVES
+CONTEXT_BLOCKS = CONTEXT_STATIONS | CONTEXT_LEAVES | CONTEXT_LOGS
 
 
 def validate_local_segment(witness, intent, native):

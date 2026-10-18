@@ -176,6 +176,7 @@ class Runtime:
         self._lease_attempted, self._lease_active = False, False
         self._lease_info = None
         self.close_outcome = None
+        self._cleanup_started = False
         self._job_control = None
         self._job_generation = 0
         self._job_request_ids = []
@@ -227,13 +228,15 @@ class Runtime:
             self.close()
             raise
 
-    def begin_job(self, control, *, scoped_profiles=None):
+    def begin_job(self, control, *, scoped_profiles=None, owner_mode="ordinary"):
         """Bind the sole runtime to one admitted job; no replacement owner stack."""
         with self._mutex:
             self._open()
             require(self._job_control is None and not self.has_unresolved_execution,
                     "runtime_job_or_unknown_owner_present")
             require(not self._lease_active, "previous_job_lease_not_released")
+            require(owner_mode in ("ordinary", "external_stop"), "invalid_owner_mode")
+            self._owner_mode = owner_mode
             self._job_control = control
             self._job_generation += 1
             self._job_request_ids = []
@@ -241,6 +244,7 @@ class Runtime:
             self._job_scoped_profiles = dict(scoped_profiles or {})
             self._owner = uuid.uuid4().hex
             self._lease_attempted = False
+            self._cleanup_started = False
             self._preflight_request_id = None
             control.owner_check = self.check_job_owner
             try:
@@ -275,16 +279,22 @@ class Runtime:
             try:
                 with control.cleanup():
                     had_lease = self._lease_active
+                    release_observation = None
                     if self._lease_active:
-                        self.observe(allow_menu=True)
+                        release_observation = self._observe_cleanup()
                         session = self._session()
                         record = self._reserve("capability_release", {"op": "capability_release",
                             "owner_id": self._owner, "expected_defense_epoch": session["defense_epoch"]})
                         self._ownership_exchange(record)
                         self._lease_active = False
+                    from .navigation_handoff import report
+                    handoff = (report(release_observation, now=self.clock(), max_age=self.max_age,
+                                      owner_released=True, unresolved=self.has_unresolved_execution)
+                               if release_observation is not None else None)
                     result = Outcome("succeeded", "job_owner_release_confirmed", tuple(self._job_request_ids),
                                      {"owner_context": self.owner_context(), "input_release_confirmed": True if had_lease else None,
-                                      "cleanup_certainty": "confirmed" if had_lease else "not_needed"})
+                                      "cleanup_certainty": "confirmed" if had_lease else "not_needed",
+                                      "navigation_handoff": handoff})
                     self._job_control = None
                     self._job_scoped_profiles = {}
                     return result
@@ -345,7 +355,7 @@ class Runtime:
                         else:
                             # A fresh neutral observation is mandatory even when
                             # the last successful skill completed long ago.
-                            self.observe(allow_menu=True)
+                            self._observe_cleanup()
                             session = self._session()
                             record = self._reserve("capability_release", {"op": "capability_release",
                                 "owner_id": self._owner, "expected_defense_epoch": session["defense_epoch"]})
@@ -422,7 +432,7 @@ class Runtime:
                                 ("world_generation", "dimension", "player_uuid", "action_session"))
                         and type(data.get("defense_epoch")) is int,
                         "capability_ownership_context_not_ready")
-                record = self._reserve("capability_acquire", {"op": "capability_acquire", "owner_id": self._owner,
+                record = self._reserve("capability_acquire", {"op": ("external_stop_acquire" if getattr(self, "_owner_mode", "ordinary") == "external_stop" else "capability_acquire"), "owner_id": self._owner,
                     "expected_context": deepcopy(context), "expected_defense_epoch": data["defense_epoch"],
                     "duration_ms": self._lease_duration_ms})
                 self._lease_attempted = True
@@ -446,11 +456,24 @@ class Runtime:
             if record["kind"] == "capability_acquire":
                 receipt = self.client.acquire_capability(self._owner, command["duration_ms"],
                     min(3, self.wait_timeout), request_id=rid, expected_context=deepcopy(command["expected_context"]),
-                    expected_defense_epoch=command["expected_defense_epoch"])
+                    expected_defense_epoch=command["expected_defense_epoch"],
+                    **({"owner_mode": "external_stop"} if command["op"] == "external_stop_acquire" else {}))
             else:
                 receipt = self.client.release_capability(self._owner, min(3, self.wait_timeout), request_id=rid)
         except Exception as exc:
             self._unknown(record, "ownership_control_unknown:" + type(exc).__name__)
+        from resident_controller.acquisition_refusal import validate as valid_refusal
+        if (record["kind"] == "capability_acquire" and not self._lease_active
+                and command.get("owner_id") == self._owner
+                and valid_refusal(receipt, command, rid, record["gateway_session"])):
+            self._receipt(record, receipt)
+            if self._job_control is not None:
+                self._job_control.emit("ownership_acquisition_refused", {"request_id": rid,
+                    "acquisition_refusal": deepcopy(receipt["acquisition_refusal"])})
+            self._finish(record, "blocked", receipt["reason"],
+                         {"effects_none_proven": True, "acquisition_refusal": receipt["acquisition_refusal"]})
+            self._completed.add(rid)
+            raise SkillError(receipt["reason"], status="blocked", request_id=rid)
         if (not isinstance(receipt, dict) or receipt.get("request_id") != rid
                 or receipt.get("session_id") != record["gateway_session"]
                 or receipt.get("queue_request_id") is not None or receipt.get("status") != "succeeded"
@@ -460,6 +483,7 @@ class Runtime:
         if record["kind"] == "capability_acquire":
             if (not isinstance(lease, dict) or lease.get("owner_id") != self._owner
                     or lease.get("state") != "active" or lease.get("context") != command["expected_context"]
+                    or lease.get("owner_mode", "ordinary") != ("external_stop" if command["op"] == "external_stop_acquire" else "ordinary")
                     or lease.get("defense_epoch") != command["expected_defense_epoch"]):
                 self._unknown(record, "ownership_control_identity_unconfirmed")
         elif lease is not None:
@@ -542,8 +566,7 @@ class Runtime:
                                 and body.get("session_id") == record.get("gateway_session")
                                 and (body.get("status") in self.TERMINAL or
                                      body.get("status") == "uncertain" and record.get("status") == "unknown"
-                                     and self._journal.get("pending") == rid and record.get("kind") == "observation"
-                                     and record["command"].get("terrain_acquisition") in {"native-full729-v1","native-full729-client-clock-v1"}),
+                                     and self._journal.get("pending") == rid),
                                 "invalid_evidence_receipt_identity")
                         receipts += 1
             for key in ("pending", "semantic_pending"):
@@ -567,6 +590,28 @@ class Runtime:
         # result and native semantic checks can complete a mutation.
         record["receipt"] = {k: deepcopy(result[k]) for k in
             ("request_id", "session_id", "queue_request_id", "queue_session_id", "status", "reason") if k in result}
+        diagnostic = result.get("native_refusal_diagnostics")
+        if isinstance(diagnostic, dict) and "scoped_native_preflight" in record.get("command", {}):
+            from resident_controller.native_admission import validate, entity_diagnostic
+            try:
+                queue_session = result.get("queue_session_id", record["gateway_session"])
+                queue_id = result.get("queue_request_id", record["request_id"])
+                intent = {k: deepcopy(v) for k, v in record["command"].items() if k not in
+                    ("op", "scoped_native_preflight", "_navigation_defense_epoch", "_capability_owner_id", "_capability_expected_dimension", "fall_rescue_policy", "fall_rescue_binding")}
+                intent["action_id"] = uuid.uuid5(uuid.UUID(queue_session), queue_id + ":1").hex
+                body = {"preflight": record["command"]["scoped_native_preflight"], "intent": intent}
+                proof, code = diagnostic.get("native_admission"), diagnostic.get("reason")
+                summary = {"schema_version": 1, "diagnostics_only": True, "effect_free_proven": False}
+                if validate(proof, body, code):
+                    summary["native_admission"] = deepcopy(proof)
+                    entity = diagnostic.get("native_entity_rejection")
+                    if entity_diagnostic(entity, code): summary["native_entity_rejection"] = deepcopy(entity)
+                else:
+                    summary["native_admission_status"] = "missing_or_invalid"
+                record["native_refusal_summary"] = summary
+            except (ValueError, TypeError, KeyError, AttributeError):
+                record["native_refusal_summary"] = {"schema_version": 1, "diagnostics_only": True,
+                    "effect_free_proven": False, "native_admission_status": "missing_or_invalid"}
 
     def _compact(self):
         records = self._journal["records"]
@@ -597,11 +642,12 @@ class Runtime:
 
     def _reserve(self, kind, command, *, skill=None, before=None):
         require(self._journal["pending"] is None, "unknown_or_pending_request_blocks_new_work")
+        require(not self._cleanup_started or kind == "capability_release", "cleanup_only_no_new_work")
         enrollment = self._observation_reacquisition
         if enrollment is not None:
             require(kind == "observation" and enrollment.active_request_id is None,
                     "observation_reacquisition_read_only")
-        if self._job_control is not None and kind in ("mutation", "observation", "survey"):
+        if self._job_control is not None and kind in ("mutation", "observation", "survey", "cleanup_observation"):
             self._job_control.consume("actions" if kind == "mutation" else "observations")
         self._compact()
         require(len(self._journal["records"]) < 4096, "execution_identity_capacity_exhausted")
@@ -675,6 +721,14 @@ class Runtime:
                     self._finish(record, "cancelled" if exc.status == "cancelled" else "blocked", exc.reason,
                                  {"submission_outcome": "stopped_before_dispatch", "gameplay_effect_confirmed": False})
                     raise
+            # The owner checkpoint above can block on session I/O. Validate the
+            # original immutable capture again after that final blocking call.
+            # Do not call owner_check, persist, refresh, or recapture on success.
+            if before is not None and not 0 <= self.clock() - before.captured_at <= self.max_age:
+                self._finish(record, "blocked", "preflight_observation_stale",
+                             {"submission_outcome": "stopped_before_dispatch", "gameplay_effect_confirmed": False})
+                raise SkillError("preflight_observation_stale")
+            if self._job_control is not None and record["kind"] == "mutation":
                 self._job_effect_certainty = "unknown"
             returned = self.client.submit(command, request_id=rid)
             self._observation_timing(record, "submit_returned")
@@ -692,10 +746,28 @@ class Runtime:
                     if result is not None:
                         cancel = record.get("cancel_control")
                         if cancel:
+                            # Preserve the original before parsing a possibly malformed cancel acknowledgement.
+                            if (isinstance(result, dict) and result.get("request_id") == rid
+                                    and result.get("session_id") == record["gateway_session"]):
+                                self._receipt(record, result)
                             ack = self.client.result(cancel["request_id"])
                             if ack is not None:
                                 cancel["receipt"] = deepcopy(ack)
                                 self._save()
+                                if "exact_cancel_terminal" in ack:
+                                    from resident_controller.cancel_terminal import validate
+                                    context = dict(zip(("world_generation", "dimension", "player_uuid", "action_session"),
+                                                       record["before_context"]))
+                                    if not validate(ack, cancel["command"], cancel["request_id"],
+                                                    record["gateway_session"], original=result, context=context):
+                                        self._unknown(record, "exact_cancel_terminal_proof_unconfirmed")
+                                if "exact_queued_cancel_terminal" in ack:
+                                    from resident_controller.queued_cancel_terminal import validate
+                                    context = dict(zip(("world_generation", "dimension", "player_uuid", "action_session"),
+                                                       record["before_context"]))
+                                    if not validate(ack, cancel["command"], cancel["request_id"],
+                                                    record["gateway_session"], original=result, context=context):
+                                        self._unknown(record, "exact_queued_cancel_terminal_proof_unconfirmed")
                                 if (ack.get("request_id") != cancel["request_id"]
                                         or ack.get("session_id") != record["gateway_session"]
                                         or ack.get("status") != "succeeded" or self._unsafe_flags(ack)):
@@ -717,12 +789,13 @@ class Runtime:
             self._unknown(record, "result_request_identity_mismatch")
         if result.get("session_id") != record["gateway_session"]:
             self._unknown(record, "result_gateway_session_mismatch")
+        if "fall_rescue_policy" in record["command"]:
+            from .attached_fall import retain
+            retain(self, record, result)
         if result.get("status") not in self.TERMINAL:
-            if (record["kind"] == "observation"
-                    and record["command"].get("terrain_acquisition") in {"native-full729-v1","native-full729-client-clock-v1"}
-                    and result.get("status") == "uncertain"):
-                # Preserve the original acquisition/closure evidence while the
-                # same pending ID remains unknown. This is never acceptance.
+            if result.get("status") == "uncertain":
+                # Identity was checked above. Retain original failure evidence;
+                # archiving never settles ownership or turns UNKNOWN into success.
                 self._receipt(record, result)
             self._unknown(record, "request_" + str(result.get("status", "unknown")))
         self._receipt(record, result)
@@ -741,7 +814,7 @@ class Runtime:
         self._journal["pending"] = None
         self._save()
 
-    def _validate_state(self, payload, *, allow_menu=False, context=None, allowed_dimension=None):
+    def _validate_state(self, payload, *, allow_menu=False, context=None, allowed_dimension=None, cleanup=False):
         require(isinstance(payload, dict) and isinstance(payload.get("state"), dict), "state_missing")
         state = payload["state"]
         p, w, a = state.get("player"), state.get("world"), state.get("client_action")
@@ -749,12 +822,32 @@ class Runtime:
         require(state.get("focused") is True, "game_window_unfocused_or_unknown")
         require(state.get("private_singleplayer") is True, "private_singleplayer_required")
         require(type(state.get("screen_open")) is bool and (allow_menu or not state["screen_open"]), "unexpected_menu")
-        require(state.get("paused") is False, "game_paused_or_unknown")
+        require(type(state.get("paused")) is bool if cleanup else state.get("paused") is False, "game_paused_or_unknown")
         require(p.get("alive") is True and type(p.get("health")) in (int, float)
                 and math.isfinite(p["health"]) and p["health"] > 0, "player_not_alive")
         held = state.get("held_inputs")
         require(isinstance(held, dict) and held.get("neutral") is True, "input_release_not_observed")
         require(a.get("status") in self.TERMINAL | {"idle"}, "native_action_still_running")
+        if "managed_navigation" in state or "managed_navigation_status" in state:
+            navigation=state.get("managed_navigation_status")
+            require(isinstance(navigation,dict) and type(navigation.get("managed_navigation_schema_version")) is int
+                    and navigation.get("managed_navigation_schema_version")==1 and navigation.get("input_owned") is False
+                    and navigation.get("unknown_outcome_quarantined") is False,"managed_navigation_original_owner_unresolved")
+        if "external_navigation" in state or "external_navigation_status" in state:
+            navigation=state.get("external_navigation_status")
+            require(isinstance(navigation,dict) and type(navigation.get("external_navigation_schema_version")) is int
+                    and navigation.get("external_navigation_schema_version")==1 and navigation.get("input_owned") is False
+                    and navigation.get("unknown_outcome_quarantined") is False,"external_navigation_original_owner_unresolved")
+        if "external_controller" in state:
+            external = state["external_controller"]
+            require(isinstance(external, dict) and type(external.get("schema_version")) is int
+                    and external.get("schema_version") == 1
+                    and external.get("idle_proven") is True, "external_controller_idle_unproven")
+        if "native_fall_rescue_status" in state or "native_fall_rescue" in state:
+            rescue = state.get("native_fall_rescue_status")
+            require(isinstance(rescue, dict) and type(rescue.get("fall_rescue_schema_version")) is int
+                    and rescue.get("fall_rescue_schema_version") == 1 and rescue.get("input_owned") is False
+                    and rescue.get("unknown_outcome_quarantined") is False, "native_rescue_owner_or_quarantine")
         require(all(type(p.get(k)) in (int, float) and math.isfinite(p[k]) for k in ("x", "y", "z")), "invalid_player_position")
         current = (w.get("world_generation"), w.get("dimension"), p.get("uuid"), a.get("action_session"))
         require(all(isinstance(v, str) and v for v in current), "context_identity_missing")
@@ -764,6 +857,11 @@ class Runtime:
                     and current[2:] == context[2:], "world_dimension_player_or_action_session_changed")
         tick = w.get("game_time")
         require(type(tick) is int and tick >= 0, "game_tick_missing")
+        if "external_controller" in state:
+            require(all(external.get(k) == value for k, value in
+                        (("world_generation", current[0]), ("player_uuid", current[2]),
+                         ("action_session", current[3]), ("source_tick", tick))),
+                    "external_controller_context_mismatch")
         guard = state.get("capability_guard")
         require(isinstance(guard, dict) and type(guard.get("schema_version")) is int
                 and guard["schema_version"] == 1 and type(guard.get("source_tick")) is int
@@ -773,7 +871,7 @@ class Runtime:
                 and -(2**63) <= int(guard["source_nano"]) < 2**63, "native_capability_nano_invalid")
         return state, current, tick
 
-    def _make_observation(self, result, captured, *, allow_menu=False, context=None, allowed_dimension=None, epoch=None, options=None):
+    def _make_observation(self, result, captured, *, allow_menu=False, context=None, allowed_dimension=None, epoch=None, options=None, cleanup=False):
         checked_at = self.clock()
         record = self._journal["records"].get(result.get("request_id"))
         if record is not None:
@@ -791,7 +889,7 @@ class Runtime:
         except (ValueError, KeyError, TypeError) as exc:
             raise SkillError("invalid_native_capability_wire_provenance") from exc
         state, identity, tick = self._validate_state(payload, allow_menu=allow_menu,
-                                                    context=context, allowed_dimension=allowed_dimension)
+                                                    context=context, allowed_dimension=allowed_dimension, cleanup=cleanup)
         stamp=None
         if self.observation_clock_contract is not None:
             try:
@@ -812,9 +910,51 @@ class Runtime:
         observation = Observation(data["state"], data.get("terrain"), data, tick, identity,
                                   captured, result["request_id"], self._owner, _digest(data), epoch, options or {},
                                   None if stamp is None else stamp.as_dict())
-        self._context, self._last = identity, observation
-        if stamp is None: self._last_tick=tick
-        else: self._last_observation_clock=stamp
+        if not cleanup:
+            self._context, self._last = identity, observation
+            if stamp is None: self._last_tick=tick
+            else: self._last_observation_clock=stamp
+        return observation
+
+    def _observe_cleanup(self):
+        """One exact-owner neutral read; explicit pause is not gameplay admission."""
+        from resident_controller.cleanup_proof import validate_cleanup
+        require(not self.has_unresolved_execution and not self._cleanup_started,
+                "cleanup_requires_settled_original_execution")
+        require(self._lease_active and self._lease_info is not None, 'cleanup_exact_owner_required')
+        session = self._session()
+        if (type(session.get('capability_cleanup_observation_schema_version')) is not int
+                or session['capability_cleanup_observation_schema_version'] != 1):
+            return self.observe(allow_menu=True)  # Old gateways retain their old fail-closed contract.
+        require(self.observation_clock_contract is None, 'cleanup_read_only_clock_not_supported')
+        context = deepcopy(session['capability_lease']['context'])
+        require(self._context is None or tuple(context[k] for k in
+                ('world_generation','dimension','player_uuid','action_session')) == self._context,
+                'cleanup_original_context_changed')
+        command = {'op': 'observe', 'capability_observation': True, 'entity_radius': 8, 'capability_cleanup': True}
+        record = self._reserve('cleanup_observation', self._owned_command(command, session))
+        self._cleanup_started = True
+        self._preflight_request_id = None
+        captured = self.clock()
+        result = self._exchange(record)
+        if result['status'] != 'succeeded':
+            self._finish(record, 'failed', 'cleanup_observation_failed')
+            raise SkillError('cleanup_observation_failed', request_id=record['request_id'])
+        try:
+            proof = validate_cleanup(result.get('result'), context,
+                last_fall=getattr(self._job_control, 'fall_rescue_last_status', None), owner_id=self._owner)
+            observation = self._make_observation(result, captured, allow_menu=True,
+                context=tuple(context[k] for k in ('world_generation','dimension','player_uuid','action_session')),
+                epoch=session['defense_epoch'], options={'entity_radius': 8, 'cleanup_only': True}, cleanup=True)
+            current = self._session()
+            require(current['defense_epoch'] == session['defense_epoch']
+                    and current['capability_lease'].get('cleanup_only') is True,
+                    'cleanup_gateway_proof_unconfirmed')
+        except (SkillError, ValueError) as exc:
+            reason = exc.reason if isinstance(exc, SkillError) else str(exc)
+            self._finish(record, 'blocked', reason)
+            raise SkillError(reason, request_id=record['request_id']) from None
+        self._finish(record, 'succeeded', 'exact_owner_neutral_cleanup_observed', proof)
         return observation
 
     def observe(self, terrain=False, radius=4, vertical=4, allow_menu=False, *, entity_radius=8, _context=None, _allowed_dimension=None,
@@ -1024,6 +1164,7 @@ class Runtime:
         require(isinstance(command, dict) and command.get("op") == "action"
                 and command.get("action") in self.ACTIONS, "guarded_native_action_required")
         require("action_id" not in command, "native_id_is_resident_owned")
+        require(not {"fall_rescue_policy","fall_rescue_binding"} & set(command), "fall_rescue_metadata_is_owner_compiled")
         self._control_checkpoint()
         timeout = command.get("timeout_ms", 15000)
         require(type(timeout) is int and 50 <= timeout <= 60000, "finite_action_timeout_required")
@@ -1070,6 +1211,8 @@ class Runtime:
                 body = self._navigation_binding.bind(body, before.state)
             except ValueError as exc:
                 raise SkillError(str(exc)) from None
+        from .attached_fall import attach
+        body = attach(self, body, before, timeout)
         return self._owned_command(body, session)
 
     @staticmethod
@@ -1083,7 +1226,7 @@ class Runtime:
                                             or policy.get("input_release_unconfirmed") is not False)
 
     @classmethod
-    def _no_effect(cls, result):
+    def _no_effect(cls, result, record=None):
         if cls._unsafe_flags(result) or cls._unsafe_flags(result.get("result")):
             return False
         policy = result.get("policy_rejection")
@@ -1109,6 +1252,26 @@ class Runtime:
                 and result.get("action") is None and result.get("action_id") is None):
             return True
         admission = result.get("action_admission")
+        if record is not None and "scoped_native_preflight" in record.get("command", {}):
+            if not isinstance(admission, dict) or type(admission.get("schema_version")) is not int or admission["schema_version"] != 2:
+                return False
+            from resident_controller.native_admission import validate, no_effect
+            try:
+                queue_session = result.get("queue_session_id", record["gateway_session"])
+                queue_id = result.get("queue_request_id", record["request_id"])
+                action_id = uuid.uuid5(uuid.UUID(queue_session), queue_id + ":1").hex
+                intent = {k: deepcopy(v) for k, v in record["command"].items() if k not in
+                    ("op", "scoped_native_preflight", "_navigation_defense_epoch", "_capability_owner_id", "_capability_expected_dimension", "fall_rescue_policy", "fall_rescue_binding")}
+                intent["action_id"] = action_id
+                body = {"preflight": record["command"]["scoped_native_preflight"], "intent": intent}
+                proof = admission.get("native_admission")
+                return (result.get("status") == "failed" and validate(proof, body, result.get("reason"))
+                    and no_effect(proof) and admission.get("admitted") is False and admission.get("uncertain") is False
+                    and type(admission.get("http_status")) is int and 400 <= admission["http_status"] < 500
+                    and admission.get("reason") == result.get("reason")
+                    and result.get("action") is None and result.get("action_id") is None and result.get("cancellation") is None)
+            except (ValueError, TypeError, KeyError, AttributeError):
+                return False
         return (result.get("status") == "failed" and isinstance(admission, dict)
                 and type(admission.get("schema_version")) is int and admission["schema_version"] == 1
                 and type(admission.get("http_status")) is int and 400 <= admission["http_status"] < 500
@@ -1146,7 +1309,7 @@ class Runtime:
         if "scoped_native_preflight" in record["command"]:
             from resident_controller.capability_snapshot import validate_scoped_witness
             intent = {k: deepcopy(v) for k, v in record["command"].items() if k not in
-                ("op", "scoped_native_preflight", "_navigation_defense_epoch", "_capability_owner_id", "_capability_expected_dimension")}
+                ("op", "scoped_native_preflight", "_navigation_defense_epoch", "_capability_owner_id", "_capability_expected_dimension", "fall_rescue_policy", "fall_rescue_binding")}
             intent["action_id"] = native["action_id"]
             try:
                 validate_scoped_witness(native, record["command"]["scoped_native_preflight"], native["action_id"], intent)
@@ -1205,7 +1368,7 @@ class Runtime:
                     self._finish(record, "blocked", exc.reason)
                     raise
                 receipt = self._exchange(record, before=before)
-                if self._no_effect(receipt):
+                if self._no_effect(receipt, record):
                     if self._job_control is not None:
                         self._job_effect_certainty = record.get("prior_job_effect_certainty", "none_proven")
                     evidence = {"gameplay_effect_confirmed": False, "server_confirmed": False,
@@ -1297,6 +1460,10 @@ class Runtime:
                         self._journal["semantic_pending"] = None
                     self._save()
                 evidence = {"server_confirmed": False}
+                if record is not None and "receipt_ref" in record:
+                    evidence["original_receipt_ref"] = deepcopy(record["receipt_ref"])
+                if record is not None and "native_refusal_summary" in record:
+                    evidence["native_refusal_diagnostics"] = deepcopy(record["native_refusal_summary"])
                 if record is not None and native is not None:
                     evidence.update(native_action_id=native["action_id"], native_status=native["status"],
                         command_sha256=record["command_sha256"], semantic_verification="incomplete")
@@ -1308,6 +1475,10 @@ class Runtime:
                     record.update(status="blocked", reason="verification_error:" + type(exc).__name__)
                     self._save()
                 evidence = {"server_confirmed": False}
+                if record is not None and "receipt_ref" in record:
+                    evidence["original_receipt_ref"] = deepcopy(record["receipt_ref"])
+                if record is not None and "native_refusal_summary" in record:
+                    evidence["native_refusal_diagnostics"] = deepcopy(record["native_refusal_summary"])
                 if record is not None and native is not None:
                     evidence.update(native_action_id=native["action_id"], native_status=native["status"],
                         command_sha256=record["command_sha256"], semantic_verification="incomplete")
@@ -1365,7 +1536,7 @@ class Runtime:
                 return Outcome("unknown", "matching_terminal_receipt_not_available", (rid,))
             if record["kind"] in ("capability_acquire", "capability_release"):
                 return Outcome("unknown", "ownership_control_requires_operator_reconciliation", (rid,))
-            if record["kind"] == "mutation" and not self._no_effect(result):
+            if record["kind"] == "mutation" and not self._no_effect(result, record):
                 fake_before = Observation({}, None, {}, 0, tuple(record["before_context"]), 0, "")
                 try:
                     self._native_receipt(record, result, fake_before)

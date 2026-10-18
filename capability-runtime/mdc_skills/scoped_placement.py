@@ -1,11 +1,21 @@
-"""One explicit stationary cobblestone placement, never blueprint execution."""
+"""One explicit stationary closed-material placement, never blueprint execution."""
 from copy import deepcopy
 from . import inventory, reach
 from .core import Outcome, require
-from .scoped_mining import BLOCKS
+from .scoped_mining import LEGACY_BLOCKS as BLOCKS
 
 PROFILE = 'placement-local-observed-v1'
-BLOCK = 'minecraft:cobblestone'
+BLOCK = 'minecraft:cobblestone'  # Original default retained for consumers.
+MATERIALS = (BLOCK, 'minecraft:crafting_table', 'minecraft:furnace')
+HORIZONTAL_FACES = ('north', 'south', 'east', 'west')
+
+
+def exact_material(block_id, properties):
+    return (type(properties) is dict and block_id in MATERIALS
+            and (set(properties) == {'facing', 'lit'}
+                 and properties['facing'] in HORIZONTAL_FACES and properties['lit'] == 'false'
+                 if block_id == 'minecraft:furnace' else properties == {}))
+
 STACK_FIELDS = ('id', 'count', 'empty', 'item_fingerprint', 'component_fingerprint', 'max_stack_size')
 
 
@@ -20,7 +30,7 @@ def _inventory(observation):
     return {r['slot']: r for r in rows}
 
 
-def _placed(before, after, target, slot):
+def _placed(before, after, target, slot, expected_block_id=BLOCK):
     native = after.state.get('client_action', {})
     result = native.get('result', {})
     proof = result.get('placement', {})
@@ -42,7 +52,7 @@ def _placed(before, after, target, slot):
     return (selected['count'] == count and proof.get('initial_count') == old[slot]['count']
             and proof.get('final_count') == count and proof.get('selected_slot') == slot
             and (selected['empty'] is True and selected['id'] in ('', 'minecraft:air') if count == 0 else
-                 selected['empty'] is False and selected['id'] == BLOCK
+                 selected['empty'] is False and selected['id'] == expected_block_id
                  and selected['component_fingerprint'] == old[slot]['component_fingerprint']))
 
 
@@ -58,7 +68,7 @@ def place_local(runtime, support, face, expected_support_id, expected_support_pr
     require(-2048 <= support['y'] <= 2048, 'placement_support_out_of_bounds')
     require(face in reach.FACES and expected_support_id in BLOCKS and expected_support_properties == {},
             'placement_static_support_and_face_required')
-    require(expected_block_id == BLOCK and expected_block_properties == {}, 'placement_plain_cobblestone_required')
+    require(exact_material(expected_block_id, expected_block_properties), 'placement_exact_material_required')
     target = {k: support[k] + reach.FACES[face][i] for i,k in enumerate(('x','y','z'))}
     require(-2048 <= target['y'] <= 2048 and abs(target['x']) <= 30000000 and abs(target['z']) <= 30000000,
             'placement_target_out_of_bounds')
@@ -69,17 +79,17 @@ def place_local(runtime, support, face, expected_support_id, expected_support_pr
     slot = before.player.get('selected_slot')
     require(type(slot) is int and 0 <= slot <= 8, 'placement_selected_slot_required')
     held = rows[slot]
-    require(held.get('id') == BLOCK and held.get('empty') is False and 1 <= held['count'] <= 64
-            and held.get('max_stack_size') == 64, 'placement_selected_cobblestone_required')
+    require(held.get('id') == expected_block_id and held.get('empty') is False and 1 <= held['count'] <= 64
+            and held.get('max_stack_size') == 64, 'placement_selected_plain_material_required')
     command = {'op':'action', 'action':'place_block', 'support':support, 'face':face,
         'expected_support_id':expected_support_id, 'expected_support_properties':deepcopy(expected_support_properties),
-        'expected_block_id':BLOCK, 'expected_block_properties':{},
+        'expected_block_id':expected_block_id, 'expected_block_properties':deepcopy(expected_block_properties),
         'expected_target_id':'minecraft:air', 'expected_target_properties':{}, 'placement_hit':hit,
         'placement_footprint':[{'position':target, 'expected_id':'minecraft:air', 'expected_properties':{},
-                                'block_id':BLOCK, 'properties':{}}], 'timeout_ms':2000}
+                                'block_id':expected_block_id, 'properties':deepcopy(expected_block_properties)}], 'timeout_ms':2000}
     outcome = runtime.execute('building.place_local', command,
-        lambda old,new: _placed(old,new,target,slot), before=before, stable_samples=2, max_samples=8)
+        lambda old,new: _placed(old,new,target,slot,expected_block_id), before=before, stable_samples=2, max_samples=8)
     return Outcome(outcome.status, outcome.reason, outcome.request_ids,
         {**outcome.evidence, 'profile':PROFILE, 'target':target, 'support':support, 'face':face,
-         'scope':'one_stationary_cobblestone_placement', 'automatic_replay_allowed':False,
+         'scope':'one_stationary_closed_material_placement', 'automatic_replay_allowed':False,
          'server_confirmed':False}, outcome.last_observation)
