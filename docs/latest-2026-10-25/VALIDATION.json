@@ -1,0 +1,344 @@
+{
+  "scope": "offline source publication; no gameplay/loader/full-Gradle acceptance",
+  "base_commit": "39799603de3372ec30a917a09382684d3593566c",
+  "native_full_compile": {
+    "result": "PASS",
+    "sources": 269,
+    "classes": 632,
+    "byte_exact_reference_classes": 632,
+    "dependency_pins": 120,
+    "initial_targeted_classpath": "22 existing AT visibility errors; resolved using all unchanged original AT rules, no source change"
+  },
+  "r14_exact_rebuild": {
+    "result": "PASS",
+    "assertions_or_scenarios": 1117,
+    "source_hooks": 34,
+    "sha256": "29141caad50641cdcfc9826a138ff30b2cfd7c555e24ce726fd03abbe366b68e"
+  },
+  "inherited_native": {
+    "result": "PASS",
+    "group_results": [
+      {
+        "group": "blaze-portal",
+        "results": [
+          {
+            "compile_exit_code": 0
+          },
+          {
+            "test": "AdmissionBoundaryChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "BlazeEscortChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "LandingCorridorChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "ThreatPortalChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          }
+        ]
+      },
+      {
+        "group": "enderman",
+        "results": [
+          {
+            "compile_exit_code": 0
+          },
+          {
+            "test": "AdmissionBoundaryChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "EndermanShelterChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          }
+        ]
+      },
+      {
+        "group": "husk",
+        "results": [
+          {
+            "compile_exit_code": 0
+          },
+          {
+            "test": "AdmissionBoundaryChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "BlazeEscortChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "HuskEscortChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          }
+        ]
+      },
+      {
+        "group": "ordinary-monotonic",
+        "results": [
+          {
+            "compile_exit_code": 0
+          },
+          {
+            "test": "OrdinaryMonotonicGuardChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          }
+        ]
+      },
+      {
+        "group": "world-backup",
+        "results": [
+          {
+            "compile_exit_code": 0
+          },
+          {
+            "test": "BackupCompatibilityChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupNativeChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupSchedulerChecks",
+            "jvm_options": [
+              "-Dmineclient.backup.intervalSeconds=0"
+            ],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupSchedulerChecks",
+            "jvm_options": [
+              "-Dmineclient.backup.intervalSeconds=60"
+            ],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupSchedulerChecks",
+            "jvm_options": [
+              "-Dmineclient.backup.intervalSeconds=1800"
+            ],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupSchedulerChecks",
+            "jvm_options": [
+              "-Dmineclient.backup.intervalSeconds=59"
+            ],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupSchedulerChecks",
+            "jvm_options": [
+              "-Dmineclient.backup.intervalSeconds=86401"
+            ],
+            "exit_code": 0
+          },
+          {
+            "test": "BackupThreatChecks",
+            "jvm_options": [],
+            "exit_code": 0
+          }
+        ]
+      }
+    ],
+    "test_portability_changes": [
+      "Latest Husk-aware BlazeEscortChecks supersedes earlier unsupported-Husk assertion",
+      "Enderman source hook ignores whitespace; production predicates unchanged"
+    ]
+  },
+  "python_additions": [
+    {
+      "component": "interaction-controller",
+      "exit_code": 0,
+      "summary": [
+        "Ran 33 tests in 3.633s",
+        "OK (skipped=3)"
+      ]
+    },
+    {
+      "component": "interaction2-controller",
+      "exit_code": 1,
+      "summary": [
+        "Ran 6 tests in 0.622s",
+        "FAILED (errors=4)"
+      ],
+      "qualification": "unavailable private legacy ledger/plan fixtures; production source not changed to bypass these fixtures",
+      "result_kind": "test-discovery errors, not a passing suite"
+    },
+    {
+      "component": "interaction3-controller",
+      "exit_code": 1,
+      "summary": [
+        "Ran 7 tests in 0.540s",
+        "FAILED (errors=5)"
+      ],
+      "qualification": "unavailable private legacy ledger/plan fixtures; production source not changed to bypass these fixtures",
+      "result_kind": "test-discovery errors, not a passing suite"
+    },
+    {
+      "component": "navigation4-controller",
+      "exit_code": 1,
+      "summary": [
+        "Ran 3 tests in 0.002s",
+        "FAILED (errors=3)"
+      ],
+      "qualification": "unavailable private legacy ledger/plan fixtures; production source not changed to bypass these fixtures",
+      "result_kind": "test-discovery errors, not a passing suite"
+    },
+    {
+      "component": "maintenance5-controller",
+      "exit_code": 1,
+      "summary": [
+        "Ran 3 tests in 0.001s",
+        "FAILED (errors=3)"
+      ],
+      "qualification": "unavailable private legacy ledger/plan fixtures; production source not changed to bypass these fixtures",
+      "result_kind": "test-discovery errors, not a passing suite"
+    },
+    {
+      "component": "survival6-controller",
+      "exit_code": 1,
+      "summary": [
+        "Ran 2 tests in 0.000s",
+        "FAILED (errors=2)"
+      ],
+      "qualification": "unavailable private legacy ledger/plan fixtures; production source not changed to bypass these fixtures",
+      "result_kind": "test-discovery errors, not a passing suite"
+    },
+    {
+      "component": "short-input-controller",
+      "exit_code": 0,
+      "summary": [
+        "Ran 38 tests in 3.533s",
+        "OK"
+      ]
+    },
+    {
+      "component": "damage-watch",
+      "exit_code": 0,
+      "summary": [
+        "Ran 25 tests in 2.101s",
+        "OK"
+      ]
+    },
+    {
+      "component": "mdc-live-helper-rebuild-20261022-r9",
+      "exit_code": 0,
+      "summary": [
+        "Ran90tests",
+        "OK after test-only drift corrections"
+      ],
+      "initial_result": {
+        "tests": 90,
+        "failures": 2,
+        "errors": 1
+      },
+      "tests": 90
+    },
+    {
+      "component": "mdc-ordinary-admission-recovery-20261023",
+      "exit_code": 0,
+      "summary": [
+        "Ran 20 tests in 9.142s",
+        "OK"
+      ]
+    },
+    {
+      "component": "mdc-room-return-settle-pickup-20261023",
+      "exit_code": 0,
+      "summary": [
+        "Ran 19 tests in 12.277s",
+        "OK"
+      ]
+    },
+    {
+      "component": "mdc-terrain-memory-20261023",
+      "exit_code": 0,
+      "summary": [
+        "31tests PASS with -s tests"
+      ],
+      "initial_attempt": "root discovery selected zero tests (ineffective command)",
+      "tests": 31
+    },
+    {
+      "component": "mdc-travel-supervisor-r1_1-20261024",
+      "exit_code": 0,
+      "summary": [
+        "Ran 33 tests in 0.215s",
+        "OK"
+      ]
+    },
+    {
+      "component": "mdc-travel-supervisor-water-r1-20261024",
+      "exit_code": 0,
+      "summary": [
+        "Ran 16 tests in 0.032s",
+        "OK"
+      ]
+    }
+  ],
+  "python_node_aggregate": {
+    "status": "RUNNING",
+    "started_utc": "2026-10-25T19:48:48Z",
+    "command": "python3 capability-runtime/run_checks.py",
+    "full_suite_green": false
+  },
+  "npm_test": {
+    "result": "FAIL",
+    "initial_toolbox_tests": 57,
+    "initial_pass": 53,
+    "initial_fail": 4,
+    "serial_exact_command_retry": {
+      "tests_before_toolbox": 92,
+      "passed_before_toolbox": 92,
+      "toolbox_tests": 57,
+      "passed": 56,
+      "failed": 1,
+      "failure": "table_success returned unknown instead of succeeded"
+    },
+    "qualification": "owner-chain timeout/heartbeat failures retained; no production workaround and no broad all-green claim"
+  },
+  "static_python_parse": {
+    "result": "PASS",
+    "files": 759
+  },
+  "excluded_private_inputs": [
+    "TEST-world cold geometry block dump",
+    "legacy94/101/338 ledger fixtures",
+    "campaign plans and routes",
+    "raw live logs / worlds / tokens / runtime configurations"
+  ],
+  "full_gradle_loader_test": "NOT_RUN",
+  "new_live_gameplay_test": "NOT_RUN",
+  "publication_product_source_changed_for_tests": false,
+  "node_fall_rescue_followup": {
+    "result": "PASS",
+    "tests": 1,
+    "reason": "npm command chain stopped before this retained final stage; separately executed exact test file"
+  },
+  "native_portable_verifier_cli": {
+    "positive": "PASS 269 sources,632 byte-exact reference classes,120 dependency pins",
+    "negative": [
+      "existing output rejected",
+      "wrong reference SHA rejected before output creation"
+    ]
+  }
+}

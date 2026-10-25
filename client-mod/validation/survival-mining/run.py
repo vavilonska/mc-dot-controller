@@ -33,7 +33,7 @@ try:
  for kind in LOGS:
   for axis in ('x','y','z'):cases.append(fixture('minecraft:'+kind+'_log',{'axis':axis}))
  for ore in ('minecraft:iron_ore','minecraft:deepslate_iron_ore'):cases.append(fixture(ore))
- contexts=[('minecraft:'+kind+'_leaves','LeavesBlock',{'distance':'3','persistent':'false','waterlogged':'false'},True) for kind in LOGS]
+ contexts=[('minecraft:'+kind+'_leaves','MangroveLeavesBlock' if kind=='mangrove' else 'LeavesBlock',{'distance':'3','persistent':'false','waterlogged':'false'},True) for kind in LOGS]
  contexts += [('minecraft:short_grass','TallGrassBlock',{},False),('minecraft:fern','TallGrassBlock',{},False),
   ('minecraft:tall_grass','DoublePlantBlock',{'half':'lower'},False),('minecraft:large_fern','DoublePlantBlock',{'half':'upper'},False),
   ('minecraft:poppy','FlowerBlock',{},False),('minecraft:vine','VineBlock',dict.fromkeys(('up','north','south','east','west'),'false'),False),

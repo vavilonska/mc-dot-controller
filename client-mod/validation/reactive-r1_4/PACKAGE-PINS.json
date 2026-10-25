@@ -1,0 +1,17 @@
+{
+  "base": {
+    "directory": "mdc-native-blaze-escort-FROZEN-20261023-bc9e4c5d",
+    "index_sha256": "44135cfacef3ced49199f4002b0993ed7b2d34264a432dd615404cd7ba630fb7",
+    "sha256sums_sha256": "ecc579a8fa24987cccf46eb1871027e2531c6f7866667b0a1da5350251e7ef78"
+  },
+  "build": {
+    "directory": "mdc-world-backup-r1-FROZEN-20261023-c69e5785",
+    "index_sha256": "e4a9b8e5b242139e0a0c66d838223a98ca32e956b2c271de058db8a4c1910773",
+    "sha256sums_sha256": "71a0105a736293e035ac9b02f0d7f236d2dbeb4f8ea8358753cbe67594ac83b7"
+  },
+  "deployed": {
+    "directory": "mdc-native-reactive-defense-r1_2-FROZEN-20261025-f51c8791",
+    "index_sha256": "e6a8d1945b5c6668fd2d3d749975246e64aaea6da770b5925b898f4989816b9e",
+    "sha256sums_sha256": "9fd578e9a631385575e1402ff4f46e45b1f46bdec88962dfcdca3706eaefa3fa"
+  }
+}

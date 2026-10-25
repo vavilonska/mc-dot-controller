@@ -14,9 +14,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(BlockItem.class)
 public abstract class ScopedPlacementItemMixin {
     @Inject(method="<init>",at=@At("RETURN"),require=1)
-    private void mineclientBridge$placementItemInstalled(CallbackInfo ci){ScopedPlacementDispatch.itemInstalled();}
+    private void mineclientBridge$placementItemInstalled(CallbackInfo ci){ScopedPlacementDispatch.itemInstalled();io.github.campione01.mineclientbridge.RecoveryMaintenancePlacementDispatch.itemInstalled();}
     @Inject(method="placeBlock",at=@At("HEAD"),require=1)
     private void mineclientBridge$placementEffect(BlockPlaceContext context,BlockState state,CallbackInfoReturnable<Boolean> cir){
-        ScopedPlacementDispatch.beforeEffect((BlockItem)(Object)this,context,state);
+        ScopedPlacementDispatch.beforeEffect((BlockItem)(Object)this,context,state);io.github.campione01.mineclientbridge.RecoveryMaintenancePlacementDispatch.beforeEffect((BlockItem)(Object)this,context,state);
     }
 }

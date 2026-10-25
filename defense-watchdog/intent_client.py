@@ -57,14 +57,25 @@ class IntentClient:
         from fall_rescue_adjudication import OPS,validate
         adjudication=isinstance(command,dict) and command.get('op') in OPS
         if adjudication:validate(command)
+        life_ack=isinstance(command,dict) and command.get('op')=='acknowledge_new_life'
+        if life_ack:
+            from resident_controller.new_life_acknowledgment import command as validate_life
+            validate_life(command)
+            if self._capability_owner is not None:raise ValueError('new_life_ack_owner_present')
+        pause_ack=isinstance(command,dict) and command.get('op')=='acknowledge_idle_pause'
+        if pause_ack:
+            from resident_controller.pause_acknowledgment import command as validate_pause
+            validate_pause(command)
+            if self._capability_owner is not None:raise ValueError('pause_ack_owner_present')
         session = self._read_session() if adjudication else self.session()
         recovery = recovery_close_command(command)
         if isinstance(command, dict) and command.get('op') == 'recovery_close_menu' and not recovery:
             raise ValueError('invalid_recovery_close_menu')
         if ((recovery and (session.get('state') != 'paused' or not isinstance(session.get('menu_recovery'), dict)
                           or session['menu_recovery'].get('can_close') is not True))
-                or (not recovery and not adjudication and session.get('state') not in ('ready', 'busy'))
-                or (adjudication and session.get('state') not in ('paused','ready','busy')) or (self.root/'STOP').exists()):
+                or (not recovery and not adjudication and not pause_ack and not life_ack and session.get('state') not in ('ready', 'busy'))
+                or (adjudication and session.get('state') not in ('paused','ready','busy'))
+                or ((pause_ack or life_ack) and session.get('state')!='paused') or (self.root/'STOP').exists()):
             raise ValueError('watchdog_not_accepting_intents')
         if not isinstance(command, dict) or command.get('op') not in OWNER_OPS:
             raise ValueError('unsupported_owner_intent')
@@ -93,7 +104,7 @@ class IntentClient:
         if 'intent_id' not in wrapped:
             return wrapped  # Explicit restart/stale-intent result.
         original=wrapped['result']
-        if (any(k in original for k in ('acquisition_refusal', 'exact_cancel_terminal', 'exact_queued_cancel_terminal'))
+        if (any(k in original for k in ('acquisition_refusal', 'exact_cancel_terminal', 'exact_queued_cancel_terminal', 'pause_acknowledgment', 'new_life_acknowledgment'))
                 and wrapped.get('intent_id') != request_id):
             raise ValueError('capability_refusal_wrapper_identity_changed')
         result = {**original, 'request_id':request_id, 'session_id':wrapped['session_id'],
@@ -111,6 +122,15 @@ class IntentClient:
             if not validate(result, proof.get('command') if isinstance(proof, dict) else None,
                             request_id, wrapped['session_id']):
                 raise ValueError('exact_queued_cancel_terminal_proof_invalid')
+        if 'new_life_acknowledgment' in result:
+            from resident_controller.new_life_acknowledgment import validate as validate_life_result
+            p=result['new_life_acknowledgment']
+            validate_life_result(result,p.get('command') if isinstance(p,dict) else None,request_id,wrapped['session_id'])
+        if 'pause_acknowledgment' in result:
+
+            from resident_controller.pause_acknowledgment import validate as validate_pause_result
+            p=result['pause_acknowledgment']
+            validate_pause_result(result,p.get('command') if isinstance(p,dict) else None,request_id,wrapped['session_id'])
         return result
     def wait(self, request_id, timeout=30):
         deadline=time.monotonic()+timeout

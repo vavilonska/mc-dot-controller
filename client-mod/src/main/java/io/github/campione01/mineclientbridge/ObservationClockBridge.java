@@ -92,5 +92,16 @@ final class ObservationClockBridge {
         requireSame(before,after);
         return ObservationClockWire.snapshot(bundle,before,after);
     }
+    /** Additive ordinary-action ticket. Existing read-only clock and schema 1 are unchanged. */
+    static void addOrdinaryGuard(JsonObject state,long sourceNano) {
+        try {
+            var guard=new JsonObject();guard.addProperty("schema_version",2);
+            guard.add("source_clock",sample().json());guard.addProperty("source_nano",Long.toString(sourceNano));
+            state.add("capability_guard_monotonic",guard);
+        } catch(ObservationClientClock.Unavailable unavailable) {
+            state.add("capability_guard_monotonic",JsonNull.INSTANCE);
+            state.addProperty("capability_guard_monotonic_unavailable",unavailable.reason);
+        }
+    }
     private ObservationClockBridge() { }
 }

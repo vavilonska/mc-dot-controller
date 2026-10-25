@@ -9,11 +9,11 @@ import java.util.stream.Stream;
 final class ScopedMiningCellPolicy {
     static final Set<String> LEGACY=ids("stone","cobblestone","dirt","andesite","granite","diorite",
         "smooth_stone","stone_bricks","bricks","oak_planks","spruce_planks","birch_planks");
-    static final Set<String> LOGS=ids("oak_log","spruce_log","birch_log","jungle_log","acacia_log","dark_oak_log");
+    static final Set<String> LOGS=ids("oak_log","spruce_log","birch_log","jungle_log","acacia_log","dark_oak_log","mangrove_log");
     static final Set<String> ORES=ids("iron_ore","deepslate_iron_ore");
     static final Set<String> ORE_CONTEXT=union(ORES,ids("coal_ore","deepslate_coal_ore"));
     static final Set<String> AIR=ids("air","cave_air","void_air");
-    static final Set<String> LEAVES=ids("oak_leaves","spruce_leaves","birch_leaves","jungle_leaves","acacia_leaves","dark_oak_leaves");
+    static final Set<String> LEAVES=ids("oak_leaves","spruce_leaves","birch_leaves","jungle_leaves","acacia_leaves","dark_oak_leaves","mangrove_leaves");
     static final Set<String> FLOWERS=ids("dandelion","poppy","blue_orchid","allium","azure_bluet","red_tulip",
         "orange_tulip","white_tulip","pink_tulip","oxeye_daisy","cornflower","lily_of_the_valley");
     static final Set<String> PLANTS=union(FLOWERS,ids("short_grass","fern","tall_grass","large_fern","vine"));
@@ -26,7 +26,7 @@ final class ScopedMiningCellPolicy {
     static String expectedClass(String id){
         String name=AIR.contains(id)?"AirBlock":id.equals("minecraft:grass_block")?"GrassBlock":
             LOGS.contains(id)||id.equals("minecraft:deepslate")?"RotatedPillarBlock":ORE_CONTEXT.contains(id)?"DropExperienceBlock":
-            LEAVES.contains(id)?"LeavesBlock":FLOWERS.contains(id)?"FlowerBlock":
+            id.equals("minecraft:mangrove_leaves")?"MangroveLeavesBlock":LEAVES.contains(id)?"LeavesBlock":FLOWERS.contains(id)?"FlowerBlock":
             id.equals("minecraft:short_grass")||id.equals("minecraft:fern")?"TallGrassBlock":
             id.equals("minecraft:tall_grass")||id.equals("minecraft:large_fern")?"DoublePlantBlock":
             id.equals("minecraft:vine")?"VineBlock":"Block";

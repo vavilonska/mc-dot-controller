@@ -57,6 +57,7 @@ final class NativeFallRescue {
         }
     }
     static JsonObject arm(FallRescuePolicy.Arm request){
+        NativeRecoveryShortInput.requireLegacyAllowed();
         Minecraft mc=Minecraft.getInstance();thread(mc);long operation=OPERATIONS.stamp();
         FallRescuePolicy.Arm seen=SEEN_ARMS.get(request.id());
         if(seen!=null){require(seen.equals(request),"fall_rescue_arm_id_conflict");require(authorization==seen,"fall_rescue_arm_id_retired");return status();}

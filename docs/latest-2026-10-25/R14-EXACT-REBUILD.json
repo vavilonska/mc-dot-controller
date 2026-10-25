@@ -1,0 +1,27 @@
+{
+  "base_sha256": "f51c879146bec1050fc9335f37d76a79c806dd3474f5a47aea9f2cc27760bed1",
+  "jar": "mineclient-bridge-C8-reactive-defense-test.1.4-20261025.jar",
+  "jar_sha256": "29141caad50641cdcfc9826a138ff30b2cfd7c555e24ce726fd03abbe366b68e",
+  "jar_bytes": 1617670,
+  "changed_entries": [
+    "io/github/campione01/mineclientbridge/NativeReactiveGuard$1.class",
+    "io/github/campione01/mineclientbridge/NativeReactiveGuard.class",
+    "io/github/campione01/mineclientbridge/ReactiveDefensePolicy$DirectFence.class",
+    "io/github/campione01/mineclientbridge/ReactiveDefensePolicy.class"
+  ],
+  "new_entries": [
+    "io/github/campione01/mineclientbridge/NativeReactiveGuard$PendingDirect.class"
+  ],
+  "removed_entries": [],
+  "unchanged_entries": 635,
+  "allowed_families": [
+    "NativeReactiveDefense",
+    "NativeReactiveGuard",
+    "ReactiveDefensePolicy",
+    "ReactivePhysicalRelease"
+  ],
+  "protected_entries_byte_exact": 25,
+  "exact_expected_jar_verification": "PASS",
+  "live": "NOT_RUN",
+  "world_token_game_touched": false
+}

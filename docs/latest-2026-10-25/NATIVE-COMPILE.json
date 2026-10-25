@@ -1,0 +1,26 @@
+{
+  "compile_exit_code": 0,
+  "source_count": 269,
+  "output_class_count": 632,
+  "installed_class_count": 632,
+  "missing_classes": [],
+  "extra_classes": [],
+  "byte_exact_class_count": 632,
+  "byte_different_class_count": 0,
+  "byte_different_classes": [],
+  "game_network_install_touched": false,
+  "installed_jar_sha256": "29141caad50641cdcfc9826a138ff30b2cfd7c555e24ce726fd03abbe366b68e",
+  "source_and_class_manifest_sha256": "b5d5baf18d2e85876cba1a846ddd4dc50235ecc83bacb1d3cc2d08e61582126a",
+  "compile_only_existing_at_receipt_sha256": "5863fd62d0fc6edce734014a2091a9fa9f187c7e5d954713f423aa86aca179b0",
+  "compile_only_existing_at_jar_sha256": "11a761f9ada047e937837aa9067cf541e72e05325c688467a736163f0aeec473",
+  "java_version": "OpenJDK 21.0.12.1+1-1-deb13u1-Debian",
+  "compiler_flags": [
+    "-source 21",
+    "-target 21",
+    "-encoding UTF-8",
+    "-proc:none",
+    "-implicit:none",
+    "-sourcepath empty"
+  ],
+  "runtime_jar_packaged": false
+}

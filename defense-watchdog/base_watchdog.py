@@ -138,6 +138,8 @@ class Watchdog(CapabilityOwnership):
         return {**self.capability_status(), 'schema_version': 3, 'implementation': 'native-defense-watchdog-v3',
                 'execution_policy_schema_version': 1, 'execution_policy': self.execution_policy,
                 'reconciliation_read_profile': 'lease-free-reconciliation/1',
+                'pause_acknowledgment': __import__('pause_acknowledgment').status(self),
+                'new_life_acknowledgment': __import__('new_life_acknowledgment').status(self),
                 'session_id': self.session_id, 'defense_epoch': self.defense_epoch,
                 'state': ('stopped' if self.stopped else 'paused' if not self.armed else 'busy'
                           if self.owner or self.phase in ('combat', 'engaging', 'retaining_target') else 'ready'),
@@ -206,6 +208,7 @@ class Watchdog(CapabilityOwnership):
     def attention(self, reason):
         if reason == 'observation_delayed_cancel_requested' and not (self.armed or self.recover_observation):
             return  # A sensor delay must never erase a manual/uncertain/death pause.
+        was_armed=self.armed
         self.defense_epoch += 1
         self.recover_observation = reason == 'observation_delayed_cancel_requested'
         self.recovery_samples = 0
@@ -213,6 +216,10 @@ class Watchdog(CapabilityOwnership):
         context = recovery_context(state)
         self.recovery_identity, self.recovery_game_time = context if context else (None, None)
         self.armed, self.phase, self.reason = False, 'needs_operator', reason
+        from pause_acknowledgment import remember
+        remember(self,reason,was_armed)
+        from new_life_acknowledgment import remember as remember_death
+        remember_death(self,reason)
 
     def stop(self):
         self.stop_requested = True
@@ -593,6 +600,10 @@ class Watchdog(CapabilityOwnership):
                         self.handoff_latched = True
                         self.attention('encounter_requires_handoff')
                     return
+                from pause_acknowledgment import observation as pause_ack_observation
+                pause_ack_observation(self,rpc,result)
+                from new_life_acknowledgment import observation as new_life_observation
+                new_life_observation(self,rpc,result)
                 self.observation_received(self.latest, kind)
                 self.observed_at = self.clock()
                 self.next_observe = self.clock() + self.interval
@@ -885,6 +896,10 @@ def run(queue, directory, watchdog_class=Watchdog, *, coordination_factory=None,
                 except (ValueError, OSError, KeyError, TypeError):
                     pass  # Claimed diagnostic stays unknown; never alter owner safety.
                 dog.tick()
+                from pause_acknowledgment import tick as pause_ack_tick
+                pause_ack_tick(dog)
+                from new_life_acknowledgment import tick as new_life_tick
+                new_life_tick(dog)
                 if coordination is not None:coordination.tick()
                 dog.persist_telemetry(directory)
                 cancel_waiting_intents(directory, dog)

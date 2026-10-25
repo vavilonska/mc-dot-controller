@@ -12,6 +12,7 @@ final class NativeExternalNavigation {
     static boolean blocksInput(){return LEASES.blocked()||NativeManagedNavigation.blocksInput();}
     static void requireOrdinaryAdmission(){require(!blocksInput(),"external_navigation_original_owner_unresolved");}
     static JsonObject stop(ExternalNavigationLease.Request request) {
+        NativeRecoveryShortInput.requireLegacyAllowed();
         Minecraft mc=Minecraft.getInstance();thread(mc);
         var existing=LEASES.existing(request);
         if(existing!=null)return describe(existing); // Exact original ID is read-only, never re-dispatched.

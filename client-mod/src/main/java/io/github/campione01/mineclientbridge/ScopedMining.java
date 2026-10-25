@@ -29,12 +29,12 @@ final class ScopedMining {
         Blocks.GRANITE,Blocks.DIORITE,Blocks.SMOOTH_STONE,Blocks.STONE_BRICKS,Blocks.BRICKS,
         Blocks.OAK_PLANKS,Blocks.SPRUCE_PLANKS,Blocks.BIRCH_PLANKS);
     static final Set<Block> TARGETS=java.util.stream.Stream.concat(LEGACY_TARGETS.stream(),java.util.stream.Stream.of(
-        Blocks.OAK_LOG,Blocks.SPRUCE_LOG,Blocks.BIRCH_LOG,Blocks.JUNGLE_LOG,Blocks.ACACIA_LOG,Blocks.DARK_OAK_LOG,
+        Blocks.OAK_LOG,Blocks.SPRUCE_LOG,Blocks.BIRCH_LOG,Blocks.JUNGLE_LOG,Blocks.ACACIA_LOG,Blocks.DARK_OAK_LOG,Blocks.MANGROVE_LOG,
         Blocks.IRON_ORE,Blocks.DEEPSLATE_IRON_ORE)).collect(java.util.stream.Collectors.toUnmodifiableSet());
     private static final Set<Block> CELLS=java.util.stream.Stream.concat(TARGETS.stream(),java.util.stream.Stream.of(
         Blocks.AIR,Blocks.CAVE_AIR,Blocks.VOID_AIR,Blocks.GRASS_BLOCK,Blocks.BEDROCK,Blocks.DEEPSLATE,
         Blocks.COAL_ORE,Blocks.DEEPSLATE_COAL_ORE,
-        Blocks.OAK_LEAVES,Blocks.SPRUCE_LEAVES,Blocks.BIRCH_LEAVES,Blocks.JUNGLE_LEAVES,Blocks.ACACIA_LEAVES,Blocks.DARK_OAK_LEAVES,
+        Blocks.OAK_LEAVES,Blocks.SPRUCE_LEAVES,Blocks.BIRCH_LEAVES,Blocks.JUNGLE_LEAVES,Blocks.ACACIA_LEAVES,Blocks.DARK_OAK_LEAVES,Blocks.MANGROVE_LEAVES,
         Blocks.SHORT_GRASS,Blocks.FERN,Blocks.TALL_GRASS,Blocks.LARGE_FERN,Blocks.VINE,
         Blocks.DANDELION,Blocks.POPPY,Blocks.BLUE_ORCHID,Blocks.ALLIUM,Blocks.AZURE_BLUET,Blocks.RED_TULIP,Blocks.ORANGE_TULIP,
         Blocks.WHITE_TULIP,Blocks.PINK_TULIP,Blocks.OXEYE_DAISY,Blocks.CORNFLOWER,Blocks.LILY_OF_THE_VALLEY))

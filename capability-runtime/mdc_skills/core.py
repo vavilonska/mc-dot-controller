@@ -608,6 +608,11 @@ class Runtime:
                     if entity_diagnostic(entity, code): summary["native_entity_rejection"] = deepcopy(entity)
                 else:
                     summary["native_admission_status"] = "missing_or_invalid"
+                from resident_controller.block_menu_geometry_diagnostic import valid as valid_menu_geometry, CODE as menu_geometry_code
+                menu_geometry = diagnostic.get("block_menu_geometry_rejection")
+                if (code == menu_geometry_code and diagnostic.get("http_status") == 409
+                        and valid_menu_geometry(menu_geometry)):
+                    summary["block_menu_geometry_rejection"] = deepcopy(menu_geometry)
                 record["native_refusal_summary"] = summary
             except (ValueError, TypeError, KeyError, AttributeError):
                 record["native_refusal_summary"] = {"schema_version": 1, "diagnostics_only": True,
@@ -1203,7 +1208,8 @@ class Runtime:
         if "defense_epoch" in session:
             require(type(session["defense_epoch"]) is int, "invalid_defense_epoch")
             body["_navigation_defense_epoch"] = session["defense_epoch"]
-        if body["action"] in ("follow_path", "break_block", "place_block", "combat_entity"):
+        if (body["action"] in ("follow_path", "break_block", "place_block", "combat_entity")
+                or body["action"] == "interact_block" and self.scoped_profile("interact_block") == "item-on-block-observed-v1"):
             from resident_controller.navigation_binding import NativeBindingContext
             if not hasattr(self, "_navigation_binding"):
                 self._navigation_binding = NativeBindingContext()

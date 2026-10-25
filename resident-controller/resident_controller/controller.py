@@ -66,6 +66,12 @@ def action_rejection_admission(exc):
         result['route_threat_rejection'] = deepcopy(threat_rejection)
     elif threat_rejection is not None or getattr(exc, 'route_threat_rejection_status', None) == 'invalid':
         result['route_threat_rejection_status'] = 'invalid'
+    from .block_menu_geometry_diagnostic import valid as valid_menu_geometry, CODE as menu_geometry_code
+    menu_geometry = getattr(exc, 'block_menu_geometry_rejection', None)
+    if exc.status == 409 and exc.code == menu_geometry_code and valid_menu_geometry(menu_geometry):
+        result['block_menu_geometry_rejection'] = deepcopy(menu_geometry)
+    elif menu_geometry is not None or getattr(exc, 'block_menu_geometry_rejection_status', None) == 'invalid':
+        result['block_menu_geometry_rejection_status'] = 'invalid'
     return result
 
 
@@ -75,7 +81,7 @@ def scoped_uncertain_diagnostics(exc):
         return None
     result = {'schema_version': 2, 'http_status': exc.status, 'reason': exc.code,
         'diagnostics_only': True, 'effect_free_proven': False, 'input_release_proven': False}
-    for name in ('native_admission', 'native_entity_rejection', 'route_entity_rejection',
+    for name in ('native_admission', 'native_entity_rejection', 'block_menu_geometry_rejection', 'route_entity_rejection',
                  'route_threat_rejection', 'scoped_movement_response_size'):
         status = getattr(exc, name + '_status', None)
         value = getattr(exc, name, None)
@@ -83,6 +89,9 @@ def scoped_uncertain_diagnostics(exc):
             or name == 'scoped_movement_response_size' and valid_size_diagnostic(value)
             or name == 'route_entity_rejection' and valid_rejection_diagnostic(value)
             or name == 'route_threat_rejection' and valid_threat_rejection(value))
+        if name == 'block_menu_geometry_rejection':
+            from .block_menu_geometry_diagnostic import valid as valid_menu_geometry, CODE as menu_geometry_code
+            validated = validated and exc.status == 409 and exc.code == menu_geometry_code and valid_menu_geometry(value)
         if validated:
             result[name] = deepcopy(value)
         elif status == 'invalid':
@@ -154,6 +163,7 @@ class Resident:
         data = {'schema_version': 1, 'session_id': self.session_id, 'coordination_protocol': 1,
                 'state': 'stopped' if not self.running else 'starting' if not self.initialized else 'paused' if self.paused else 'busy' if self.active else 'ready',
                 'resident_policy': self.observation_policy(),
+                'survey_result_contract': 'historical-survey-result/1',
                 'reason': self.reason, 'started_at': self.started_at, 'updated_at': time.time(),
                 'base_url': self.bridge.base_url, 'controller_pid': os.getpid(),
                 'bridge_identity': self.bridge_identity,
@@ -247,9 +257,17 @@ class Resident:
             return
         if any(k in command for k in ('encounter_mode', 'encounter_scope', 'encounter_pause_on_terminal')):
             fields.update(risk_remaining=True, requires_handoff=True, safety_assured=False)
-        atomic_json(receipt_path,
-                    {'request_id': request_id, 'session_id': command.get('session_id', self.session_id),
-                     'status': status, 'finished_at': time.time(), **fields})
+        receipt = {'request_id': request_id, 'session_id': command.get('session_id', self.session_id),
+                   'status': status, 'finished_at': time.time(), **fields}
+        if command.get('capability_survey') is True:
+            from .survey_result import command_binding, original_command, finish_receipt
+            try:
+                command_binding(original_command(command))
+            except ValueError:
+                pass  # Invalid commands retain the ordinary small refusal path.
+            else:
+                receipt = finish_receipt(command, receipt)
+        atomic_json(receipt_path, receipt)
         (self.root / 'working' / (request_id + '.json')).unlink(missing_ok=True)
         files = sorted((self.root / 'results').glob('*.json'), key=lambda p: p.stat().st_mtime)
         for path in files[:-MAX_RESULTS]:
@@ -293,6 +311,9 @@ class Resident:
             self.end_active('cancelled', reason=reason, mod_cancel_confirmed=False)
 
     def snapshot(self, command):
+        if command.get('capability_survey') is True:
+            from .survey_result import command_binding, original_command
+            command_binding(original_command(command))  # Before any native GET/allocation.
         if "compact_observation" in command:
             from .compact_observation import snapshot
             return snapshot(self,command)
@@ -1496,8 +1517,8 @@ class Resident:
             try: validate_defensive_envelope(result)
             except (ValueError,KeyError,TypeError) as exc:
                 raise BridgeError('defensive_action_receipt_invalid',uncertain=True) from exc
-        if route_profile in ('movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2'):
-            detail = 'route_spatial_stop' if route_profile in ('movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2') else 'route_threat'
+        if route_profile in ('movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2', 'target-action-stationary-v1', 'item-on-block-observed-v1', 'portal-entry-observed-v1'):
+            detail = {'target-action-stationary-v1':'target_action','item-on-block-observed-v1':'typed_item','portal-entry-observed-v1':'portal_entry'}.get(route_profile, 'route_spatial_stop' if route_profile in ('movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2') else 'route_threat')
             try:
                 from .capability_snapshot import validate_scoped_witness, exact
                 witness = validate_scoped_witness(result, task.command['scoped_native_preflight'], task.action_id,

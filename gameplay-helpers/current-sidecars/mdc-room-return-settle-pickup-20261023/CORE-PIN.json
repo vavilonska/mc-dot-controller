@@ -1,0 +1,9 @@
+{
+  "directory": "mdc-room-return-settle-pickup-20261023",
+  "files": {
+    "idle_guard.py": "af499034a51d2d190047daa5a1d9c85f102c7dc4af79ce18ac8284090eeeb6a0",
+    "guard_core.py": "d52259c79cded362477e9931ec5cc02949e003a3a5047fdd7d3a37e1fda93b01",
+    "exposure-roundtrip.py": "ac5d4655ce3743081c74358378061736256b28600dc4d3b3e4cd22e942109fe6",
+    "shield-axe.py": "acdf01c4c6bf405ace6efd562254ad3f588f6b8dee161e4fd1cd260265b3cae8"
+  }
+}

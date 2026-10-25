@@ -209,7 +209,10 @@ final class BlockMenuPreflight {
     static JsonObject cell(Minecraft mc, BlockPos pos) {
         require(mc.level.hasChunkAt(pos), "block_menu_dependency_unloaded");
         BlockState state = mc.level.getBlockState(pos);
-        require(staticGeometry(state), "block_menu_unknown_geometry_provider");
+        var block = state.getBlock();
+        if (!staticGeometry(state, block))
+            throw new ClientActionRequest.Rejected(409, "block_menu_unknown_geometry_provider")
+                .withBlockMenuGeometryRejection(BlockMenuGeometryDiagnostic.capture(pos, block));
         JsonObject out = pos(pos); out.addProperty("id", id(state)); out.add("properties", properties(state));
         out.addProperty("loaded", true); out.addProperty("fluid", BuiltInRegistries.FLUID.getKey(state.getFluidState().getType()).toString());
         JsonArray collision = new JsonArray(), outline = new JsonArray();
@@ -218,12 +221,15 @@ final class BlockMenuPreflight {
         out.add("collision", collision); out.add("outline", outline); return out;
     }
     static boolean staticGeometry(BlockState state) {
-        var b=state.getBlock();
+        return staticGeometry(state, state.getBlock());
+    }
+    private static boolean staticGeometry(BlockState state, net.minecraft.world.level.block.Block b) {
         return FAMILIES.keySet().stream().anyMatch(id -> exactVanillaFamily(state,id))
             || b==Blocks.AIR || b==Blocks.CAVE_AIR || b==Blocks.VOID_AIR
             || b==Blocks.STONE || b==Blocks.COBBLESTONE || b==Blocks.DIRT || b==Blocks.GRASS_BLOCK
             || b==Blocks.SMOOTH_STONE || b==Blocks.STONE_BRICKS || b==Blocks.BEDROCK
-            || b==Blocks.OAK_PLANKS || b==Blocks.SPRUCE_PLANKS || b==Blocks.BIRCH_PLANKS;
+            || b==Blocks.OAK_PLANKS || b==Blocks.SPRUCE_PLANKS || b==Blocks.BIRCH_PLANKS
+            || BlockMenuLogGeometry.allows(b);
     }
     static void assertRawPlayer(Minecraft mc, JsonObject facts) {
         var p=mc.player; JsonObject b=facts.getAsJsonObject("block_menu");

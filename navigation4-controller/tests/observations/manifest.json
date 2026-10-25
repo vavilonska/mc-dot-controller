@@ -1,0 +1,106 @@
+{
+  "scope": "Synthetic shape models derived from already-exported cold block metadata; actual production Geometry and JSON codec; NOT native live geometry/gameplay",
+  "cold_source": "excluded-private-test-fixture (not a live acceptance claim)",
+  "cold_blocks": 1452,
+  "max_response_bytes": 65536,
+  "cases": [
+    {
+      "file": "source.json",
+      "bytes": 24993,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "bed-head.json",
+      "bytes": 24863,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "bed-foot.json",
+      "bytes": 24947,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "table.json",
+      "bytes": 24826,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "floor-north.json",
+      "bytes": 24555,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "floor-west.json",
+      "bytes": 24727,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "chest.json",
+      "bytes": 24502,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "cut-sandstone.json",
+      "bytes": 24066,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "door.json",
+      "bytes": 24334,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "shape-failed.json",
+      "bytes": 24997,
+      "budget_accepted": true,
+      "ready": false,
+      "collision_boxes_complete": false
+    },
+    {
+      "file": "unloaded.json",
+      "bytes": 24973,
+      "budget_accepted": true,
+      "ready": false,
+      "collision_boxes_complete": false
+    },
+    {
+      "file": "no-world.json",
+      "bytes": 728,
+      "budget_accepted": true,
+      "ready": false,
+      "collision_boxes_complete": false
+    },
+    {
+      "file": "max-512-short-decimals.json",
+      "bytes": 35161,
+      "budget_accepted": true,
+      "ready": true,
+      "collision_boxes_complete": true
+    },
+    {
+      "file": "max-512-long-decimals.json",
+      "bytes": 82777,
+      "budget_accepted": false,
+      "ready": true,
+      "collision_boxes_complete": true
+    }
+  ]
+}

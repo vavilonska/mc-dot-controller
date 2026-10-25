@@ -1,0 +1,7 @@
+[
+  {
+    "path": "native-src/io/github/campione01/mineclientbridge/ClientActions.java",
+    "sha256": "cc415f794f3f50fa51e80338415bbd5423e529a30c7d4386ed1a69c45be6ef4e",
+    "purpose": "Byte-exact d290 production source for unchanged cleanup/dispatch source-hook tests"
+  }
+]

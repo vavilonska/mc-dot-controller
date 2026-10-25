@@ -51,7 +51,7 @@ class SkillTests(unittest.TestCase):
                 self.assertFalse(v.evidence['automatic_replay_allowed']);self.assertEqual(len(r.actions),1)
                 self.assertEqual(r.actions[0]['pickup_target']['item_id'],item)
     def test_new_items_keep_capacity_component_and_unknown_fences(self):
-        for item in ('minecraft:jungle_log','minecraft:raw_iron','minecraft:furnace','minecraft:cooked_beef'):
+        for item in ('minecraft:jungle_log','minecraft:mangrove_log','minecraft:mangrove_planks','minecraft:raw_iron','minecraft:furnace','minecraft:cooked_beef'):
             with self.subTest(item=item):
                 r=Runtime(item=item);r.modifier=lambda o:(o.player['inventory'][0].update(component_fingerprint='wrong') or o)
                 self.assertFalse(run(r).ok)
@@ -143,7 +143,7 @@ class WitnessTests(unittest.TestCase):
             with self.subTest(item=item):
                 d=collect_fixture(item_id=item);validate_scoped_witness(*d)
     def test_unsupported_items_remain_rejected_by_both_consumers(self):
-        for item in ('minecraft:diamond','minecraft:mangrove_log','minecraft:carrot','minecraft:potato',
+        for item in ('minecraft:diamond','minecraft:mangrove_roots','minecraft:carrot','minecraft:potato',
                      'minecraft:potion','minecraft:bucket','minecraft:iron_pickaxe','mod:bread'):
             with self.subTest(item=item):
                 r=Runtime(item=item)

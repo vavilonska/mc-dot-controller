@@ -12,7 +12,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         int containerId, int slot, int button, String clickType, JsonObject original) {
     record Point(double x, double y, double z, boolean jump) { }
     record Cell(int x, int y, int z) { }
-    static final Set<String> LEGACY_ACTIONS = Set.of("follow_path", "break_block", "place_block", "click_slot", "recover_environment", "combat_entity", "boat_drive", "boat_mount", "boat_dismount");
+    static final Set<String> LEGACY_ACTIONS = Set.of("reactive_defense", "portal_defend", "follow_path", "break_block", "place_block", "click_slot", "recover_environment", "combat_entity", "boat_drive", "boat_mount", "boat_dismount");
     static final Set<String> CAPABILITY_ACTIONS = Set.of("interact_block", "use_item", "select_hotbar", "close_menu", "attack_entity", "shoot_entity", "gateway_pearl", "movement_budget_start", "movement_budget_finish");
     static final Set<String> ACTIONS = java.util.stream.Stream.concat(LEGACY_ACTIONS.stream(), CAPABILITY_ACTIONS.stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());
     static final Set<String> FACES = Set.of("up", "down", "north", "south", "east", "west");
@@ -55,6 +55,10 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             support = cell(body, "support");
             face = string(body, "face");
             require(FACES.contains(face), "invalid_face");
+        } else if (action.equals("reactive_defense")) {
+            require(body.has("defense_arm_id"),"reactive_defense_internal_arm_required");
+        } else if (action.equals("portal_defend")) {
+            require(body.has("portal_handoff_parent"),"portal_defend_internal_parent_required");
         } else if (MovementBudget.budgetAction(action)) {
             // Explicit no-input lifetime operation, with normal action-ID deduplication.
         } else if (action.equals("gateway_pearl")) {
@@ -96,6 +100,8 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
                 bool(body, "jump", false), bool(body, "sneak", false), container, slot, button, click, body.deepCopy());
         CoordinationStepGuard.validate(request);
         CapabilityGuard.validate(request);
+        NativeBlazeEscort.validate(request);
+        NativePortalHandoff.validate(request);
         MovementBudget.validate(request);
         return request;
     }
@@ -153,6 +159,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         final JsonObject routeThreatRejection;
         final JsonObject nativeAdmission;
         final JsonObject nativeEntityDiagnostic;
+        final JsonObject blockMenuGeometryRejection;
         Rejected(int httpStatus, String reason) { this(httpStatus, reason, null); }
         Rejected(int httpStatus, String reason, JsonObject freshness) {
             this(httpStatus,reason,freshness,null);
@@ -167,10 +174,12 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             this(httpStatus,reason,freshness,movementSize,routeEntityRejection,routeTerrainRejection,null);
         }
         Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection,JsonObject routeThreatRejection) {
-            this(httpStatus,reason,freshness,movementSize,routeEntityRejection,routeTerrainRejection,routeThreatRejection,null,null);
+            this(httpStatus,reason,freshness,movementSize,routeEntityRejection,routeTerrainRejection,routeThreatRejection,null,null,null);
         }
-        private Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection,JsonObject routeThreatRejection,JsonObject nativeAdmission,JsonObject nativeEntityDiagnostic) {
+        private Rejected(int httpStatus,String reason,JsonObject freshness,JsonObject movementSize,JsonObject routeEntityRejection,JsonObject routeTerrainRejection,JsonObject routeThreatRejection,JsonObject nativeAdmission,JsonObject nativeEntityDiagnostic,JsonObject blockMenuGeometryRejection) {
             super(reason); this.httpStatus = httpStatus;
+            this.blockMenuGeometryRejection=httpStatus==409 && reason.equals("block_menu_unknown_geometry_provider")
+                && BlockMenuGeometryDiagnostic.valid(blockMenuGeometryRejection) ? blockMenuGeometryRejection.deepCopy() : null;
             this.nativeAdmission=nativeAdmission==null?null:nativeAdmission.deepCopy();
             this.nativeEntityDiagnostic=nativeEntityDiagnostic==null?null:nativeEntityDiagnostic.deepCopy();
             this.routeThreatRejection=routeThreatRejection==null?null:routeThreatRejection.deepCopy();
@@ -182,11 +191,15 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
         }
         Rejected withNativeAdmission(JsonObject proof) {
             return new Rejected(httpStatus,getMessage(),capabilitySourceFreshness,scopedMovementResponseSize,
-                routeEntityRejection,routeTerrainRejection,routeThreatRejection,proof,nativeEntityDiagnostic);
+                routeEntityRejection,routeTerrainRejection,routeThreatRejection,proof,nativeEntityDiagnostic,blockMenuGeometryRejection);
         }
         Rejected withNativeEntityDiagnostic(JsonObject diagnostic) {
             return new Rejected(httpStatus,getMessage(),capabilitySourceFreshness,scopedMovementResponseSize,
-                routeEntityRejection,routeTerrainRejection,routeThreatRejection,nativeAdmission,diagnostic);
+                routeEntityRejection,routeTerrainRejection,routeThreatRejection,nativeAdmission,diagnostic,blockMenuGeometryRejection);
+        }
+        Rejected withBlockMenuGeometryRejection(JsonObject diagnostic) {
+            return new Rejected(httpStatus,getMessage(),capabilitySourceFreshness,scopedMovementResponseSize,
+                routeEntityRejection,routeTerrainRejection,routeThreatRejection,nativeAdmission,nativeEntityDiagnostic,diagnostic);
         }
         JsonObject response() {
             JsonObject body = new JsonObject();
@@ -198,6 +211,7 @@ record ClientActionRequest(String id, String action, long timeoutMs, List<Point>
             if(routeThreatRejection!=null)body.add("route_threat_rejection",routeThreatRejection.deepCopy());
             if(nativeAdmission!=null)body.add("native_admission",nativeAdmission.deepCopy());
             if(nativeEntityDiagnostic!=null)body.add("native_entity_rejection",nativeEntityDiagnostic.deepCopy());
+            if(blockMenuGeometryRejection!=null)body.add("block_menu_geometry_rejection",blockMenuGeometryRejection.deepCopy());
             return body;
         }
     }

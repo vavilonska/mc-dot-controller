@@ -1,0 +1,1 @@
+{"fixture_origin":"synthetic input through production Recorder.snapshot and RecoveryShortInputCodec.encode; not live gameplay evidence","largest_fixture_bytes":48181,"sampling_boundary":"PlayerTick.Post after LivingEntity.tick and before ClientTick.Post cleanup; does not prove every external input writer"}

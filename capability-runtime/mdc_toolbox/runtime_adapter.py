@@ -16,7 +16,7 @@ from .control import JobControl
 from .budgets import SharedBudget
 from .supervisor import LocalSupervisor
 from .serialization import serialize_outcome
-from . import defend_once
+from . import defend_once, scoped_survival
 from .contracts import POLICY, validate_schema, ToolboxError
 
 
@@ -58,6 +58,9 @@ class OwnerRuntimeBackend:
         self.runtime = runtime
         self._bindings = bindings
         self._lock = threading.Lock()
+        # Independent, short critical section: no gateway I/O or Runtime locks.
+        self._new_life_receipts_lock = threading.Lock()
+        self._new_life_receipts = {}
         self._active = None
         self._completed = {}
         self._quarantined = False
@@ -100,6 +103,11 @@ class OwnerRuntimeBackend:
                            and (name not in ('defend_local','evade_local') or isinstance(scoped,dict) and scoped.get('profiles',{}).get('combat-defensive-local-v1')==['combat_entity'])
                            and 'scoped-native-preflight/1' in features
                            and (name not in ('clear_hand', 'recover_cursor') or 'inventory-recovery/1' in features))
+        # New profiles are opt-in per named primitive. They never replace a legacy
+        # profile for an unrelated job, even when their underlying action overlaps.
+        if session.get('execution_policy') == 'request_only':
+            supported.extend(name for name in scoped_survival.CAPABILITY_PROFILE
+                if name in self._plugins() and scoped_survival.available(name, scoped))
         managed=session.get('managed_navigation',{})
         if (session.get('managed_navigation_owner_control')=='managed-navigation-owner-control/1'
                 and isinstance(managed,dict) and managed.get('version')=='managed-navigation-owner-control/1'
@@ -136,7 +144,14 @@ class OwnerRuntimeBackend:
                      and not self.runtime.has_unresolved_execution)
         return {'available': available, 'private_singleplayer': session.get('private_singleplayer') is True,
                 'session_ref': _ref(session.get('session_id')), 'context_ref': _ref(session.get('capability_context')),
+                'pause_acknowledgment': deepcopy(session.get('pause_acknowledgment',{})),
+                'new_life_acknowledgment': deepcopy(session.get('new_life_acknowledgment',{})),
                 'supported_capabilities': supported, 'native_features': sorted(features),
+                'survey_observation': {'available': session.get('historical_survey_result_contract') == 'historical-survey-result/1',
+                    'version': 'historical-survey-result/1', 'maximum_radius': 16, 'maximum_vertical': 8,
+                    'maximum_result_bytes': 16*1024*1024, 'default_display_cells': 1024,
+                    'maximum_display_cells': 2048, 'maximum_display_bytes': 1024*1024,
+                    'display_only': True, 'physics_omitted': True, 'execution_authority': False},
                 'supported_budget_metrics': list(SharedBudget.METRICS),
                 'supported_policies': {'version': 1, 'execution_mode': ['noncombat','guarded','request_only'], 'reactions': ['stop', 'defend_once'] if profiles_defense_ready(scoped) else ['stop']},
                 'execution_policy': session.get('execution_policy'),
@@ -240,6 +255,7 @@ class OwnerRuntimeBackend:
                     profiles['follow_path'] = 'movement-local-segment-spatial-threat-v1'
                     control.route_threat_guard = {'schema_version': 1,
                         'target_uuid': policy['defense']['target_uuid']}
+            scoped_survival.select(capability, profiles)
             self.runtime.begin_job(control, scoped_profiles=profiles,
                 **({"owner_mode": "external_stop"} if capability == "stop_external_navigation" else {}))
             begun = True
@@ -410,8 +426,13 @@ class OwnerRuntimeBackend:
                 raise SkillError('observation_profile_unavailable')
             if selectors:
                 raise SkillError('observation_selectors_unavailable')
-            if set(bounds) - {'radius','vertical','entity_radius','max_age_ms'}:
+            if set(bounds) - ({'radius','vertical','entity_radius','max_age_ms','max_cells'} if profile == 'survey' else {'radius','vertical','entity_radius','max_age_ms'}):
                 raise SkillError('observation_bounds_unavailable')
+            if profile == 'survey':
+                if description.get('survey_observation', {}).get('available') is not True:
+                    raise SkillError('survey_result_contract_unavailable')
+                from .survey_display import cell_limit
+                cell_limit(bounds)  # Before acquiring any lease or submitting a read.
             control = JobControl(context)
             self._active = {'context': _public_context(context), 'control': control}
             self.runtime.begin_job(control)
@@ -499,6 +520,9 @@ class OwnerRuntimeBackend:
             result['provenance'].update(state_representation='decoded-semantic-native-siblings',
                 native_wire_encoding=wire['encoding'], native_wire_bytes=wire['bytes'],
                 native_wire_sha256=wire['sha256'])
+        if profile == 'survey':
+            from .survey_display import project
+            result = project(result, bounds)
         return result
 
 

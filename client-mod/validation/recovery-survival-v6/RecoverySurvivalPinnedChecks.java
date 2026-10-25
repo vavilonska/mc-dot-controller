@@ -1,0 +1,39 @@
+package io.github.campione01.mineclientbridge;
+import java.util.*;
+import java.util.jar.*;
+import org.objectweb.asm.*;
+import org.objectweb.asm.tree.*;
+/** Exact pinned native chronology and compiled production seams, not a live Mixin/client test. */
+public final class RecoverySurvivalPinnedChecks {
+ static int n;static void check(boolean b,String why){if(!b)throw new AssertionError(why);n++;}
+ static ClassNode read(JarFile j,String name)throws Exception{return RecoveryInteractionPinnedChecks.read(j,name);}
+ static ClassNode own(Class<?> c)throws Exception{try(var in=c.getResourceAsStream("/"+c.getName().replace('.','/')+".class")){var node=new ClassNode();new ClassReader(in).accept(node,0);return node;}}
+ static MethodNode method(ClassNode c,String name){return RecoveryInteractionPinnedChecks.method(c,name);}
+ static List<MethodInsnNode> calls(MethodNode m,String owner,String name){return RecoveryInteractionPinnedChecks.calls(m,owner,name);}
+ static int at(MethodNode m,AbstractInsnNode i){return m.instructions.indexOf(i);}
+ static boolean writes(MethodNode m,String field){return Arrays.stream(m.instructions.toArray()).anyMatch(i->i instanceof FieldInsnNode f&&f.getOpcode()==Opcodes.PUTFIELD&&f.name.equals(field));}
+ public static void main(String[] args)throws Exception{
+  String gm="net/minecraft/client/multiplayer/MultiPlayerGameMode",local="net/minecraft/client/player/LocalPlayer",living="net/minecraft/world/entity/LivingEntity",item="net/minecraft/world/item/ItemStack",mc="net/minecraft/client/Minecraft",self="io/github/campione01/mineclientbridge/RecoverySurvivalV6",ledger="io/github/campione01/mineclientbridge/RecoveryShortInputLedger";
+  try(var jar=new JarFile(args[0])){
+   var lp=read(jar,local);check(writes(method(lp,"startUsingItem"),"startedUsingItem"),"LocalPlayer sets local use flag after superclass");check(writes(method(lp,"stopUsingItem"),"startedUsingItem"),"LocalPlayer clears local use flag");check(Arrays.stream(method(lp,"isUsingItem").instructions.toArray()).anyMatch(i->i instanceof FieldInsnNode f&&f.name.equals("startedUsingItem")),"local isUsing not lagged server flags");
+   var li=read(jar,living);var finish=method(li,"completeUsingItem");check(at(finish,calls(finish,item,"finishUsingItem").getFirst())<at(finish,calls(finish,living,"stopUsingItem").getFirst()),"onecallback finish/shrink before stop; no client preTick between");check(calls(finish,living,"setItemInHand").size()==1,"native may replace completed stack");
+   var server=method(read(jar,"net/minecraft/server/level/ServerPlayer"),"completeUsingItem");int send=-1,complete=-1;for(var i:server.instructions)if(i instanceof MethodInsnNode c){if(c.name.equals("send"))send=at(server,i);if(c.name.equals("completeUsingItem"))complete=at(server,i);}check(send>=0&&send<complete,"completion event9 before server consumption/inventory updates");
+   var update=method(li,"updateUsingItem");check(Arrays.stream(update.instructions.toArray()).anyMatch(i->i.getOpcode()==Opcodes.ISUB),"useRemaining decrements, negative client awaitingfinish allowed");check(Arrays.stream(update.instructions.toArray()).anyMatch(i->i instanceof FieldInsnNode f&&f.name.equals("isClientSide")),"only server natural duration completion");
+   var renderer=read(jar,"net/minecraft/client/renderer/GameRenderer");var filter=method(renderer,"filterHitResult");check(calls(filter,"net/minecraft/world/phys/Vec3","closerThan").size()==1,"native reach filtered by strict closerThan");var rendererPick=renderer.methods.stream().filter(m->m.name.equals("pick")&&m.desc.contains("Entity;")).findFirst().orElseThrow();check(Arrays.stream(rendererPick.instructions.toArray()).anyMatch(i->i.getOpcode()==Opcodes.IFGE),"native equal block/entity distance rejects entity");
+   var game=read(jar,gm);var attack=method(game,"attack");int packet=-1,localAttack=-1;for(var i:attack.instructions)if(i instanceof MethodInsnNode c){if(c.name.equals("send"))packet=at(attack,i);if(c.name.equals("attack"))localAttack=at(attack,i);}check(packet>=0&&packet<localAttack,"attack packet can precede local damage; normalcall not damageproof");
+   var use=method(game,"useItem");check(calls(use,gm,"startPrediction").size()==1,"one vanilla use prediction");var lambda=method(game,"lambda$useItem$5");check(Arrays.stream(lambda.instructions.toArray()).anyMatch(i->i instanceof TypeInsnNode t&&t.getOpcode()==Opcodes.NEW&&t.desc.endsWith("ServerboundUseItemPacket")),"returned PASS/FAIL may still packet");
+   var release=method(game,"releaseUsingItem");check(calls(release,"net/minecraft/world/entity/player/Player","releaseUsingItem").size()==1,"original use release path");
+   var keys=method(read(jar,mc),"handleKeybinds");check(calls(keys,mc,"startUseItem").size()>=1,"default use repeat exists");check(calls(keys,gm,"releaseUsingItem").size()==1,"default keyup releases");
+  }
+  var code=own(RecoverySurvivalV6.class);check(calls(method(code,"attack"),gm,"attack").size()==1,"exact one top attack");check(calls(method(code,"startUse"),gm,"useItem").size()==1,"exact one top fooduse");check(calls(method(code,"release"),gm,"releaseUsingItem").size()==1,"at most one owned cleanup path");
+  var start=method(code,"startUse");int latch=-1;for(var i:start.instructions)if(i instanceof FieldInsnNode f&&f.getOpcode()==Opcodes.PUTSTATIC&&f.name.equals("ownedUse"))latch=at(start,i);check(latch>=0&&latch<at(start,calls(start,gm,"useItem").getFirst()),"repeat suppression installed before call");
+  var suppression=method(code,"suppressDefaultUse");check(calls(suppression,ledger,"live").isEmpty()&&calls(suppression,ledger,"owns").isEmpty(),"stop/expiry never drops repeat latch");
+  for(var m:code.methods)for(var i:m.instructions){if(i instanceof TypeInsnNode t&&t.getOpcode()==Opcodes.NEW)check(!t.desc.contains("Packet"),"no constructed packet");if(i instanceof MethodInsnNode c)check(!Set.of("setBlock","setPos","setDeltaMovement","hurt","eat","finishUsingItem","shrink","useItemOn","startAttack","execute","schedule").contains(c.name),"no generic/hidden world action "+c.name);}
+  var nested=Class.forName(self.replace('/','.')+"$Use",false,RecoverySurvivalPinnedChecks.class.getClassLoader());var bind=method(own(nested),"binding");for(String field:List.of("input","options","keyUse","selected"))check(Arrays.stream(bind.instructions.toArray()).anyMatch(i->i instanceof FieldInsnNode f&&f.name.equals(field)),"exact lifecycle binding "+field);
+  var nativeCode=own(NativeRecoveryShortInput.class);var tick=method(nativeCode,"interactionTick");check((tick.access&Opcodes.ACC_SYNCHRONIZED)==0&&Arrays.stream(tick.instructions.toArray()).noneMatch(i->i.getOpcode()==Opcodes.MONITORENTER),"top calls outside ledger monitor");int claim=at(tick,calls(tick,ledger,"claimCall").getFirst());for(String name:List.of("attack","startUse"))check(claim<at(tick,calls(tick,self,name).getFirst()),"claim before "+name);
+  int firstComplete=at(tick,calls(tick,ledger,"completeCall").getFirst());int useFinished=at(tick,calls(tick,self,"useFinished").getFirst());check(calls(tick,ledger,"live").stream().anyMatch(i->at(tick,i)>firstComplete&&at(tick,i)<useFinished),"samecallback completed use checks stop/TTL before retaining hold");
+  var cleanup=method(nativeCode,"cleanup");check(at(cleanup,calls(cleanup,self,"release").getFirst())<at(cleanup,calls(cleanup,ledger,"release").getFirst()),"native exact release before ledger terminal");
+  var gate=own(Class.forName("io.github.campione01.mineclientbridge.mixin.RecoverySurvivalUseMixin",false,RecoverySurvivalPinnedChecks.class.getClassLoader()));check(gate.methods.stream().anyMatch(m->!calls(m,self,"installed").isEmpty()),"Mixin actual installed flag");check(gate.methods.stream().anyMatch(m->!calls(m,self,"suppressDefaultUse").isEmpty()),"Mixin defaultstart gate");
+  System.out.println("RecoverySurvivalPinnedChecks PASS checks="+n+"; pinned/compiled bytecode only, not live loader/use capture");
+ }
+}

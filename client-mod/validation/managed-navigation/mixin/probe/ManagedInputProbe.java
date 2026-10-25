@@ -37,7 +37,7 @@ public final class ManagedInputProbe {
   }
   check(callbacks==2,"both direct and queued shutdown callbacks covered");
   ClassNode nativeRoute=new ClassNode();new ClassReader(resource("io/github/campione01/mineclientbridge/NativeManagedNavigation.class")).accept(nativeRoute,0);
-  check(ops(method(nativeRoute,"inputAllowed")).stream().filter(x->x.contains("BridgeServer.isRunning")).count()==2,"setter checks bridge availability before and after callbacks");
+  check(ops(nativeRoute.methods.stream().filter(m->m.name.equals("inputAllowed")&&m.desc.equals("(Lio/github/campione01/mineclientbridge/NativeManagedNavigation$Data;Lnet/minecraft/world/phys/Vec3;ZD)Z")).findFirst().orElseThrow()).stream().filter(x->x.contains("BridgeServer.isRunning")).count()==2,"setter checks bridge availability before and after callbacks");
   check(ops(method(nativeRoute,"bridgeStopping")).stream().anyMatch(x->x.contains("ManagedNavigationInputPolicy.shutdownOwns")),"actual shutdown callback checks original captured token");
   check(ops(method(nativeRoute,"tick")).stream().anyMatch(x->x.contains("ManagedNavigationInputPolicy.bridgeClosed")),"tick retains original closure across reopen even without callback");
   check(ops(method(nativeRoute,"start")).stream().filter(x->x.contains("BridgeServer.isRunning")).count()==3,"start checks bridge availability at initial and both final fences");

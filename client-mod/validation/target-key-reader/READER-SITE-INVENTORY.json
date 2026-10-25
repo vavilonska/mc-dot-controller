@@ -1,0 +1,406 @@
+{
+  "scope": "finite15 original target delta files; native exact-class/method-owner sites enumerated, new raw-key helper tested separately",
+  "files": [
+    {
+      "path": "capability-runtime/mdc_skills/scoped_target_action.py",
+      "sha256": "8107407f81b9d0f41d13e701b47b6e8d1a737e22ae574981058f8dfd70c22920",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "capability-runtime/mdc_toolbox/bindings/target_actions.py",
+      "sha256": "9df81c550a8c0113fec3390e781a5db808ac2a64b49e0ea3f8de39b8e111be62",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "capability-runtime/tests/test_scoped_target_action.py",
+      "sha256": "bd3b1e7936d2bbe90a2e08197f911428abd80bfe869b66261aecb135fc8a2a8c",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "capability-runtime/tests/test_target_action_chain.py",
+      "sha256": "58ab27af2aef38272804e9cfc97519b5ce8efdf46c051b672613294fb9924570",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityTargetAction.java",
+      "sha256": "aa02ab4eb4b838c34470e416cd5b6a552df1642f6588fa6fe444ea44832f46e5",
+      "exact_reader_sites": [],
+      "scope": "native production reader audit"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedTargetAction.java",
+      "sha256": "27a765f9728ac57e31bdb46f6b4850b13feb92c07129cb5c7a63fe5ee7e3aa39",
+      "exact_reader_sites": [
+        {
+          "line": 62,
+          "text": "require(useKey!=null&&useKey.getClass()==net.minecraft.client.KeyMapping.class,\"target_scope_exact_use_key_required\");"
+        },
+        {
+          "line": 63,
+          "text": "require(mc.getClass()==Minecraft.class&&server!=null&&server.getClass()==net.minecraft.client.server.IntegratedServer.class"
+        },
+        {
+          "line": 64,
+          "text": "&&player!=null&&player.getClass()==LocalPlayer.class&&level!=null&&level.getClass()==ClientLevel.class"
+        },
+        {
+          "line": 65,
+          "text": "&&gameMode!=null&&gameMode.getClass()==net.minecraft.client.multiplayer.MultiPlayerGameMode.class,"
+        },
+        {
+          "line": 67,
+          "text": "require(player.getInventory().getClass()==net.minecraft.world.entity.player.Inventory.class"
+        },
+        {
+          "line": 68,
+          "text": "&&player.inventoryMenu.getClass()==net.minecraft.world.inventory.InventoryMenu.class,\"target_scope_exact_inventory_readers_required\");"
+        },
+        {
+          "line": 76,
+          "text": "requireEntityReaders(target);requireEntityReaders(player);requireTargetClass();requirePlayerReaders();"
+        },
+        {
+          "line": 207,
+          "text": "require(player.getInventory().getClass()==net.minecraft.world.entity.player.Inventory.class"
+        },
+        {
+          "line": 208,
+          "text": "&&player.inventoryMenu.getClass()==net.minecraft.world.inventory.InventoryMenu.class"
+        },
+        {
+          "line": 210,
+          "text": "&&level.getChunkSource().getClass()==net.minecraft.client.multiplayer.ClientChunkCache.class"
+        },
+        {
+          "line": 211,
+          "text": "&&level.getLevelData().getClass()==ClientLevel.ClientLevelData.class"
+        },
+        {
+          "line": 212,
+          "text": "&&player.getActiveEffectsMap().getClass()==java.util.HashMap.class,"
+        },
+        {
+          "line": 214,
+          "text": "require(player.getInventory().items.getClass()==net.minecraft.core.NonNullList.class"
+        },
+        {
+          "line": 215,
+          "text": "&&player.getInventory().armor.getClass()==net.minecraft.core.NonNullList.class"
+        },
+        {
+          "line": 216,
+          "text": "&&player.getInventory().offhand.getClass()==net.minecraft.core.NonNullList.class,\"target_scope_inventory_list_reader_unknown\");"
+        },
+        {
+          "line": 217,
+          "text": "require(player.getFoodData().getClass()==net.minecraft.world.food.FoodData.class"
+        },
+        {
+          "line": 218,
+          "text": "&&player.getAbilities().getClass()==net.minecraft.world.entity.player.Abilities.class"
+        },
+        {
+          "line": 219,
+          "text": "&&player.getAttributes().getClass()==net.minecraft.world.entity.ai.attributes.AttributeMap.class,"
+        },
+        {
+          "line": 226,
+          "text": "require(value!=null&&value.getClass()==net.minecraft.world.entity.ai.attributes.AttributeInstance.class"
+        },
+        {
+          "line": 227,
+          "text": "&&value.getAttribute()==attribute&&attribute.getClass()==net.minecraft.core.Holder.Reference.class"
+        },
+        {
+          "line": 228,
+          "text": "&&attribute.value().getClass()==net.minecraft.world.entity.ai.attributes.RangedAttribute.class,\"target_scope_attribute_reader_unknown\");"
+        },
+        {
+          "line": 231,
+          "text": "private void requireTargetClass(){"
+        },
+        {
+          "line": 248,
+          "text": "};require(expected!=null&&target.getClass()==expected,\"target_scope_exact_target_class_required\");"
+        },
+        {
+          "line": 252,
+          "text": "requirePlayerReaders();requireTargetClass();requireEntityReaders(target);requireEntityReaders(player);"
+        },
+        {
+          "line": 272,
+          "text": "require(ranged?selectedItem.getItem().getClass()==net.minecraft.world.item.BowItem.class:"
+        },
+        {
+          "line": 273,
+          "text": "selectedItem.getItem().getClass()==net.minecraft.world.item.AxeItem.class,"
+        },
+        {
+          "line": 316,
+          "text": "require(stack!=null&&stack.getClass()==ItemStack.class,\"target_scope_stack_reader_unknown\");"
+        },
+        {
+          "line": 317,
+          "text": "require(TargetActionReaderPolicy.declaredBy(stack.getItem().getClass(),\"components\",net.minecraft.world.item.Item.class),\"target_scope_item_component_reader_unknown\");"
+        },
+        {
+          "line": 318,
+          "text": "var prototype=stack.getPrototype();Class<?> type=prototype.getClass();"
+        },
+        {
+          "line": 321,
+          "text": "&&type.getClassLoader()==net.minecraft.core.component.DataComponentMap.class.getClassLoader(),\"target_scope_component_prototype_unknown\");"
+        },
+        {
+          "line": 323,
+          "text": "||map.getClass()==net.minecraft.core.component.PatchedDataComponentMap.class,\"target_scope_component_map_unknown\");"
+        },
+        {
+          "line": 351,
+          "text": "require(entity!=null,\"target_scope_entity_reader_missing\");Class<?> type=entity.getClass();"
+        },
+        {
+          "line": 353,
+          "text": "require(TargetActionReaderPolicy.declaredBy(type,name,Entity.class),\"target_scope_entity_reader_unknown\");"
+        },
+        {
+          "line": 354,
+          "text": "require(TargetActionReaderPolicy.declaredBy(type,\"isAlive\",entity instanceof LivingEntity?LivingEntity.class:Entity.class),"
+        },
+        {
+          "line": 356,
+          "text": "if(entity instanceof LivingEntity)require(TargetActionReaderPolicy.declaredBy(type,\"getHealth\",LivingEntity.class),\"target_scope_health_reader_unknown\");"
+        },
+        {
+          "line": 358,
+          "text": "require(entity.getEntityData().getClass()==net.minecraft.network.syncher.SynchedEntityData.class,\"target_scope_entity_data_reader_unknown\");"
+        },
+        {
+          "line": 359,
+          "text": "require(entity.getBoundingBox().getClass()==net.minecraft.world.phys.AABB.class&&entity.position().getClass()==Vec3.class,"
+        },
+        {
+          "line": 362,
+          "text": "require(entity.getDeltaMovement().getClass()==Vec3.class,\"target_scope_velocity_reader_unknown\");"
+        },
+        {
+          "line": 364,
+          "text": "require(TargetActionReaderPolicy.declaredBy(type,\"getOwner\",net.minecraft.world.entity.projectile.Projectile.class),\"target_scope_projectile_owner_reader_unknown\");"
+        },
+        {
+          "line": 372,
+          "text": "require(manager.getClass()==net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhaseManager.class,\"target_scope_dragon_manager_reader_unknown\");"
+        },
+        {
+          "line": 384,
+          "text": "net.minecraft.world.entity.boss.enderdragon.phases.DragonHoverPhase.class).contains(phase.getClass()),\"target_scope_exact_dragon_phase_reader_required\");"
+        },
+        {
+          "line": 425,
+          "text": "require(slots.getClass()==net.minecraft.core.NonNullList.class&&slots.size()==46,\"target_scope_menu_slot_coverage\");"
+        },
+        {
+          "line": 427,
+          "text": "require(TargetActionReaderPolicy.declaredBy(slot.getClass(),\"getItem\",net.minecraft.world.inventory.Slot.class)"
+        },
+        {
+          "line": 428,
+          "text": "&&TargetActionReaderPolicy.declaredBy(slot.getClass(),\"getContainerSlot\",net.minecraft.world.inventory.Slot.class),\"target_scope_slot_reader_unknown\");"
+        },
+        {
+          "line": 429,
+          "text": "Class<?> container=slot.container.getClass();"
+        },
+        {
+          "line": 470,
+          "text": "var scoreboard=level.getScoreboard();require(scoreboard.getClass()==net.minecraft.world.scores.Scoreboard.class,\"target_scope_scoreboard_reader_unknown\");"
+        },
+        {
+          "line": 472,
+          "text": "require((playerTeam==null||playerTeam.getClass()==net.minecraft.world.scores.PlayerTeam.class)"
+        },
+        {
+          "line": 473,
+          "text": "&&(targetTeam==null||targetTeam.getClass()==net.minecraft.world.scores.PlayerTeam.class),\"target_scope_team_reader_unknown\");"
+        },
+        {
+          "line": 478,
+          "text": "require(effect.getKey().getClass()==net.minecraft.core.Holder.Reference.class"
+        },
+        {
+          "line": 479,
+          "text": "&&effect.getValue().getClass()==net.minecraft.world.effect.MobEffectInstance.class,\"target_scope_effect_reader_unknown\");"
+        },
+        {
+          "line": 490,
+          "text": "require(eye.getClass()==Vec3.class,\"target_scope_eye_reader_unknown\");"
+        },
+        {
+          "line": 509,
+          "text": "require(ray.getClass()==EntityHitResult.class&&ray.getLocation().getClass()==Vec3.class,\"target_scope_ray_reader_unknown\");"
+        },
+        {
+          "line": 516,
+          "text": "require(chunk!=null&&chunk.getClass()==net.minecraft.world.level.chunk.LevelChunk.class,\"target_scope_chunk_reader_unknown\");"
+        },
+        {
+          "line": 520,
+          "text": "require(section!=null&&section.getClass()==net.minecraft.world.level.chunk.LevelChunkSection.class"
+        },
+        {
+          "line": 521,
+          "text": "&&section.getStates().getClass()==net.minecraft.world.level.chunk.PalettedContainer.class,\"target_scope_chunk_section_reader_unknown\");"
+        },
+        {
+          "line": 561,
+          "text": "var block=state.getBlock();require(state.getClass()==BlockState.class&&PolicyCells.VALUES.contains(block)"
+        },
+        {
+          "line": 562,
+          "text": "&&block.getClass().getClassLoader()==net.minecraft.world.level.block.Block.class.getClassLoader(),\"target_scope_policy_cell_unsupported\");"
+        },
+        {
+          "line": 565,
+          "text": "require(TargetActionReaderPolicy.implementationDeclaredBy(block.getClass(),\"getShape\",shape,BlockState.class,"
+        },
+        {
+          "line": 567,
+          "text": "&&TargetActionReaderPolicy.implementationDeclaredBy(block.getClass(),\"getCollisionShape\",behavior,BlockState.class,"
+        }
+      ],
+      "scope": "native production reader audit"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ScopedTargetDispatch.java",
+      "sha256": "d33afd8a50593b369517dc23c41f5c71e00e932352ff1310427cd4b08d4ce7ce",
+      "exact_reader_sites": [
+        {
+          "line": 159,
+          "text": "ScopedTargetAction.require(source.getClass()==net.minecraft.world.damagesource.DamageSource.class"
+        },
+        {
+          "line": 200,
+          "text": "||packet instanceof ServerboundPlayerActionPacket action&&(action.getClass()!=ServerboundPlayerActionPacket.class"
+        },
+        {
+          "line": 222,
+          "text": "Class<?> type=packet.getClass();"
+        },
+        {
+          "line": 250,
+          "text": "var field=ServerboundInteractPacket.class.getDeclaredField(name);int modifiers=field.getModifiers();"
+        },
+        {
+          "line": 253,
+          "text": "||field.getType().getClassLoader()!=ServerboundInteractPacket.class.getClassLoader()||!field.trySetAccessible())return null;"
+        },
+        {
+          "line": 261,
+          "text": "&&VANILLA.getClass().getName().equals(ServerboundInteractPacket.class.getName()+\"$1\")"
+        },
+        {
+          "line": 262,
+          "text": "&&VANILLA.getClass().getClassLoader()==ServerboundInteractPacket.class.getClassLoader()&&read(SINGLETON,null)==VANILLA;}"
+        },
+        {
+          "line": 263,
+          "text": "static boolean attack(ServerboundInteractPacket packet){return ready()&&packet.getClass()==ServerboundInteractPacket.class&&read(ACTION,packet)==VANILLA;}"
+        }
+      ],
+      "scope": "native production reader audit"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TargetActionEffectBudget.java",
+      "sha256": "82756309378c6ce0213013fc79a98ae6a6f98cc64c9dbecd6ea4ddeaa5b3aa17",
+      "exact_reader_sites": [],
+      "scope": "native production reader audit"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/TargetActionReaderPolicy.java",
+      "sha256": "c8b966c0e66d01fd68e78503abfd2b25cd7bda5c66d2846de8a2c21250c28e37",
+      "exact_reader_sites": [
+        {
+          "line": 5,
+          "text": "static boolean declaredBy(Class<?> actual,String name,Class<?> expected,Class<?>... arguments){"
+        },
+        {
+          "line": 9,
+          "text": "static boolean implementationDeclaredBy(Class<?> actual,String name,Class<?> expected,Class<?>... arguments){"
+        },
+        {
+          "line": 25,
+          "text": "return declaredBy(actual,\"getDeltaMovement\",owner);"
+        }
+      ],
+      "scope": "native production reader audit"
+    },
+    {
+      "path": "client-mod/validation/scoped-target/README.md",
+      "sha256": "303a4f12f233e37827222555be048af12aee90c106a826a2b63af3c310f0594a",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "client-mod/validation/scoped-target/ScopedTargetAdmissionChecks.java",
+      "sha256": "952006f904d2caa3eee451d0312d199285a2b90f81b8e08565548088565502b0",
+      "exact_reader_sites": [
+        {
+          "line": 66,
+          "text": "var action=type.getDeclaredField(\"action\");var singleton=type.getDeclaredField(\"ATTACK_ACTION\");"
+        }
+      ],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "client-mod/validation/scoped-target/run_dispatch_hook_checks.py",
+      "sha256": "d6e850b7b05f29c93f01d9cabe0f1fbb95c27248dee8cf2c0e8b21c8179ab295",
+      "exact_reader_sites": [
+        {
+          "line": 22,
+          "text": "'net/minecraft/network/protocol/game/ServerboundInteractPacket.java':'''package net.minecraft.network.protocol.game; import net.minecraft.world.InteractionHand;import net.minecraft.world.phys.Vec3;public class ServerboundInteractPacket implements net.minecraft.network.protocol.Packet<Object>,io.github.campione01.mineclientbridge.mixin.ScopedCombatInteractAccessor {public int id=9;public boolean secondary;private interface Action {void dispatch(Handler h);}private static final Action ATTACK_ACTION=new Action(){public void dispatch(Handler h){h.onAttack();}};private final Action action=ATTACK_ACTION;public static int maliciousCalls;public void replaceAction(){try{var f=ServerboundInteractPacket.class.getDeclaredField(\"action\");f.setAccessible(true);f.set(this,new Action(){public void dispatch(Handler h){maliciousCalls++;h.onAttack();}});}catch(Exception e){throw new RuntimeException(e);}}public boolean isUsingSecondaryAction(){return secondary;}public int mineclientBridge$entityId(){return id;}public interface Handler {void onAttack();void onInteraction(InteractionHand h);void onInteraction(InteractionHand h,Vec3 p);}public void dispatch(Handler h){action.dispatch(h);}}''',"
+        },
+        {
+          "line": 35,
+          "text": "PKG+'/ScopedTargetAction.java':'''package io.github.campione01.mineclientbridge;import net.minecraft.client.Minecraft;import net.minecraft.world.entity.player.Player;import net.minecraft.world.entity.Entity;class ScopedTargetAction {static class Level {long tick=100;long getGameTime(){return tick;}}Player player=new Player();Entity target=new Entity(),head;Level level=new Level();ActionRegistry.Entry entry=new ActionRegistry.Entry();TargetActionEffectBudget budget;CapabilityTargetAction action=new CapabilityTargetAction(this);int selected,geometry;Runnable finalHook;boolean valid=true,unknown,safe=true,externalIdle=true;long deadline=Long.MAX_VALUE;Runnable hook;ScopedTargetAction(boolean ranged,boolean shield){budget=new TargetActionEffectBudget(ranged,shield);ClientActions.owner=this;}CapabilityTargetAction action(){return action;}int geometry(){return geometry;}void geometryUnchanged(int before){require(before==geometry,\"geometry_changed\");rawBound(Minecraft.getInstance());}void finalExternalFence(int before){if(finalHook!=null){Runnable h=finalHook;finalHook=null;h.run();}geometryUnchanged(before);require(externalIdle,\"external_owner_started\");}void afterMelee(Minecraft mc){rawBound(mc);require(safe,\"post_policy_changed\");}void beforeEffect(Minecraft mc,TargetActionEffectBudget.Effect effect){rawBound(mc);require(safe,\"species_or_collateral_changed\");if(hook!=null){Runnable h=hook;hook=null;h.run();}rawBound(mc);}void rawBound(Minecraft mc){require(ClientActions.ownsScopedTarget(this,entry)&&System.nanoTime()<deadline,\"owner_or_deadline\");}void cleanupFence(Minecraft mc){require(ClientActions.terminalTargetCleanup(this,entry),\"cleanup_owner\");}record StackGeometry(net.minecraft.world.item.ItemStack stack,Object item){}static StackGeometry argumentStack(net.minecraft.world.item.ItemStack s){require(s!=null&&s.getClass()==net.minecraft.world.item.ItemStack.class,\"argument_reader\");return new StackGeometry(s,s.item);}static void unchangedArgument(StackGeometry b,net.minecraft.world.item.ItemStack a){require(b.stack==a&&b.item==a.item,\"argument_changed\");}void unknown(){unknown=true;budget.poison();}static void require(boolean ok,String reason){if(!ok)throw new ClientActionRequest.Rejected(409,reason);}}''',"
+        },
+        {
+          "line": 59,
+          "text": "ok(TargetActionReaderPolicy.declaredBy(SafeReader.class,\"getHealth\",BaseReader.class));"
+        },
+        {
+          "line": 60,
+          "text": "ok(!TargetActionReaderPolicy.declaredBy(MutatingReader.class,\"getHealth\",BaseReader.class));"
+        },
+        {
+          "line": 62,
+          "text": "ok(!TargetActionReaderPolicy.declaredBy(SafeReader.class,\"unknown\",BaseReader.class));"
+        }
+      ],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "resident-controller/resident_controller/target_action_snapshot.py",
+      "sha256": "bb545b72ed6ccde2af69090e6211fe796321b5d7ada22f78079ed27a520ea059",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "resident-controller/tests/target_action_witness_fixture.py",
+      "sha256": "8e1a41097b0e7857acf96a91c145624096805ae234fcdadbee6b0d18c5eed519",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    },
+    {
+      "path": "resident-controller/tests/test_target_action_snapshot.py",
+      "sha256": "0611318724e91fffefaaa19e72878a29cd5e235274b91a988a411bd671024210",
+      "exact_reader_sites": [],
+      "scope": "retained Python/schema/test artifact; no production native class admission"
+    }
+  ],
+  "site_count": 76,
+  "pending": "actual compiled/official factory audit gate"
+}

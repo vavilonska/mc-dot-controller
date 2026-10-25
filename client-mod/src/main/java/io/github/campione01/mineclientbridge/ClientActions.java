@@ -32,6 +32,8 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 final class ClientActions {
     private static final ActionRegistry ACTIONS = new ActionRegistry();
     private static RuntimeAction active;
+    private static final ScopedTerminalCleanupScope TERMINAL_CLEANUP=new ScopedTerminalCleanupScope();
+    private static RuntimeAction terminalCleanupOwner;
     private static final FallRescueCleanupScope FALL_CLEANUP=new FallRescueCleanupScope();
     // Call-stack guard only, never an alternative owner; survives hook cancellation until native use unwinds.
     private static RuntimeAction scopedDispatchInFlight;
@@ -45,6 +47,11 @@ final class ClientActions {
         final long deadline;
         final long navigationEpoch;
         final BoundedCombat combat;
+        NativeReactiveDefense reactiveDefense;
+        NativeBlazeEscort blazeEscort;
+        NativeShelteredEnderman shelteredEnderman;
+        NativePortalHandoff.Defense portalDefense;
+        float escortStrafe;
         final BoundedBoatDrive boat;
         final BoundedBoatTransfer transfer;
         final CoordinationStepGuard coordinationStep;
@@ -59,6 +66,9 @@ final class ClientActions {
         ScopedMining scopedMining;
         ScopedPlacement scopedPlacement;
         ScopedCombat scopedCombat;
+        ScopedTargetAction scopedTargetAction;
+        ScopedItemInteraction scopedItemInteraction;
+        ScopedPortalEntry scopedPortalEntry;
         boolean useHeld;
         boolean left, right;
         Input input;
@@ -75,7 +85,7 @@ final class ClientActions {
         net.minecraft.world.item.Item placementBeforeItem;
         int placementBeforeSlot;
         final PlacementOwnerFence placementOwner;
-        RuntimeAction(ActionRegistry.Entry entry, Minecraft mc, BoundedCombat combat, BoundedBoatDrive boat, BoundedBoatTransfer transfer, long combatDeadline, CoordinationStepGuard coordinationStep, long coordinationDeadline, CapabilityGuard capabilityGuard, CapabilityTargetAction capabilityTarget) {
+        RuntimeAction(ActionRegistry.Entry entry, Minecraft mc, BoundedCombat combat, BoundedBoatDrive boat, BoundedBoatTransfer transfer, long combatDeadline, CoordinationStepGuard coordinationStep, long coordinationDeadline, CapabilityGuard capabilityGuard, CapabilityTargetAction capabilityTarget, long scopedDeadline) {
             this.entry = entry;
             placementOwner = new PlacementOwnerFence(this,mc.player,mc.level,mc.gameMode,
                 mc.player.containerMenu,mc.screen,ACTIONS.session,WorldGeneration.current(mc.level));
@@ -89,7 +99,8 @@ final class ClientActions {
             navigationEpoch = NavigationPositionGuard.epoch();
             // Opt-in coordination includes admission work in its bounded lifetime.
             // All legacy owners retain the original deadline expression and timing.
-            if (coordinationStep != null) deadline=coordinationDeadline;
+            if (scopedDeadline>0) deadline=scopedDeadline;
+            else if (coordinationStep != null) deadline=coordinationDeadline;
             else {
                 deadline = combat != null ? combatDeadline : entry.request.timeoutMs() == 0 ? Long.MAX_VALUE
                     : System.nanoTime() + entry.request.timeoutMs() * 1_000_000L;
@@ -99,30 +110,50 @@ final class ClientActions {
 
     static synchronized void install() {
         if (installed) return;
+        NativeWorldBackup.install();
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Pre.class, event -> preTick());
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> postTick());
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, MovementInputUpdateEvent.class, ClientActions::input);
         NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, event -> {
-            IntegratedServerIdentity.clear();NativeExternalNavigation.contextLost();NativeFallRescue.stop("world_transition");cancel("world_transition");
+            NativeRecoveryShortInput.contextLost("world_transition");
+            NativeReactiveGuard.stop("disconnect");NativeThreatObservation.clear("disconnect");NativePortalHandoff.revoke("disconnect");IntegratedServerIdentity.clear();NativeExternalNavigation.contextLost();NativeFallRescue.stop("world_transition");cancel("world_transition");
         });
-        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.Clone.class, event -> { NativeExternalNavigation.contextLost();NativeFallRescue.stop("player_changed"); cancel("player_changed"); });
+        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.Clone.class, event -> { NativeReactiveGuard.stop("player_context_changed");NativeThreatObservation.clear("player_context_changed");NativePortalHandoff.playerClone(event.getOldPlayer(),event.getNewPlayer());NativeRecoveryShortInput.contextLost("player_changed");NativeExternalNavigation.contextLost();NativeFallRescue.stop("player_changed"); cancel("player_changed"); });
         NeoForge.EVENT_BUS.addListener(LevelEvent.Unload.class, event -> {
-            if (event.getLevel().isClientSide()) { NativeExternalNavigation.contextLost();NativeFallRescue.stop("world_transition"); MovementBudget.interrupt("movement_budget_context_changed"); cancel("world_transition"); }
+            if (event.getLevel().isClientSide()) { NativeReactiveGuard.stop("world_transition");NativeThreatObservation.clear("world_transition");NativeRecoveryShortInput.contextLost("world_transition");NativeExternalNavigation.contextLost();NativeFallRescue.stop("world_transition"); MovementBudget.interrupt("movement_budget_context_changed"); cancel("world_transition"); }
         });
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, true, net.neoforged.neoforge.client.event.ScreenEvent.Opening.class,
-                event -> NativeFallRescue.stop("user_screen_or_pause"));
+                event -> {NativeReactiveGuard.userPause("screen_open");NativeRecoveryShortInput.contextLost("user_screen_or_pause");NativeFallRescue.stop("user_screen_or_pause");});
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.CalculatePlayerTurnEvent.class,event->{var mc=Minecraft.getInstance();if(Math.abs(mc.mouseHandler.getXVelocity())+Math.abs(mc.mouseHandler.getYVelocity())>0)NativeReactiveGuard.userPause("physical_mouse_turn");});
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.InputEvent.MouseScrollingEvent.class,event->NativeReactiveGuard.userPause("physical_scroll"));
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.InputEvent.Key.class,event->NativeReactiveGuard.userPause("physical_key"));
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.InputEvent.MouseButton.Pre.class,event->NativeReactiveGuard.userPause("physical_mouse"));
         installed = true;
     }
 
     static JsonObject start(ClientActionRequest request) { return start(request, null); }
 
     static JsonObject start(ClientActionRequest request, ScopedNativePreflight.Capture scoped) {
+        NativeRecoveryShortInput.requireLegacyAllowed();
         Minecraft mc = Minecraft.getInstance();
         requireThread(mc);
+        if(scoped==null)NativeAdmission.ordinaryStartEntered();
+        requireNoScopedCleanup();
+        NativeWorldBackup.requireNoSnapshot();
         ActionRegistry.Entry old = ACTIONS.existing(request);
         if (old != null) return status(request.id());
+        NativeReactiveGuard.requireStart(request);
+        NativePortalHandoff.beforeStart(request);
         if(request.original().has("defensive_policy") && (scoped==null || scoped.combat==null || scoped.combat.defensive==null))
             throw new ClientActionRequest.Rejected(409,"defensive_scoped_profile_required");
+        if(request.original().has("typed_item_interaction") && (scoped==null || scoped.itemInteraction==null))
+            throw new ClientActionRequest.Rejected(409,"typed_item_scoped_profile_required");
+        if(request.original().has("typed_portal_entry") && (scoped==null || scoped.portalEntry==null))
+            throw new ClientActionRequest.Rejected(409,"portal_entry_scoped_profile_required");
+        if(SetCapabilityTarget(request.action()) && (scoped==null || scoped.targetAction==null))
+            throw new ClientActionRequest.Rejected(409,"target_scoped_profile_required");
+        if(request.original().has("blaze_guard") && scoped!=null)
+            throw new ClientActionRequest.Rejected(409,"blaze_guard_requires_ordinary_unscoped_owner");
         NativeFallRescue.requireOrdinaryAdmission();
         NativeExternalNavigation.requireOrdinaryAdmission();
         if (active != null) throw new ClientActionRequest.Rejected(409, "action_busy");
@@ -144,7 +175,7 @@ final class ClientActions {
         MovementBudget.admission(mc,request);
         long capabilityOwnerRevision=ownershipRevision;
         CapabilityGuard capabilityGuard=CapabilityGuard.start(mc,request);
-        CapabilityTargetAction capabilityTarget=SetCapabilityTarget(request.action())?CapabilityTargetAction.start(mc,request.original()):null;
+        CapabilityTargetAction capabilityTarget=SetCapabilityTarget(request.action())?scoped.targetAction.action():null;
         boolean coordinationRequested = CoordinationStepGuard.requested(request.original());
         long coordinationOwnerRevision = ownershipRevision;
         LocalPlayer coordinationPlayer = mc.player;
@@ -152,6 +183,7 @@ final class ClientActions {
         long coordinationDeadline = coordinationRequested
                 ? System.nanoTime()+request.timeoutMs()*1_000_000L : 0;
         NavigationPositionGuard.requireBinding(mc, request);
+        NativePortalHandoff.requireSource(mc,request);
         EncounterRequest encounterRequest=request.action().equals("combat_entity")?EncounterRequest.parseOptional(request.original()):null;
         if (encounterRequest!=null && !EncounterRequest.runtimeEnabled(encounterRequest.mode()))
             throw new ClientActionRequest.Rejected(409,EncounterRequest.THREE_MODE.equals(encounterRequest.mode())
@@ -162,6 +194,12 @@ final class ClientActions {
         JsonObject combatEvidence = new JsonObject();
         BoundedCombat combat = request.action().equals("combat_entity")
                 ? new BoundedCombat(mc, BoundedCombatRequest.parse(request.original()), combatEvidence, combatDeadline) : null;
+        JsonObject blazeEvidence = new JsonObject();
+        NativeBlazeEscort blazeEscort = request.original().has("blaze_guard")
+                ? new NativeBlazeEscort(mc, request, blazeEvidence) : null;
+        JsonObject endermanEvidence = new JsonObject();
+        NativeShelteredEnderman shelteredEnderman=request.original().has("enderman_shelter")
+                ? new NativeShelteredEnderman(mc,request,endermanEvidence) : null;
         JsonObject boatEvidence = new JsonObject();
         BoundedBoatDrive boat = request.action().equals("boat_drive")
                 ? new BoundedBoatDrive(mc, BoatDriveRequest.parse(request.original()), boatEvidence) : null;
@@ -202,6 +240,8 @@ final class ClientActions {
             String denied=capabilityGuard.check(mc,false);
             if(denied!=null)throw new ClientActionRequest.Rejected(409,denied);
         }
+        NativePortalHandoff.requireFinal(request);
+        NativeReactiveGuard.finalFence(request);
         NativeAdmission.mark(NativeAdmission.Stage.INPUT_TRANSFER);
         // Transfer ownership once. A direct request later releases only this action's inputs.
         if (coordinationStep == null) BridgeServer.releaseAllInputs();
@@ -235,14 +275,47 @@ final class ClientActions {
         // Preserve the original freshness deadline after the final external API reads.
         if(capabilityGuard!=null)capabilityGuard.requireFresh(mc,"external_controller_final");
         if(coordinationStep!=null)coordinationStep.requireFresh(mc);
+        // New primitive profiles consume their complete original fact binding after
+        // every shared callback; the remaining shared admission checks are pure.
+        if(scoped!=null && (scoped.targetAction!=null || scoped.itemInteraction!=null || scoped.portalEntry!=null)) {
+            scoped.finalPrimitiveAdmission(mc);
+            // Exact-reader primitive lanes preserve both original freshness clocks.
+            if(capabilityGuard!=null)capabilityGuard.requireFresh(mc,"primitive_final");
+            if(coordinationStep!=null)coordinationStep.requireFresh(mc);
+        }
         if(active!=null || ownershipRevision!=capabilityOwnerRevision
                 || mc.player!=coordinationPlayer || mc.level!=coordinationLevel)
             throw new ClientActionRequest.Rejected(409,"external_controller_owner_changed_during_check");
         NativeFallRescue.requireOrdinaryAdmission();
         NativeExternalNavigation.requireOrdinaryAdmission();
+        requireNoScopedCleanup();
+        NativePortalHandoff.requireFinal(request);
+        NativeReactiveGuard.finalFence(request);
         NativeAdmission.mark(NativeAdmission.Stage.REGISTERED);
         ownershipRevision++;
-        active = new RuntimeAction(ACTIONS.begin(request), mc, combat, boat, transfer, combatDeadline, coordinationStep, coordinationDeadline, capabilityGuard, capabilityTarget);
+        active = new RuntimeAction(ACTIONS.begin(request), mc, combat, boat, transfer, combatDeadline, coordinationStep, coordinationDeadline, capabilityGuard, capabilityTarget,
+            scoped==null?0:scoped.targetAction!=null?scoped.targetAction.deadline:scoped.itemInteraction!=null?scoped.itemInteraction.deadline:scoped.portalEntry!=null?scoped.portalEntry.deadline:0);
+        NativePortalHandoff.registered(active.entry);
+        if(request.action().equals("reactive_defense")){
+            RuntimeAction owner=active;NativeReactiveGuard.registered(request,owner.entry);
+            owner.reactiveDefense=NativeReactiveGuard.create(mc,request,owner.entry.result);
+            owner.reactiveDefense.bind(()->active==owner&&ACTIONS.active()==owner.entry&&owner.entry.running());
+        }
+        if(request.action().equals("portal_defend")){
+            RuntimeAction owner=active;owner.portalDefense=new NativePortalHandoff.Defense(mc,owner.entry.result,
+                ()->active==owner&&ACTIONS.active()==owner.entry&&owner.entry.running());
+        }
+        NativePortalHandoff.activate(mc,active.entry);
+        if(blazeEscort!=null){
+            RuntimeAction owner=active;owner.blazeEscort=blazeEscort;
+            blazeEscort.bind(()->active==owner && ACTIONS.active()==owner.entry && owner.entry.running(),owner.entry.result);
+            owner.entry.result.add("blaze_escort",blazeEvidence);
+        }
+        if(shelteredEnderman!=null){
+            RuntimeAction owner=active;owner.shelteredEnderman=shelteredEnderman;
+            shelteredEnderman.bind(()->active==owner && ACTIONS.active()==owner.entry && owner.entry.running(),owner.entry.result);
+            owner.entry.result.add("enderman_shelter",endermanEvidence);
+        }
         if (scoped != null) {
             active.entry.result.add("scoped_native_preflight", scoped.witness(request.id()));
             active.scopedMovement = scoped.movement;
@@ -251,6 +324,12 @@ final class ClientActions {
             if(active.scopedLocalSegment!=null)active.scopedLocalSegment.activate(active.entry);
             active.scopedStepDown=scoped.stepDown;
             if(active.scopedStepDown!=null)active.scopedStepDown.activate(active.entry);
+            active.scopedItemInteraction=scoped.itemInteraction;
+            if(active.scopedItemInteraction!=null)active.scopedItemInteraction.activate(active.entry);
+            active.scopedPortalEntry=scoped.portalEntry;
+            if(active.scopedPortalEntry!=null)active.scopedPortalEntry.activate(active.entry);
+            active.scopedTargetAction=scoped.targetAction;
+            if(active.scopedTargetAction!=null)active.scopedTargetAction.activate(active.entry);
             active.scopedCombat=scoped.combat;
             if(active.scopedCombat!=null){active.scopedCombat.activate(active.entry);active.combat.bindScoped(active.scopedCombat);}
             active.scopedPlacement=scoped.placement;
@@ -353,13 +432,30 @@ final class ClientActions {
         }
     }
     static boolean ownsCapabilityTarget(CapabilityTargetAction target) { return active!=null && active.capabilityTarget==target; }
-    static JsonObject status(String id) { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(id);j.add("movement_budget",MovementBudget.snapshot(Minecraft.getInstance()));return j; }
+    static JsonObject status(String id) { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(id);j.add("movement_budget",MovementBudget.snapshot(Minecraft.getInstance()));j.add("threat_observation",NativeThreatObservation.snapshot());j.add("portal_handoff",NativePortalHandoff.status());j.add("reactive_guard",NativeReactiveGuard.status());return j; }
     /** Recheck a coherent read without creating another movement-budget boundary sample. */
-    static JsonObject statusWithoutObservation() { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(null);j.add("movement_budget",MovementBudget.snapshot());return j; }
+    static JsonObject statusWithoutObservation() { requireThread(Minecraft.getInstance()); JsonObject j=ACTIONS.status(null);j.add("movement_budget",MovementBudget.snapshot());j.add("threat_observation",NativeThreatObservation.snapshot());j.add("portal_handoff",NativePortalHandoff.status());j.add("reactive_guard",NativeReactiveGuard.status());return j; }
+    static ActionRegistry.Entry portalEntry(String id){requireThread(Minecraft.getInstance());return ACTIONS.get(id);}
+    static void cancelPortalChild(ActionRegistry.Entry e){if(active!=null&&active.entry==e)cancel("portal_handoff_revoked");}
     static String session() { return ACTIONS.session; }
     static long externalOwnerRevision() { return ownershipRevision; } // Pure owner identity fence.
-    static boolean ownsInput() { return active != null || NativeFallRescue.blocksInput() || NativeExternalNavigation.blocksInput(); }
-    static boolean hasRuntimeAction() { return active != null; }
+    static boolean ownsInput() { return NativeRecoveryShortInput.blocksInput() || active != null || TERMINAL_CLEANUP.active() || NativeFallRescue.blocksInput() || NativeExternalNavigation.blocksInput(); }
+    static boolean reactiveReleaseEvidence(JsonObject j){return !j.has("input_release_diagnostics")&&(!j.has("input_release_confirmed")||j.get("input_release_confirmed").isJsonPrimitive()&&j.getAsJsonPrimitive("input_release_confirmed").isBoolean()&&j.get("input_release_confirmed").getAsBoolean());}
+    static ActionRegistry.Entry reactiveLatest(){return ACTIONS.get(null);}
+    static boolean reactiveChannelsAbsent(){return preemptionChannelsAbsent();}
+    static boolean reactiveNoCleanup(){return !TERMINAL_CLEANUP.active()&&!FALL_CLEANUP.active();}
+    static boolean reactiveNoDispatch(){return scopedDispatchInFlight==null&&!NativeBlazeEscort.dispatchInFlight();}
+    static boolean reactiveNoOwner(){return active==null&&ACTIONS.active()==null;}
+    static void cancelReactiveChild(ActionRegistry.Entry e,String reason){if(active!=null&&active.entry==e&&active.entry.request.action().equals("reactive_defense"))cancel(reason);}
+    static boolean interruptForReactiveDefense(){
+        RuntimeAction a=active;if(a==null||a.reactiveDefense!=null||!reactiveNoCleanup()||!reactiveNoDispatch()||!preemptionChannelsAbsent())return false;
+        if(a.scopedMovement!=null||a.scopedStepDown!=null||a.scopedLocalSegment!=null||a.scopedMining!=null||a.scopedPlacement!=null||a.scopedCombat!=null||a.scopedTargetAction!=null||a.scopedItemInteraction!=null||a.scopedPortalEntry!=null||a.scopedBlockMenu!=null||a.portalDefense!=null||a.boat!=null||a.transfer!=null||a.entry.request.original().has("portal_handoff"))return false;
+        if(!Set.of("follow_path","break_block","place_block","use_item","recover_environment","combat_entity").contains(a.entry.request.action()))return false;
+        if(a.entry.request.action().equals("recover_environment")&&(a.player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)||a.player.isInLava()))return false;
+        a.entry.result.addProperty("interrupted_by_reactive_defense",true);cancel("reactive_defense_preempted");return active==null;
+    }
+    static boolean backupSafe() { requireThread(Minecraft.getInstance()); return active==null && !TERMINAL_CLEANUP.active() && scopedDispatchInFlight==null && ACTIONS.backupSafe(); }
+    static boolean hasRuntimeAction() { return active != null || TERMINAL_CLEANUP.active(); }
     static long ownershipRevision() { return ownershipRevision; }
     static boolean ownsTransfer(BoundedBoatTransfer transfer) {
         requireThread(Minecraft.getInstance());
@@ -373,15 +469,22 @@ final class ClientActions {
     }
     static JsonObject cancelId(String id) {
         requireThread(Minecraft.getInstance());
+        NativeReactiveGuard.externalCancel(id);
+        NativePortalHandoff.cancelId(id);
         ActionRegistry.Entry entry = ACTIONS.get(id);
         if (active != null && active.entry == entry) cancel("cancel_requested");
         return status(id);
     }
     static void directTakeover() {
+        NativeRecoveryShortInput.requireLegacyAllowed();
+        NativeWorldBackup.requireNoSnapshot();
         requireThread(Minecraft.getInstance());
+        requireNoScopedCleanup();
         ExternalControllerGuard.requireIdle(Minecraft.getInstance());
         NativeFallRescue.requireOrdinaryAdmission();
         NativeExternalNavigation.requireOrdinaryAdmission();
+        NativeReactiveGuard.userPause("direct_takeover");
+        NativePortalHandoff.revoke("direct_takeover");
         ownershipRevision++;
         MovementBudget.interrupt("movement_budget_direct_takeover");
         cancel("direct_takeover");
@@ -397,6 +500,7 @@ final class ClientActions {
 
     /** An exact declared action may be interrupted, but is never resumed or replaced automatically. */
     static void requireFallRescueAdmission(Set<String> permittedIds) {
+        requireNoScopedCleanup();
         NativeExternalNavigation.requireOrdinaryAdmission();
         RuntimeAction a=active;
         if(a!=null && (!permittedIds.contains(a.entry.request.id())
@@ -546,7 +650,11 @@ final class ClientActions {
     }
 
     private static void preTick() {
+        if(NativeRecoveryShortInput.ENABLED){NativeRecoveryShortInput.preTick();return;}
         Minecraft mc = Minecraft.getInstance();
+        NativeThreatObservation.tick(mc);
+        NativeReactiveGuard.observeLifecycle(mc);
+        NativeWorldBackup.clientTick(mc);
         NativeExternalNavigation.tick(mc);
         if(NativeExternalNavigation.blocksInput())return;
         NativeFallRescue.preTick(mc);
@@ -554,18 +662,49 @@ final class ClientActions {
         ScopedLocalSegmentDispatch.nextTick();
         MovementBudget.preTick(mc);
         NavigationPositionGuard.tick(mc);
+        NativePortalHandoff.tick(mc);
+        NativeReactiveGuard.tick(mc);
         if (!context(mc,"pre_tick")) return;
         RuntimeAction entered=active;
         try {
             RuntimeAction a = active;
             a.entry.ticks++;
             a.forward = 0;
+            a.escortStrafe=0;
             a.left = a.right = false;
             a.jump = false;
             a.sneak = a.entry.request.sneak();
             if (mc.isPaused()) return;
             switch (a.entry.request.action()) {
-                case "follow_path" -> followPath(mc, a);
+                case "reactive_defense" -> {
+                    var step=a.reactiveDefense.tick(mc,a.entry.ticks,a.deadline);
+                    if(active!=a)return;
+                    a.forward=step.forward();a.escortStrafe=step.strafe();a.jump=step.jump();a.sneak=false;
+                    a.entry.result.addProperty("phase",step.reason());
+                    if(step.terminal()!=null)finish(step.terminal(),step.reason());
+                }
+                case "portal_defend" -> {
+                    var step=a.portalDefense.tick(mc);
+                    if(active!=a)return;
+                    a.entry.result.addProperty("phase",step.reason());
+                    if(step.terminal()!=null)finish(step.terminal(),step.reason());
+                }
+                case "follow_path" -> {
+                    if(a.shelteredEnderman!=null){
+                        NativeBlazeEscort.Step step=a.shelteredEnderman.tick(mc,a.entry.ticks,a.deadline);
+                        if(active!=a)return;
+                        a.forward=step.forward();a.escortStrafe=step.strafe();a.jump=step.jump();a.sneak=false;
+                        a.entry.result.addProperty("phase",step.reason());
+                        if(step.terminal()!=null)finish(step.terminal(),step.reason());
+                    } else if(a.blazeEscort==null)followPath(mc,a);
+                    else {
+                        NativeBlazeEscort.Step step=a.blazeEscort.tick(mc,a.entry.ticks,a.deadline);
+                        if(active!=a)return;
+                        a.forward=step.forward();a.escortStrafe=step.strafe();a.jump=step.jump();a.sneak=false;
+                        a.entry.result.addProperty("phase",step.reason());
+                        if(step.terminal()!=null)finish(step.terminal(),step.reason());
+                    }
+                }
                 case "recover_environment" -> recoverEnvironment(mc, a);
                 case "boat_mount", "boat_dismount" -> {
                     BoundedBoatTransfer.Step step;
@@ -593,7 +732,8 @@ final class ClientActions {
                 case "attack_entity", "shoot_entity" -> {
                     CapabilityTargetAction.Step step;
                     try { step=a.capabilityTarget.tick(mc); }
-                    catch (RuntimeException failure) { if (active == a) failException(failure); return; }
+                    catch (RuntimeException failure) { a.dispatched |= a.scopedTargetAction.attempted(); if (active == a) failException(failure); return; }
+                    a.dispatched |= a.scopedTargetAction.attempted();
                     if(active!=a)return;
                     a.entry.result.add("target_action",step.evidence());
                     if(step.status()!=null)finish(step.status(),step.reason());
@@ -614,6 +754,10 @@ final class ClientActions {
     }
 
     private static void input(MovementInputUpdateEvent event) {
+        if(NativeRecoveryShortInput.ENABLED){
+            if(event.getEntity()==Minecraft.getInstance().player)NativeRecoveryShortInput.input(Minecraft.getInstance().player,event.getInput());
+            return;
+        }
         if (event.getEntity() == Minecraft.getInstance().player && NativeFallRescue.input(Minecraft.getInstance(),event.getInput())) return;
         RuntimeAction a = active;
         MovementBudget.checkInput(Minecraft.getInstance(),event.getInput(),a!=null&&event.getEntity()==a.player);
@@ -625,6 +769,11 @@ final class ClientActions {
                 if (active != a) return;
                 if (reason != null) { finish("failed", reason); return; }
             } catch (RuntimeException failure) { if (active == a) failException(failure); return; }
+        }
+        if(a.reactiveDefense!=null){
+            try{if(!a.reactiveDefense.motionAllowed(Minecraft.getInstance())){a.forward=0;a.escortStrafe=0;a.jump=false;}}
+            catch(RuntimeException failed){if(active==a)failException(failed);return;}
+            if(active!=a)return;
         }
         Input input = event.getInput();
         if(a.scopedCombat!=null){
@@ -689,12 +838,24 @@ final class ClientActions {
         }
         if(!externalOwnerCheck(Minecraft.getInstance(),a))return;
         if(active!=a || input!=a.player.input || System.nanoTime()>=a.deadline)return;
+        if(a.scopedPortalEntry!=null || a.scopedTargetAction!=null || a.scopedItemInteraction!=null){
+            try {
+                if(!ScopedFlatMovement.neutral(input)||event.getInput()!=input)throw new IllegalStateException("scoped_survival_external_input");
+                if(a.scopedPortalEntry!=null)a.scopedPortalEntry.beforeEffect(Minecraft.getInstance());
+                if(a.scopedTargetAction!=null)a.scopedTargetAction.check(Minecraft.getInstance(),false);
+                if(a.scopedItemInteraction!=null)a.scopedItemInteraction.check(Minecraft.getInstance(),a.dispatched,false);
+                if(active!=a||input!=a.player.input||event.getInput()!=input||!ScopedFlatMovement.neutral(input)||System.nanoTime()>=a.deadline)
+                    throw new IllegalStateException("scoped_survival_input_identity_changed");
+                if(a.scopedPortalEntry!=null && a.forward!=0){a.dispatched=true;a.scopedPortalEntry.markAttempted();}
+            } catch(RuntimeException failure){if(active==a)finish("cancelled","scoped_survival_input_unconfirmed");return;}
+        }
         a.input = input;
         input.forwardImpulse = a.forward;
-        input.leftImpulse = a.left ? 1 : a.right ? -1 : 0;
+        input.leftImpulse = (a.blazeEscort!=null||a.shelteredEnderman!=null||a.reactiveDefense!=null)?a.escortStrafe:a.left ? 1 : a.right ? -1 : 0;
         input.up = a.forward > 0;
         input.down = a.forward < 0;
-        if (a.boat == null) input.left = input.right = false;
+        if(a.blazeEscort!=null||a.shelteredEnderman!=null||a.reactiveDefense!=null){input.left=a.escortStrafe>0;input.right=a.escortStrafe<0;}
+        else if (a.boat == null) input.left = input.right = false;
         else { input.left = a.left; input.right = a.right; }
         input.jumping = a.jump;
         input.shiftKeyDown = a.transfer != null ? a.transfer.sneakInput(Minecraft.getInstance()) : a.sneak;
@@ -704,6 +865,7 @@ final class ClientActions {
     }
 
     private static void postTick() {
+        if(NativeRecoveryShortInput.ENABLED){NativeRecoveryShortInput.postTick();return;}
         Minecraft mc = Minecraft.getInstance();
         NativeFallRescue.postTick(mc);
         if (NativeFallRescue.blocksInput()) return;
@@ -757,6 +919,7 @@ final class ClientActions {
     }
 
     private static void followPath(Minecraft mc, RuntimeAction a) {
+        if(a.scopedPortalEntry!=null){followPortalEntry(mc,a);return;}
         if(a.scopedLocalSegment!=null){followLocalSegment(mc,a);return;}
         if(a.scopedStepDown!=null){
             try {a.scopedStepDown.beforeEffect(mc);}
@@ -834,6 +997,25 @@ final class ClientActions {
         finish("succeeded", "path_reached");
     }
 
+    private static void followPortalEntry(Minecraft mc,RuntimeAction a) {
+        ScopedPortalEntry guard=a.scopedPortalEntry;
+        try {
+            guard.beforeEffect(mc);if(active!=a)return;
+            if(guard.atPortal()){
+                a.forward=0;a.jump=false;a.sneak=false;
+                a.entry.result.addProperty("phase","portal_entry_awaiting_exact_transition");return;
+            }
+            guard.beforeEffect(mc);if(active!=a)return;
+            var step=guard.step();
+            guard.markAttempted();a.dispatched=true;
+            a.player.setYRot(step.yaw());
+            if(active!=a)return;
+            a.forward=Math.min(.5F,step.forward());a.jump=false;a.sneak=false;
+            a.entry.result.addProperty("phase","portal_entry_approach");
+            a.entry.result.addProperty("waypoint_index",0);a.entry.result.addProperty("waypoint_count",1);
+        } catch(RuntimeException failed){if(active==a){if(guard.attempted())guard.markUnknown();finish("cancelled","portal_entry_revalidation_failed");}}
+    }
+
     private static void followLocalSegment(Minecraft mc,RuntimeAction a) {
         try {
             a.scopedLocalSegment.beforeEffect(mc);
@@ -905,6 +1087,7 @@ final class ClientActions {
             } else if (++a.unchangedTicks >= 60) {
                 // Keep flotation, stop futile horizontal pressure, ask the external planner.
                 a.recoveryStalled = true; a.forward = 0;
+            a.escortStrafe=0;
             }
             break;
         }
@@ -914,6 +1097,42 @@ final class ClientActions {
         a.entry.result.addProperty("environment_waiting_for_route", a.recoveryStalled || a.waypoint >= points.size());
     }
 
+    static boolean ownsScopedPortalEntry(ScopedPortalEntry guard,ActionRegistry.Entry entry) {
+        return active!=null&&active.scopedPortalEntry==guard&&active.entry==entry&&ACTIONS.active()==entry&&entry.status.equals("running");
+    }
+    static boolean terminalPortalEntryCleanup(ScopedPortalEntry guard,ActionRegistry.Entry entry) {
+        RuntimeAction a=terminalCleanupOwner;
+        return a!=null&&a.scopedPortalEntry==guard&&a.entry==entry&&TERMINAL_CLEANUP.bound(a,entry,ownershipRevision,active,ACTIONS.active());
+    }
+    static boolean ownsScopedItemInteraction(ScopedItemInteraction guard,ActionRegistry.Entry entry){
+        return active!=null && active.scopedItemInteraction==guard && active.entry==entry
+            && entry!=null && entry.running() && ACTIONS.active()==entry;
+    }
+    static boolean terminalItemInteractionCleanup(ScopedItemInteraction guard,ActionRegistry.Entry entry){
+        RuntimeAction a=terminalCleanupOwner;
+        return a!=null && a.scopedItemInteraction==guard && a.entry==entry
+            && TERMINAL_CLEANUP.bound(a,entry,ownershipRevision,active,ACTIONS.active());
+    }
+    static boolean ownsScopedTarget(ScopedTargetAction guard,ActionRegistry.Entry entry){
+        return active!=null && active.scopedTargetAction==guard && active.entry==entry
+            && entry!=null && entry.running() && ACTIONS.active()==entry;
+    }
+    static ScopedTargetAction scopedTarget(CapabilityTargetAction target){
+        return active!=null && active.capabilityTarget==target?active.scopedTargetAction:
+            terminalCleanupOwner!=null && terminalCleanupOwner.capabilityTarget==target?terminalCleanupOwner.scopedTargetAction:null;
+    }
+    static ScopedTargetAction activeScopedTarget(){
+        return active!=null?active.scopedTargetAction:terminalCleanupOwner!=null?terminalCleanupOwner.scopedTargetAction:null;
+    }
+    static boolean terminalTargetCleanup(ScopedTargetAction guard,ActionRegistry.Entry entry){
+        RuntimeAction a=terminalCleanupOwner;
+        return a!=null && a.scopedTargetAction==guard && a.entry==entry
+            && TERMINAL_CLEANUP.bound(a,entry,ownershipRevision,active,ACTIONS.active());
+    }
+    private static void requireNoScopedCleanup(){
+        if(NativeBlazeEscort.dispatchInFlight())throw new ClientActionRequest.Rejected(409,"blaze_guard_native_dispatch_in_flight");
+        if(TERMINAL_CLEANUP.active())throw new ClientActionRequest.Rejected(409,"scoped_terminal_cleanup_in_progress");
+    }
     static boolean ownsScopedCombat(ScopedCombat guard,ActionRegistry.Entry entry){return active!=null && active.scopedCombat==guard
         && active.entry==entry && ACTIONS.active()==entry && entry!=null && entry.running();}
     static ScopedCombat activeDefensiveCombat(){return active!=null && active.scopedCombat!=null && active.scopedCombat.defensive!=null?active.scopedCombat:null;}
@@ -1346,7 +1565,48 @@ final class ClientActions {
         NativeExternalNavigation.requireOrdinaryAdmission();
         return active==a;
     }
+    private static void interactTypedItem(Minecraft mc,RuntimeAction a){
+        ScopedItemInteraction guard=a.scopedItemInteraction;
+        try {
+            if(a.dispatched){
+                guard.check(mc,true,false);
+                if(active!=a)return;
+                if(guard.settled())finish("succeeded","typed_item_outcome_observed");
+                return;
+            }
+            guard.check(mc,false,false);
+            if(active!=a)return;
+            var point=a.entry.request.original().getAsJsonObject("item_hit");
+            Vec3 target=new Vec3(point.get("x").getAsDouble(),point.get("y").getAsDouble(),point.get("z").getAsDouble());
+            Vec3 delta=target.subtract(a.player.getEyePosition());
+            float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z));
+            float pitch=(float)-Math.toDegrees(Math.atan2(delta.y,Math.hypot(delta.x,delta.z)));
+            guard.check(mc,false,false);if(active!=a)return;a.player.setYRot(yaw);
+            guard.check(mc,false,false);if(active!=a)return;a.player.setXRot(pitch);
+            guard.check(mc,false,false);if(active!=a)return;a.player.setYHeadRot(yaw);
+            var event=ClientHooks.onClickInput(1,mc.options.keyUse,InteractionHand.MAIN_HAND);
+            if(active!=a)return;
+            if(event.isCanceled()){finish("failed","typed_item_click_cancelled");return;}
+            BlockHitResult hit=pick(mc,pos(a.entry.request.target()),Direction.UP);
+            if(active!=a)return;
+            if(hit==null){finish("failed","typed_item_target_not_visible");return;}
+            if(!capabilityDispatchCheck(mc,a))return;
+            guard.beforeUse(mc,hit);
+            if(active!=a)return;
+            a.dispatched=true;a.entry.result.addProperty("dispatched",true);
+            InteractionResult result=ScopedItemInteractionDispatch.use(guard,()->mc.gameMode.useItemOn(a.player,InteractionHand.MAIN_HAND,hit));
+            if(active!=a)return;
+            a.entry.result.addProperty("interaction_result",result.name().toLowerCase(Locale.ROOT));
+            guard.check(mc,true,false);if(active!=a)return;
+            if(result==InteractionResult.FAIL)finish("failed","typed_item_use_rejected");
+            else if(guard.settled())finish("succeeded","typed_item_outcome_observed");
+        } catch(RuntimeException failure){
+            guard.recordFailure(failure);if(guard.attempted())guard.markUnknown();
+            if(active==a)finish("failed","typed_item_context_unconfirmed");
+        }
+    }
     private static void interactBlock(Minecraft mc,RuntimeAction a) {
+        if(a.scopedItemInteraction!=null){interactTypedItem(mc,a);return;}
         if(a.dispatched){finish("succeeded","interaction_dispatched");return;}
         BlockPos target=pos(a.entry.request.target());
         Direction face=Direction.valueOf(a.entry.request.face().toUpperCase(Locale.ROOT));
@@ -1497,8 +1757,44 @@ final class ClientActions {
         return j;
     }
     private static void finish(String status, String reason) {
-        RuntimeAction a = active;
-        if (a == null) return;
+        RuntimeAction a=active;
+        if(a==null)return;
+        long endingRevision=ownershipRevision;
+        if(!NativeReactiveGuard.captureRequested()&&a.reactiveDefense==null&&a.scopedTargetAction==null&&a.scopedItemInteraction==null&&a.scopedPortalEntry==null&&a.blazeEscort==null&&a.shelteredEnderman==null&&a.portalDefense==null){
+            boolean done=false;try{finishOwned(a,status,reason);done=true;}finally{NativeReactiveGuard.released(a.entry,a.player,a.level,ownershipRevision,done&&ownershipRevision==endingRevision&&reactiveReleaseEvidence(a.entry.result));}return;
+        }
+        ScopedTerminalCleanupScope.Token token=TERMINAL_CLEANUP.enter(a,a.entry,ownershipRevision);
+        terminalCleanupOwner=a;
+        boolean complete=false;
+        try {finishOwned(a,status,reason);complete=true;}
+        catch(RuntimeException failure){
+            a.entry.result.addProperty("unknown_outcome",true);
+            a.entry.result.addProperty("requires_handoff",true);
+            a.entry.result.addProperty("input_release_confirmed",false);
+            if(active==a)active=null;
+            if(TERMINAL_CLEANUP.bound(a,a.entry,ownershipRevision,active,ACTIONS.active()))
+                ACTIONS.finishAfterCleanup("failed","scoped_terminal_cleanup_unconfirmed",false);
+        } finally {terminalCleanupOwner=null;TERMINAL_CLEANUP.close(token);
+            boolean evidenceOk=!a.entry.result.has("input_release_diagnostics")&&(!a.entry.result.has("input_release_confirmed")||a.entry.result.get("input_release_confirmed").isJsonPrimitive()&&a.entry.result.getAsJsonPrimitive("input_release_confirmed").isBoolean()&&a.entry.result.get("input_release_confirmed").getAsBoolean());
+            NativeReactiveGuard.released(a.entry,a.player,a.level,ownershipRevision,complete&&evidenceOk&&ownershipRevision==endingRevision);
+        }
+    }
+    private static void finishOwned(RuntimeAction a,String status,String reason){
+        if(active!=a)return;
+        if(a.scopedPortalEntry!=null){
+            boolean transition=status.equals("cancelled")&&a.scopedPortalEntry.expectedTransition(Minecraft.getInstance(),reason);
+            if(active!=a)return;
+            if(transition)reason="world_transition";
+            else if(a.scopedPortalEntry.attempted()&&!reason.equals("cancel_requested"))a.scopedPortalEntry.markUnknown();
+            if(status.equals("succeeded")){a.scopedPortalEntry.markUnknown();status="failed";reason="portal_entry_arrival_not_proven";}
+        }
+        if(a.scopedItemInteraction!=null && a.scopedItemInteraction.attempted() && !status.equals("succeeded")){
+            a.scopedItemInteraction.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);
+        }
+        if(a.scopedTargetAction!=null && status.equals("succeeded") && !a.scopedTargetAction.completed()){
+            a.scopedTargetAction.unknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);
+            status="failed";reason="target_effect_completion_unconfirmed";
+        }
         if(a.entry.request.action().equals("place_block") && a.dispatched && !status.equals("succeeded")) {
             a.entry.result.addProperty("unknown_outcome",true);
             a.entry.result.addProperty("requires_handoff",true);
@@ -1514,10 +1810,11 @@ final class ClientActions {
         boolean pathAction = a.entry.request.action().equals("follow_path");
         boolean discontinuityCleanup = reason.equals("position_discontinuity_rebind_required");
         boolean managedCleanup = pathAction || a.boat != null || a.transfer != null || discontinuityCleanup || a.combat != null;
-        managedCleanup = managedCleanup || a.capabilityGuard != null;
+        managedCleanup = managedCleanup || a.capabilityGuard != null || a.portalDefense!=null || a.entry.request.action().equals("reactive_defense");
         // Preserve legacy terminal timing/fields for recovery, mining, placement
         // and inventory actions. New boat/combat owners require confirmed cleanup.
-        if (!managedCleanup) ACTIONS.finish(status, reason);
+        final String earlyStatus=status,earlyReason=reason;
+        managedCleanup=beginTerminalCleanup(managedCleanup,terminalCleanupOwner,a,()->ACTIONS.finish(earlyStatus,earlyReason));
         requireCleanupOwner(a);
         a.entry.result.addProperty("x", a.player.getX());
         a.entry.result.addProperty("y", a.player.getY());
@@ -1552,6 +1849,10 @@ final class ClientActions {
             if (a.transfer != null) released &= cleanupStage(a,"transfer_release",a.transfer::release);
             if (a.boat != null) released &= cleanupStage(a,"boat_release",() -> a.boat.release(Minecraft.getInstance()));
             if (a.combat != null) released &= cleanupStage(a,"combat_release",() -> a.combat.release(Minecraft.getInstance()));
+            if(a.reactiveDefense!=null) released &= cleanupStage(a,"reactive_defense_release",()->a.reactiveDefense.release(Minecraft.getInstance(),()->requireCleanupOwner(a)));
+            if(a.portalDefense!=null) released &= cleanupStage(a,"portal_defense_release",()->a.portalDefense.release(Minecraft.getInstance(),()->requireCleanupOwner(a)));
+            if (a.shelteredEnderman != null) released &= cleanupStage(a,"enderman_shelter_release",() -> a.shelteredEnderman.release(Minecraft.getInstance(),()->requireCleanupOwner(a)));
+            if (a.blazeEscort != null) released &= cleanupStage(a,"blaze_escort_release",() -> a.blazeEscort.release(Minecraft.getInstance(),()->requireCleanupOwner(a)));
             released &= cleanupStage(a,"sprint_release",() -> sprint(Minecraft.getInstance(), a, false));
             requireCleanupOwner(a);
             if(a.scopedMovement!=null) {
@@ -1613,6 +1914,38 @@ final class ClientActions {
                 a.entry.result.add("placement_diagnostics",a.scopedPlacement.diagnostics(keyNeutral,releaseBinding,semanticContext));
                 a.entry.result.add("placement",a.scopedPlacement.terminal(keyNeutral,status.equals("succeeded")&&released&&semanticContext));
             }
+            if(a.scopedItemInteraction!=null){
+                Minecraft mc=Minecraft.getInstance();
+                boolean semantic=a.scopedItemInteraction.cleanupState(status.equals("succeeded"));
+                boolean neutral=ScopedFlatMovement.neutral(a.input) && ScopedFlatMovement.neutral(a.player.input)
+                    && !ScopedFlatMovement.keysDown(mc) && !BridgeServer.hasHeldInputs() && !a.player.isUsingItem();
+                boolean binding=a.scopedItemInteraction.releaseBinding(mc);
+                requireCleanupOwner(a);released &= neutral && binding;
+                if((!released||!semantic)&&a.scopedItemInteraction.attempted()){
+                    a.scopedItemInteraction.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);
+                }
+                if(!semantic && status.equals("succeeded")){status="failed";reason="typed_item_cleanup_unconfirmed";}
+                a.entry.result.add("item_interaction",a.scopedItemInteraction.terminal(released,status.equals("succeeded")&&semantic&&released));
+                requireCleanupOwner(a);
+            }
+            if(a.scopedPortalEntry!=null){
+                Minecraft mc=Minecraft.getInstance();
+                boolean neutral=ScopedFlatMovement.neutral(a.input)&&ScopedFlatMovement.neutral(a.player.input)
+                    &&mc.player!=null&&ScopedFlatMovement.neutral(mc.player.input)&&!ScopedFlatMovement.keysDown(mc)&&!BridgeServer.hasHeldInputs();
+                boolean binding=a.scopedPortalEntry.releaseBinding(mc);
+                requireCleanupOwner(a);released &= neutral&&binding;
+                if(!released&&a.scopedPortalEntry.attempted()){a.scopedPortalEntry.markUnknown();a.entry.result.addProperty("unknown_outcome",true);a.entry.result.addProperty("requires_handoff",true);}
+                a.entry.result.add("portal_entry",a.scopedPortalEntry.terminal(released));requireCleanupOwner(a);
+            }
+            if(a.scopedTargetAction!=null){
+                Minecraft mc=Minecraft.getInstance();
+                boolean neutral=ScopedFlatMovement.neutral(a.input) && ScopedFlatMovement.neutral(a.player.input)
+                    && !ScopedFlatMovement.keysDown(mc) && !BridgeServer.hasHeldInputs() && !a.player.isUsingItem();
+                requireCleanupOwner(a);
+                released &= neutral;
+                a.entry.result.add("target_scope",a.scopedTargetAction.terminal(released));
+                requireCleanupOwner(a);
+            }
             if(FALL_CLEANUP.active()) {
                 boolean bound=FALL_CLEANUP.bound(a,a.entry);
                 released &= bound;
@@ -1623,6 +1956,7 @@ final class ClientActions {
                 // A late callback may retire the old registry entry; never finish a replacement.
                 if(ACTIONS.active()!=a.entry){a.entry.result.addProperty("unknown_outcome",true);return;}
             }
+            requireCleanupOwner(a);
             ACTIONS.finishAfterCleanup(status, reason, released);
             if (a.combat != null && !reason.equals("native_fall_rescue_preempted"))
                 EncounterTerminalPause.afterTerminal(a.entry, ACTIONS.session, BridgeServer::pauseEncounterTerminalOnGameThread);
@@ -1630,12 +1964,21 @@ final class ClientActions {
                 a.entry.result.addProperty("automatic_terminal_pause_deferred_to_fall_rescue",true);
         }
     }
+    // The real early-terminal seam: an acquired cleanup scope retains registry ownership
+    // until finishAfterCleanup, including otherwise-legacy mining/placement/inventory.
+    static boolean beginTerminalCleanup(boolean managed,Object scopeOwner,Object endingOwner,Runnable legacyFinish) {
+        boolean deferred=managed || scopeOwner!=null && scopeOwner==endingOwner;
+        if(!deferred)legacyFinish.run();
+        return deferred;
+    }
     static boolean releaseDiscontinuousAttack(Runnable keyUp, Runnable stopDestroy) {
         boolean released = cleanup(keyUp);
         released &= cleanup(stopDestroy); // Non-short-circuit: attempt both even after failure.
         return released;
     }
     private static void requireCleanupOwner(RuntimeAction a) {
+        if(TERMINAL_CLEANUP.active() && !TERMINAL_CLEANUP.bound(a,a.entry,ownershipRevision,active,ACTIONS.active()))
+            throw new ClientActionRequest.Rejected(409,"scoped_terminal_cleanup_owner_changed");
         if(FALL_CLEANUP.active()&&!FALL_CLEANUP.bound(a,a.entry))
             throw new ClientActionRequest.Rejected(409,"fall_rescue_cleanup_scope_changed");
     }

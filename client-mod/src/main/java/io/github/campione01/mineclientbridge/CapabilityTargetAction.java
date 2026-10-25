@@ -57,6 +57,51 @@ final class CapabilityTargetAction {
     private final long deadline;
     private float expectedYaw,expectedPitch;
     private boolean drawStarted,dispatched,released,useOwned;
+    private ScopedTargetAction scoped;
+    void bindScoped(ScopedTargetAction value){if(scoped!=null)throw new IllegalStateException("target_scope_rebind");scoped=value;}
+    ScopedTargetAction scoped(){return scoped;}
+    boolean ownsUseInput(){return useOwned;} // Pure owner-phase read for raw key admission.
+    Entity hitTarget(){
+        Entity t=target();
+        if(t instanceof EnderDragon dragon){for(EnderDragonPart part:dragon.getSubEntities())if(part.name.equals("head"))return part;return null;}
+        return t;
+    }
+    private void ownedView(Minecraft mc,float yaw,float pitch,boolean head){
+        ScopedTargetAction.require(scoped!=null,"target_scope_required");
+        scoped.rawBound(mc);player.setYRot(yaw);scoped.rawBound(mc);
+        player.setXRot(pitch);scoped.rawBound(mc);
+        if(head){player.setYHeadRot(yaw);scoped.rawBound(mc);}
+    }
+    String policyGuard(Minecraft mc,boolean after){
+        String problem=safety(mc);return after&&"target_missing_not_a_kill".equals(problem)?null:problem;
+    }
+    String effectGuard(Minecraft mc,TargetActionEffectBudget.Effect effect){
+        String problem=policyGuard(mc,false);if(problem!=null)return problem;
+        Entity t=target(),hit=hitTarget();if(t==null||hit==null||!t.isAlive())return "target_effect_target_missing";
+        if(t instanceof net.minecraft.world.entity.monster.Shulker shulker&&!shulkerShellOpen(shulker))return "shulker_shell_not_open";
+        if(shieldWindow&&preCoverComplete&&t instanceof net.minecraft.world.entity.monster.Blaze blaze
+                &&(blaze.isCharged()||fireballsNear()))return "blaze_draw_window_closed";
+        Vec3 eye=player.getEyePosition();
+        if(effect==TargetActionEffectBudget.Effect.MELEE){
+            if(!(mc.hitResult instanceof EntityHitResult ray)||ray.getEntity()!=hit
+                    ||!hit.getBoundingBox().inflate(.01).contains(ray.getLocation())
+                    ||!CapabilityTargetPolicy.meleeReach(eye.distanceTo(ray.getLocation()),player.entityInteractionRange()))return "target_final_exact_melee_ray";
+            if(level.clip(new ClipContext(eye,ray.getLocation(),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,player)).getType()!=HitResult.Type.MISS)return "target_final_melee_blocked";
+            if(!CombatRules.cooldownReady(player.getAttackStrengthScale(.5F)))return "target_final_cooldown_not_ready";
+        }else{
+            Vec3 point=hit.getBoundingBox().getCenter(),delta=point.subtract(eye);double flat=Math.hypot(delta.x,delta.z);
+            if(eye.distanceTo(point)<4||eye.distanceTo(point)>CapabilityTargetPolicy.MAX_SHOT_DISTANCE)return "shot_range_4_to_32";
+            double elevation=CapabilityTargetPolicy.bowElevation(flat,delta.y);
+            if(!Double.isFinite(elevation))return "shot_trajectory_unavailable";
+            float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z)),pitch=(float)-Math.toDegrees(elevation);
+            if(Math.abs(net.minecraft.util.Mth.wrapDegrees(player.getYRot()-yaw))>.01||Math.abs(player.getXRot()-pitch)>.01)return "target_final_bow_aim_changed";
+            problem=shotCorridor(eye,point,elevation,t);if(problem!=null)return problem;
+            if(effect==TargetActionEffectBudget.Effect.BOW_RELEASE&&(!player.isUsingItem()
+                    ||player.getUsedItemHand()!=InteractionHand.MAIN_HAND||!player.getUseItem().is(Items.BOW)
+                    ||player.getTicksUsingItem()<drawTicks||player.getTicksUsingItem()>40))return "target_final_full_draw_required";
+        }
+        return null;
+    }
 
     static void validate(JsonObject body) {
         String action=ClientActionRequest.string(body,"action");
@@ -152,6 +197,10 @@ final class CapabilityTargetAction {
     }
     private String guard(Minecraft mc) {
         if(!ClientActions.ownsCapabilityTarget(this))return "target_owner_changed";
+        if(scoped==null)return "target_scope_required";
+        scoped.check(mc,!dispatched);return null;
+    }
+    private String safety(Minecraft mc) {
         if(System.nanoTime()>=deadline)return "target_deadline_exceeded";
         if(mc.player!=player || mc.level!=level || mc.gameMode==null || !world.equals(WorldGeneration.current(level))
                 || !session.equals(ClientActions.session())
@@ -248,7 +297,7 @@ final class CapabilityTargetAction {
         // Guard against callbacks during geometry reads before replacing our owned view.
         problem=guard(mc);if(problem!=null)return done("failed",problem);
         expectedYaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z));expectedPitch=(float)-Math.toDegrees(elevation);
-        player.setYRot(expectedYaw);player.setXRot(expectedPitch);player.setYHeadRot(expectedYaw);
+        ownedView(mc,expectedYaw,expectedPitch,true);
         problem=guard(mc);if(problem!=null)return done("failed",problem);
         mc.gameRenderer.pick(1.0F);
         problem=guard(mc);if(problem!=null)return done("failed",problem);
@@ -257,9 +306,9 @@ final class CapabilityTargetAction {
                 if(player.isUsingItem() || mc.options.keyUse.isDown())return done("failed","item_use_already_active");
                 if(player.getProjectile(player.getMainHandItem()).isEmpty())return done("failed","bow_ammunition_required");
                 drawStarted=true;useOwned=true; // Mark ownership before any potentially reentrant callback.
-                mc.options.keyUse.setDown(true);
+                scoped.rawBound(mc);mc.options.keyUse.setDown(true);scoped.rawBound(mc);
                 problem=guard(mc);if(problem!=null)return done("failed",problem);
-                itemUseTransition.run(()->mc.gameMode.useItem(player,InteractionHand.MAIN_HAND));
+                ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.DRAW,()->itemUseTransition.run(()->mc.gameMode.useItem(player,InteractionHand.MAIN_HAND)));
                 problem=guard(mc);if(problem!=null)return done("failed",problem);
                 if(!player.isUsingItem())return done("failed","bow_draw_not_started");
                 return done(null,"drawing_bow");
@@ -276,11 +325,11 @@ final class CapabilityTargetAction {
             dispatched=true;evidence.addProperty("dispatches",1);
             ClientActions.markCapabilityDispatched(this);
             evidence.addProperty("draw_ticks",player.getTicksUsingItem());
-            itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player));
+            ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.BOW_RELEASE,()->itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player)));
             // A resumed old callback must not clear the replacement owner's input.
             if(!ClientActions.ownsCapabilityTarget(this))return done("failed","target_owner_changed");
             released=!player.isUsingItem();
-            mc.options.keyUse.setDown(false);useOwned=false;
+            scoped.rawBound(mc);mc.options.keyUse.setDown(false);useOwned=false;
             problem=guardAfterDispatch(mc);if(problem!=null)return done("failed",problem);
             if(!released)return done("failed","bow_release_unconfirmed");
             return shieldWindow?cover(mc):done("succeeded","bow_released_observe_outcome");
@@ -291,10 +340,10 @@ final class CapabilityTargetAction {
         if(!CombatRules.cooldownReady(player.getAttackStrengthScale(.5F)))return done(null,"waiting_attack_cooldown");
         problem=guard(mc);if(problem!=null)return done("failed",problem);
         dispatched=true;evidence.addProperty("dispatches",1);
-        mc.gameMode.attack(player,hitTarget);
+        Entity exactHit=hitTarget;
+        ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.MELEE,()->mc.gameMode.attack(player,exactHit));
         problem=guardAfterDispatch(mc);if(problem!=null)return done("failed",problem);
-        player.swing(InteractionHand.MAIN_HAND);
-        problem=guardAfterDispatch(mc);if(problem!=null)return done("failed",problem);
+        // The attack packet and exact local attack are sufficient. Omit optional item-callback swing animation.
         return done("succeeded","melee_dispatched_observe_outcome");
     }
     private boolean outgoingOwnArrow(Entity entity,String type) {
@@ -323,8 +372,8 @@ final class CapabilityTargetAction {
         if(!shieldStarted) {
             if(player.isUsingItem())return done("failed","blaze_shield_existing_use");
             shieldStarted=true;shieldStartTick=level.getGameTime();useOwned=true;
-            mc.options.keyUse.setDown(true);
-            itemUseTransition.run(()->mc.gameMode.useItem(player,InteractionHand.OFF_HAND));
+            scoped.rawBound(mc);mc.options.keyUse.setDown(true);scoped.rawBound(mc);
+            ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.SHIELD_USE,()->itemUseTransition.run(()->mc.gameMode.useItem(player,InteractionHand.OFF_HAND)));
             if(!ClientActions.ownsCapabilityTarget(this))return done("failed","target_owner_changed");
         }
         if(!player.isUsingItem()||player.getUsedItemHand()!=InteractionHand.OFF_HAND||!player.getUseItem().is(Items.SHIELD))return done("failed","blaze_shield_interrupted");
@@ -335,14 +384,14 @@ final class CapabilityTargetAction {
         if(!(t instanceof net.minecraft.world.entity.monster.Blaze blaze)||!blaze.isAlive())return done("failed","blaze_precover_target_changed");
         Vec3 direction=t.position().subtract(player.position());
         expectedYaw=(float)Math.toDegrees(Math.atan2(-direction.x,direction.z));expectedPitch=0;
-        player.setYRot(expectedYaw);player.setXRot(expectedPitch);
+        ownedView(mc,expectedYaw,expectedPitch,false);
         boolean charged=blaze.isCharged();if(charged)preCoverSawCharge=true;
         boolean fireballs=fireballsNear();
         evidence.addProperty("shield_blocking_observed",player.isBlocking());evidence.addProperty("risk_remaining",charged||fireballs);
         if(BlazeShieldPolicy.initialReady(preCoverSawCharge,preCoverTicks,charged,fireballs)) {
-            itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player));
+            ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.SHIELD_RELEASE,()->itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player)));
             if(!ClientActions.ownsCapabilityTarget(this))return done("failed","target_owner_changed");
-            shieldReleased=!player.isUsingItem();mc.options.keyUse.setDown(false);useOwned=false;
+            shieldReleased=!player.isUsingItem();scoped.rawBound(mc);mc.options.keyUse.setDown(false);useOwned=false;
             if(!shieldReleased)return done("failed","blaze_shield_release_unconfirmed");
             preCoverComplete=true;shieldStarted=false;shieldReleased=false;
             return done(null,"blaze_cooldown_observed_prepare_single_draw");
@@ -355,8 +404,8 @@ final class CapabilityTargetAction {
         if(!shieldStarted) {
             if(player.isUsingItem())return done("failed","blaze_shield_existing_use");
             shieldStarted=true;shieldStartTick=level.getGameTime();useOwned=true;
-            mc.options.keyUse.setDown(true);
-            itemUseTransition.run(()->mc.gameMode.useItem(player,InteractionHand.OFF_HAND));
+            scoped.rawBound(mc);mc.options.keyUse.setDown(true);scoped.rawBound(mc);
+            ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.SHIELD_USE,()->itemUseTransition.run(()->mc.gameMode.useItem(player,InteractionHand.OFF_HAND)));
             if(!ClientActions.ownsCapabilityTarget(this))return done("failed","target_owner_changed");
             if(!player.isUsingItem()||player.getUsedItemHand()!=InteractionHand.OFF_HAND)return done("failed","blaze_shield_use_unconfirmed");
         }
@@ -368,16 +417,16 @@ final class CapabilityTargetAction {
         if(t!=null&&t.isAlive()) {
             Vec3 direction=t.position().subtract(player.position());
             expectedYaw=(float)Math.toDegrees(Math.atan2(-direction.x,direction.z));expectedPitch=0;
-            player.setYRot(expectedYaw);player.setXRot(expectedPitch);
+            ownedView(mc,expectedYaw,expectedPitch,false);
         }
         boolean charged=t instanceof net.minecraft.world.entity.monster.Blaze blaze&&blaze.isAlive()&&blaze.isCharged();
         boolean fireballs=fireballsNear();
         evidence.addProperty("shield_blocking_observed",player.isBlocking());evidence.addProperty("cover_ticks",coverTicks);
         evidence.addProperty("risk_remaining",charged||fireballs);
         if(BlazeShieldPolicy.ready(coverTicks,charged,fireballs)) {
-            itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player));
+            ScopedTargetDispatch.run(this,TargetActionEffectBudget.Effect.SHIELD_RELEASE,()->itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player)));
             if(!ClientActions.ownsCapabilityTarget(this))return done("failed","target_owner_changed");
-            shieldReleased=!player.isUsingItem();mc.options.keyUse.setDown(false);useOwned=false;
+            shieldReleased=!player.isUsingItem();scoped.rawBound(mc);mc.options.keyUse.setDown(false);useOwned=false;
             problem=guardAfterDispatch(mc);if(problem!=null)return done("failed",problem);
             return done(shieldReleased?"succeeded":"failed",shieldReleased?"blaze_shield_window_released":"blaze_shield_release_unconfirmed");
         }
@@ -432,22 +481,29 @@ final class CapabilityTargetAction {
         return new Step(status,reason,evidence.deepCopy());
     }
     void release(Minecraft mc) {
-        boolean uncertain=drawStarted && !released;
+        boolean uncertain=drawStarted&&!released;
+        ScopedTargetAction.require(scoped!=null,"target_scope_required");
         try {
-            // Never release a half-drawn bow: that would fire during a safety stop.
-            if(uncertain && mc.player==player)player.stopUsingItem();
+            scoped.cleanupFence(mc);
+            // A stopped draw has unknown server state. Never send RELEASE_USE_ITEM for this cleanup.
+            if(uncertain&&mc.player==player){
+                ScopedTargetDispatch.cleanup(this,TargetActionEffectBudget.Effect.ABORT,player::stopUsingItem);
+                scoped.unknown();
+            }
             if(!itemUseTransition.cleanupMayConfirm())throw new IllegalStateException("item_use_transition_unconfirmed");
-            if(shieldStarted&&!shieldReleased) {
-                if(mc.player!=player||mc.gameMode==null)throw new IllegalStateException("shield_release_context_unconfirmed");
-                if(player.isUsingItem()) {
+            if(shieldStarted&&!shieldReleased){
+                scoped.cleanupFence(mc);
+                if(player.isUsingItem()){
                     if(player.getUsedItemHand()!=InteractionHand.OFF_HAND||!player.getUseItem().is(Items.SHIELD))throw new IllegalStateException("shield_release_hand_unconfirmed");
-                    itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player));
+                    ScopedTargetDispatch.cleanup(this,TargetActionEffectBudget.Effect.SHIELD_CLEANUP,
+                        ()->itemUseTransition.run(()->mc.gameMode.releaseUsingItem(player)));
                 }
-                shieldReleased=!player.isUsingItem();
+                scoped.cleanupFence(mc);shieldReleased=!player.isUsingItem();
                 if(!shieldReleased)throw new IllegalStateException("shield_release_unconfirmed");
             }
-        } finally {
-            if(useOwned){mc.options.keyUse.setDown(false);useOwned=false;}
+        }catch(RuntimeException failure){scoped.unknown();throw failure;}
+        finally {
+            if(useOwned){scoped.cleanupFence(mc);mc.options.keyUse.setDown(false);useOwned=false;}
         }
         if(uncertain)throw new IllegalStateException("bow_abort_server_release_unconfirmed");
     }

@@ -12,6 +12,32 @@ from .jobs import JobStore
 from .storage_reserve import StorageReserve
 from .serialization import public_data, serialize_outcome
 
+def _life_adoption_pending(record):
+    result=record.get('result');result=result if type(result) is dict else {}
+    adoption=result.get('runtime_context_adoption');life=result.get('new_life_acknowledgment')
+    return (record.get('job_kind')=='new_life_acknowledgment' and record.get('state')=='blocked'
+        and type(life) is dict and life.get('rearmed') is True
+        and type(adoption) is dict and adoption.get('adopted') is False
+        and adoption.get('gateway_request_id') in record.get('request_ids',[]))
+
+def _life_proven_receipt(record):
+    """Recognize only a fully validated, already archived control receipt."""
+    if (record.get('job_kind')!='new_life_acknowledgment' or record.get('state') not in ('blocked','succeeded')
+            or record.get('effect_certainty')!='none_proven' or record.get('cleanup_certainty')!='not_needed'):
+        return None
+    try:
+        from resident_controller import new_life_acknowledgment as proof
+        context=record['backend_context'];receipt=record['evidence']['gateway_receipt'];result=record['result']
+        p=proof.validate(receipt,context['life_command'],context['gateway_request_id'],context['gateway_session'])
+        adoption=result['runtime_context_adoption']
+        if (not proof.exact(p,result['new_life_acknowledgment']) or type(adoption) is not dict
+                or type(adoption.get('adopted')) is not bool
+                or adoption.get('gateway_request_id')!=context['gateway_request_id']):return None
+        if record['state']=='succeeded' and not (p['rearmed'] and adoption['adopted']):return None
+        return (proof.digest(receipt),adoption['adopted'])
+    except (KeyError,TypeError,ValueError):return None
+
+
 class UnavailableBackend:
     def describe(self):
         return {'available':False,'private_singleplayer':False,'session_ref':None,'context_ref':None,
@@ -190,6 +216,14 @@ class ToolboxService:
         result.update(planned); result['executable_authority']=False; result['server_confirmed']=False
         return result
 
+    def _acknowledge_new_life(self,args):
+        from .new_life_acknowledgment import acknowledge
+        return acknowledge(self,args)
+
+    def _acknowledge_pause(self,args):
+        from .pause_acknowledgment import acknowledge
+        return acknowledge(self,args)
+
     def job(self,args):
         return getattr(self,'_'+args['operation'])(args)
 
@@ -319,6 +353,9 @@ class ToolboxService:
 
     def _unknown(self,job_id,reason,event):
         record=self.store.get(job_id=job_id)
+        if _life_proven_receipt(record) is not None:
+            self.store.save(record,'new_life_late_lookup_unavailable',{'source_event':event,'known_receipt_retained':True})
+            self._condition.notify_all();return
         record.update(state='unknown',phase=event,cleanup_certainty='unknown',continuation='reconcile_original_id_required')
         if record['effect_certainty']!='known': record['effect_certainty']='unknown'
         record['error']=ToolboxError('outcome_unknown',reason,stage=event,effect_certainty=record['effect_certainty'],
@@ -328,6 +365,13 @@ class ToolboxService:
     def _apply(self,job_id,outcome,event):
         outcome=public_data(outcome); json_data(outcome)
         record=self.store.get(job_id=job_id)
+        known=_life_proven_receipt(record)
+        if known is not None:
+            incoming=(_life_proven_receipt({**record,**outcome}) if type(outcome) is dict
+                and 'result' in outcome and 'evidence' in outcome else None)
+            if incoming is None or incoming[0]!=known[0] or (known[1] and not incoming[1]):
+                self.store.save(record,'new_life_late_result_retained',{'source_event':event,'known_receipt_retained':True})
+                self._condition.notify_all();return
         if not isinstance(outcome,dict) or outcome.get('state') not in STATES or outcome.get('effect_certainty') not in EFFECT_CERTAINTIES or outcome.get('cleanup_certainty') not in CLEANUP_CERTAINTIES:
             self._unknown(job_id,'Backend certainty contract invalid',event); return
         if (event=='cancel_result' and record['state'] in TERMINAL and record['state']!='unknown'
@@ -345,7 +389,7 @@ class ToolboxService:
         if event=='reconcile_result' and any(identity not in record['request_ids'] for identity in outcome.get('request_ids',[])):
             self._unknown(job_id,'Reconciliation returned an unbound request identity',event);return
         if outcome.get('result') is not None:
-            try:validate_schema(outcome['result'],{'type':'object'} if record.get('job_kind')=='observation' else self.capabilities.get(record['capability'])['result_schema'])
+            try:validate_schema(outcome['result'],{'type':'object'} if record.get('job_kind') in ('observation','pause_acknowledgment','new_life_acknowledgment') else self.capabilities.get(record['capability'])['result_schema'])
             except ToolboxError:
                 self._unknown(job_id,'Domain result does not match advertised schema',event);return
         previous_goal=record.get('goal_result')
@@ -373,7 +417,7 @@ class ToolboxService:
         # Known semantic success does not imply lease/input cleanup success.
         if record['cleanup_certainty'] in ('pending','unknown') and record['state'] in TERMINAL:
             record['state']='unknown'
-        if record['state']=='unknown':record['continuation']='reconcile_original_id_required'
+        if record['state']=='unknown' or _life_adoption_pending(record):record['continuation']='reconcile_original_id_required'
         elif record['state'] in ('blocked','failed','interrupted'):record['continuation']='fresh_replan_required'
         else:record['continuation']='none'
         record['phase']=event
@@ -382,7 +426,7 @@ class ToolboxService:
             record['error']=ToolboxError('outcome_unknown' if record['state']=='unknown' else
                                          ('observation_unavailable' if record.get('job_kind')=='observation' else 'known_action_failure'),
                                          str(outcome['reason'])[:512],stage=event,effect_certainty=record['effect_certainty'],affected_ids=record['request_ids'],
-                                         suggested_next_operation='reconcile' if record['state']=='unknown' else None).as_dict()
+                                         suggested_next_operation='reconcile' if record['state']=='unknown' or _life_adoption_pending(record) else None).as_dict()
         else:record['error']=None
         self.store.save(record,event,{'state':record['state']});self._condition.notify_all()
 
@@ -401,7 +445,10 @@ class ToolboxService:
 
     def _cancel(self,args):
         with self._lock:
-            record=self._lookup(args); job_id=record['job_id']
+            record=self._lookup(args)
+            if record.get('job_kind') in ('pause_acknowledgment','new_life_acknowledgment'):
+                raise ToolboxError('policy_violation','Lifecycle acknowledgment has no gameplay cancel; read its original status',stage='cancel')
+            job_id=record['job_id']
             fresh=self.store.bind_cancel(args['cancel_request_id'],job_id,self._digest(args,('wait_ms',)))
             if not fresh:return self._public_job(record)
             if record['state'] in TERMINAL:return self._public_job(record)
@@ -478,15 +525,34 @@ class ToolboxService:
     def _reconcile(self,args):
         with self._lock:
             record=self._lookup(args)
-            if not record['dispatch_started'] or record['state'] not in ('unknown','interrupted'):
+            exact_life_adoption=_life_adoption_pending(record)
+            if not record['dispatch_started'] or (record['state'] not in ('unknown','interrupted') and not exact_life_adoption):
                 return self._public_job(record)
             context=deepcopy(record['backend_context'])
-        try:outcome=self.backend.reconcile_original(context)
+            if exact_life_adoption:
+                from resident_controller.new_life_acknowledgment import digest
+                context['accepted_proof_sha256']=digest(record['result']['new_life_acknowledgment'])
+        try:
+            if record.get('job_kind') in ('pause_acknowledgment','new_life_acknowledgment'):
+                if record['job_kind']=='new_life_acknowledgment':
+                    from .new_life_acknowledgment import exchange
+                else:
+                    from .pause_acknowledgment import exchange
+                outcome=exchange(self.backend,context,read_only=True)
+            else:outcome=self.backend.reconcile_original(context)
         except Exception:
             with self._lock:
+                if exact_life_adoption:
+                    current=self.store.get(job_id=record['job_id'])
+                    self.store.save(current,'new_life_adoption_lookup_refused',{'reason':'original_receipt_unavailable_or_invalid_no_change'})
+                    return self._public_job(self.store.get(job_id=record['job_id']))
                 self._unknown(record['job_id'],'Original evidence reconciliation unavailable','reconcile_unknown')
                 return self._public_job(self.store.get(job_id=record['job_id']))
         with self._lock:
+            if exact_life_adoption and outcome.get('state')=='unknown':
+                current=self.store.get(job_id=record['job_id'])
+                self.store.save(current,'new_life_adoption_lookup_pending',{'reason':'original_receipt_pending_no_change'})
+                return self._public_job(self.store.get(job_id=record['job_id']))
             self._apply(record['job_id'],outcome,'reconcile_result')
             return self._public_job(self.store.get(job_id=record['job_id']))
 
@@ -497,6 +563,19 @@ class ToolboxService:
             self._closing=True
             records=self.store.all()
         for record in records:
+            if record.get('job_kind') in ('pause_acknowledgment','new_life_acknowledgment') and record['state'] in ('accepted','running','stopping'):
+                # One exact receipt read only. Never synthesize a gameplay cancel
+                # or resubmit a lifecycle acknowledgement during shutdown.
+                try:
+                    if record['job_kind']=='new_life_acknowledgment':
+                        from .new_life_acknowledgment import exchange
+                    else:
+                        from .pause_acknowledgment import exchange
+                    outcome=exchange(self.backend,deepcopy(record['backend_context']),read_only=True)
+                    with self._lock:self._apply(record['job_id'],outcome,'new_life_ack_shutdown_read' if record['job_kind']=='new_life_acknowledgment' else 'pause_ack_shutdown_read')
+                except Exception:
+                    with self._lock:self._unknown(record['job_id'],'Lifecycle acknowledgment unresolved at shutdown','shutdown_unknown')
+                continue
             if record['state'] in ('accepted','running','stopping'):
                 self._cancel({'api_version':API_VERSION,'operation':'cancel','session_ref':record['session_ref'],'job_id':record['job_id'],
                               'cancel_request_id':'shutdown_'+uuid.uuid4().hex,'reason':'service_shutdown'})

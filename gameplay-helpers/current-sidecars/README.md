@@ -1,0 +1,13 @@
+# Current historical sidecars (source-only preservation)
+
+These are bounded reusable components from the October 22–25 single-player work, not a new unified runtime. Production source is preserved unchanged. No import/test here is permission to start a game, replay an unknown operation, resume a paused task or connect multiplayer.
+
+- `mdc-live-helper-rebuild-20261022-r9`: session, grounded-contact, corridor/stride planning, original-ID reconciliation and closed handoff helpers. It retains original owner/player safety pins; reusing another context requires a separately reviewed configuration change. Run its included synthetic tests with `MDC_C8_SOURCE=<repository root>` and `PYTHONPATH=<repository root>/survival6-controller`.
+- `mdc-ordinary-admission-recovery-20261023`: ordinary transport, admission/return helpers and the current October 25 independent break physical-release fallback. Existing focused tests do not exhaustively cover that new fallback branch.
+- `mdc-room-return-settle-pickup-20261023`: bounded room combat/return/settle/pickup and its exact source pin. Keep the sibling directory layout. Run separately from ordinary tests because their `guard_core` / `idle_guard` module names intentionally refer to different frozen versions.
+- `mdc-travel-supervisor-r1_1-20261024` and `mdc-travel-supervisor-water-r1-20261024`: finite travel/use/water checks and synthetic tests; water tests reference their r1.1 sibling. A small reduced real-use response fixture has no credentials or world geometry; it is parser evidence, not a general live pass.
+- `mdc-terrain-memory-20261023`: historical bounded map/route memory and an executable synthetic example. It grants no movement/freshness authority. Its 31 tests are under `tests/`; run `PYTHONPATH=. python3 -B -m unittest discover -s tests -v` from that directory. Root-level discovery alone finds zero tests and is not a pass.
+
+Several ordinary/room scripts retain historical absolute local token/lock/runtime *paths*, not token values. They are not turnkey portable live launchers. Missing private directories must not be bypassed or created to imitate an authorized runtime. No live invocation was made during publication.
+
+The 60 selected files were copied from verified source; room `CORE-PIN.json` keeps only its directory and four necessary SHA-256 values. Two r9 test files have documented test-only drift corrections; production code remains unchanged. Private-fixture-dependent r9 tests, runtime configs, campaigns, Library metadata, raw logs and real worlds are excluded. See the [publication validation](../../docs/latest-2026-10-25/README.md) for exact passed/failed/unavailable coverage.

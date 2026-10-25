@@ -167,6 +167,14 @@ JOB_OPERATION_SCHEMAS = {
  'cancel':obj({**BASE,'operation':{'const':'cancel'},'session_ref':REFERENCE,'job_id':IDENTIFIER,'cancel_request_id':IDENTIFIER,'reason':string(256),'wait_ms':WAIT},('api_version','operation','session_ref','job_id','cancel_request_id')),
  'reconcile':obj({**BASE,'operation':{'const':'reconcile'},'session_ref':REFERENCE,'job_id':IDENTIFIER},('api_version','operation','session_ref','job_id')),
 }
+JOB_OPERATION_SCHEMAS['acknowledge_pause']=obj({**BASE,'operation':{'const':'acknowledge_pause'},'request_id':IDENTIFIER,'session_ref':REFERENCE,
+     'pause_ref':{'type':'string','pattern':'^[0-9a-f]{64}$','maxLength':64},
+     'acknowledgment':{'type':'string','const':'allow_new_requests_only_no_task_resume'}},
+     ('api_version','operation','request_id','session_ref','pause_ref','acknowledgment'))
+JOB_OPERATION_SCHEMAS['acknowledge_new_life']=obj({**BASE,'operation':{'const':'acknowledge_new_life'},'request_id':IDENTIFIER,'session_ref':REFERENCE,
+     'death_ref':{'type':'string','pattern':'^[0-9a-f]{64}$','maxLength':64},
+     'acknowledgment':{'type':'string','const':'allow_new_life_requests_only_no_task_resume'}},
+     ('api_version','operation','request_id','session_ref','death_ref','acknowledgment'))
 for operation in ('adjudication_prepare','adjudicate','adjudication_status'):
     properties={**BASE,'operation':{'const':operation},'session_ref':REFERENCE,'job_id':IDENTIFIER}
     required=['api_version','operation','session_ref','job_id']
@@ -179,6 +187,7 @@ for operation in ('adjudication_prepare','adjudicate','adjudication_status'):
 JOB_OPERATION_SCHEMAS['status']['oneOf'] = [{'required':['job_id'],'not':{'required':['request_id']}},{'required':['request_id'],'not':{'required':['job_id']}}]
 JOB_SCHEMA = obj({key:deepcopy(value) for schema in JOB_OPERATION_SCHEMAS.values() for key,value in schema['properties'].items()}, ('api_version','operation','session_ref'))
 JOB_SCHEMA['properties']['operation'] = {'type':'string','enum':list(JOB_OPERATION_SCHEMAS)}
+JOB_SCHEMA['properties']['acknowledgment'] = {'type':'string','enum':['allow_new_requests_only_no_task_resume','allow_new_life_requests_only_no_task_resume','release_authority_keep_original_effects_unknown_no_resume']}
 JOB_SCHEMA['allOf'] = [{'if':{'properties':{'operation':{'const':operation}}},'then':schema} for operation,schema in JOB_OPERATION_SCHEMAS.items()]
 TOOL_SCHEMAS = {'mdc_catalog':CATALOG_SCHEMA,'mdc_observe':OBSERVE_SCHEMA,'mdc_plan':PLAN_SCHEMA,'mdc_job':JOB_SCHEMA}
 

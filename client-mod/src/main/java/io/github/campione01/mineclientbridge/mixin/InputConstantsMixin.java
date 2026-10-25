@@ -2,6 +2,7 @@ package io.github.campione01.mineclientbridge.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.campione01.mineclientbridge.ClientInputIsolation;
+import io.github.campione01.mineclientbridge.RecoveryDeathScreenUi;
 import org.lwjgl.glfw.GLFWKeyCallbackI;
 import org.lwjgl.glfw.GLFWCharModsCallbackI;
 import org.lwjgl.glfw.GLFWCursorPosCallbackI;
@@ -26,8 +27,11 @@ public abstract class InputConstantsMixin {
     private static void mineclientBridge$omitNativeMouseCallbacks(long window,
             GLFWCursorPosCallbackI position, GLFWMouseButtonCallbackI button,
             GLFWScrollCallbackI scroll, GLFWDropCallbackI drop, CallbackInfo callback) {
-        // Reject hardware before it can enter a reentrant Minecraft task queue.
-        if (ClientInputIsolation.suppressNativeCallbackRegistration()) callback.cancel();
+        // Original callbacks remain omitted. The opt-in exception is a separate one-shot UI-only callback.
+        if (ClientInputIsolation.suppressNativeCallbackRegistration()) {
+            RecoveryDeathScreenUi.install(window);
+            callback.cancel();
+        }
     }
 
     @Inject(method = "grabOrReleaseMouse(JIDD)V", at = @At("HEAD"), cancellable = true)

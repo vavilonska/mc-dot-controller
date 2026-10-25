@@ -1,0 +1,22 @@
+[
+  {
+    "path": "native-src/io/github/campione01/mineclientbridge/NativeReactiveGuard.java",
+    "sha256": "6eda772003d9dc910a69c376a389c4d47ad44653dcd2aa790b036143d5d9ca26",
+    "bytes": 18380
+  },
+  {
+    "path": "native-src/io/github/campione01/mineclientbridge/NativeReactiveDefense.java",
+    "sha256": "349f5b325abd3f37fa95c7d957fea13cbb19955ba7ba7db4b13583360b6aa990",
+    "bytes": 19740
+  },
+  {
+    "path": "native-src/io/github/campione01/mineclientbridge/ReactiveDefensePolicy.java",
+    "sha256": "671050cc2cf9034bfe35acce1e7a7415c9017b4067129b9d6176a9b5d90a6f52",
+    "bytes": 6338
+  },
+  {
+    "path": "native-src/io/github/campione01/mineclientbridge/ReactivePhysicalRelease.java",
+    "sha256": "a37ca33297c3c988e9579c8bb7c6f2f7dcb91ba7890b4a8626ad38e9e0bc90ff",
+    "bytes": 1634
+  }
+]

@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "InputConstantsMixin",
+    "RecoverySurvivalUseMixin",
     "MouseHandlerMixin",
     "KeyboardHandlerMixin",
     "EntityMovementBudgetMixin",
@@ -17,10 +18,20 @@
     "ScopedPlacementSendMixin",
     "ScopedMiningClientMixin",
     "ScopedMiningGameModeMixin",
+    "RecoveryMiningAccessor",
     "ScopedCombatPacketMixin",
     "ScopedCombatAttackMixin",
     "ScopedCombatInteractAccessor",
-    "NativeFallRescueBucketMixin"
+    "NativeFallRescueBucketMixin",
+    "ManagedDryInputMixin",
+    "ManagedDryTravelMixin",
+    "ManagedDryAccelerationMixin",
+    "ScopedTargetReleaseMixin",
+    "ScopedFlintInteractionMixin",
+    "ScopedEyeInteractionMixin",
+    "ScopedTargetProjectileMixin",
+    "ScopedTargetMeleeMixin",
+    "ScopedEntityBoundaryMixin"
   ],
   "injectors": {
     "defaultRequire": 1

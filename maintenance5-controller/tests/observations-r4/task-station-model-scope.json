@@ -1,0 +1,5 @@
+{
+  "scope": "Original exported 1573 cold cells plus EXPLICIT hypothetical earlier service removals: A after S-column, B after S+A columns, C after S+A+B columns. NOT actual operations or native/live capture. Geometry uses production shape DTO and JSON codec.",
+  "facts_source": "excluded-private-test-fixture (not a live acceptance claim)",
+  "plan_source": "excluded-private-test-fixture (not a live acceptance claim)"
+}

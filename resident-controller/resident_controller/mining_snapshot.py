@@ -6,7 +6,7 @@ LEGACY_BLOCKS = frozenset('minecraft:' + b for b in ('stone','cobblestone','dirt
     'smooth_stone','stone_bricks','bricks','oak_planks','spruce_planks','birch_planks'))
 AIR = {'minecraft:air','minecraft:cave_air','minecraft:void_air'}
 LEGACY_STATIC = LEGACY_BLOCKS | AIR | {'minecraft:grass_block','minecraft:bedrock'}
-LOGS = frozenset('minecraft:'+name+'_log' for name in ('oak','spruce','birch','jungle','acacia','dark_oak'))
+LOGS = frozenset('minecraft:'+name+'_log' for name in ('oak','spruce','birch','jungle','acacia','dark_oak','mangrove'))
 LEAVES = frozenset(name.removesuffix('_log')+'_leaves' for name in LOGS)
 ORES = frozenset(('minecraft:iron_ore','minecraft:deepslate_iron_ore'))
 BLOCKS = LEGACY_BLOCKS | LOGS | ORES
@@ -20,7 +20,7 @@ STATIC = LEGACY_STATIC | LOGS | ORE_CONTEXT | LEAVES | PLANTS | {'minecraft:deep
 def cell_class(block_id):
     kind = ('AirBlock' if block_id in AIR else 'GrassBlock' if block_id == 'minecraft:grass_block'
             else 'RotatedPillarBlock' if block_id in LOGS or block_id == 'minecraft:deepslate'
-            else 'DropExperienceBlock' if block_id in ORE_CONTEXT else 'LeavesBlock' if block_id in LEAVES
+            else 'DropExperienceBlock' if block_id in ORE_CONTEXT else 'MangroveLeavesBlock' if block_id == 'minecraft:mangrove_leaves' else 'LeavesBlock' if block_id in LEAVES
             else 'FlowerBlock' if block_id in FLOWERS else 'TallGrassBlock' if block_id in ('minecraft:short_grass','minecraft:fern')
             else 'DoublePlantBlock' if block_id in ('minecraft:tall_grass','minecraft:large_fern')
             else 'VineBlock' if block_id == 'minecraft:vine' else 'Block')

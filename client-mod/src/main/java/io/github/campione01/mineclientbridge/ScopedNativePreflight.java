@@ -39,6 +39,7 @@ final class ScopedNativePreflight {
             profiles.add(profile, actions);
         }
         if (ScopedMovementEntities.ready()) {
+            if(ScopedPortalEntryDispatch.ready()){JsonArray portal=new JsonArray();portal.add("follow_path");profiles.add(ScopedPortalEntry.PROFILE,portal);}
             JsonArray collect=new JsonArray();collect.add("follow_path");profiles.add(ScopedCollectTarget.PROFILE,collect);
             JsonArray descent=new JsonArray();descent.add("follow_path");profiles.add(ScopedStepDownMovement.PROFILE,descent);
             if(ScopedLocalSegmentDispatch.ready()){JsonArray localSegmentActions=new JsonArray();localSegmentActions.add("follow_path");profiles.add(ScopedLocalSegmentMovement.PROFILE,localSegmentActions);
@@ -50,6 +51,8 @@ final class ScopedNativePreflight {
         }
         if(ScopedPlacementDispatch.ready()){JsonArray placement=new JsonArray();placement.add("place_block");profiles.add(ScopedPlacement.PROFILE,placement);}
         if(ScopedCombatDispatch.ready()){JsonArray combat=new JsonArray();combat.add("combat_entity");profiles.add(ScopedCombat.PROFILE,combat);profiles.add(DefensiveCombatPolicy.PROFILE,combat.deepCopy());}
+        if(ScopedTargetDispatch.ready()){JsonArray target=new JsonArray();target.add("attack_entity");target.add("shoot_entity");profiles.add(ScopedTargetAction.PROFILE,target);}
+        if(ScopedItemInteractionDispatch.ready()){JsonArray item=new JsonArray();item.add("interact_block");profiles.add(ScopedItemInteraction.PROFILE,item);}
         out.add("profiles", profiles);
         JsonArray supported = new JsonArray();
         ClientActionRequest.ACTIONS.stream().sorted().forEach(supported::add);
@@ -76,6 +79,9 @@ final class ScopedNativePreflight {
                 || ((profile.equals(ScopedFlatMovement.PROFILE) || profile.equals(ScopedCollectTarget.PROFILE)) && action.equals("follow_path"))
                 || ((profile.equals(ScopedCombat.PROFILE)||profile.equals(DefensiveCombatPolicy.PROFILE)) && action.equals("combat_entity") && ScopedCombatDispatch.ready())
                 || (profile.equals(ScopedMining.PROFILE) && action.equals("break_block") && ScopedMiningDispatch.ready())
+                || (profile.equals(ScopedTargetAction.PROFILE) && Set.of("attack_entity","shoot_entity").contains(action) && ScopedTargetDispatch.ready())
+                || (profile.equals(ScopedItemInteraction.PROFILE) && action.equals("interact_block") && ScopedItemInteractionDispatch.ready())
+                || (profile.equals(ScopedPortalEntry.PROFILE) && action.equals("follow_path") && ScopedMovementEntities.ready() && ScopedPortalEntryDispatch.ready())
                 || (profile.equals(ScopedPlacement.PROFILE) && action.equals("place_block") && ScopedPlacementDispatch.ready()), "scoped_profile_unavailable_for_action");
         require(ClientActionRequest.string(scope, "owner_id").matches("[0-9a-f]{32}"), "invalid_scoped_owner");
         require(ClientActionRequest.integer(scope, "owner_generation", -1) > 0, "invalid_scoped_owner_generation");
@@ -95,6 +101,9 @@ final class ScopedNativePreflight {
             require(ScopedBlockMenuDispatch.ready(), "block_menu_post_hook_fence_unavailable");
             BlockMenuPreflight.validateIntent(intent);
         }
+        if(profile.equals(ScopedTargetAction.PROFILE))ScopedTargetAction.validateIntent(intent);
+        if(profile.equals(ScopedItemInteraction.PROFILE))ScopedItemInteraction.validateIntent(intent);
+        if(profile.equals(ScopedPortalEntry.PROFILE))ScopedPortalEntry.validateIntent(intent);
         Capture capture = new Capture(mc, scope, intent);
         // This guard belongs to facts just captured here, never a re-stamped remote observation.
         intent.add("capability_guard", CapabilityGuard.observation(capture.tick, capture.nano));
@@ -105,8 +114,10 @@ final class ScopedNativePreflight {
             capture.facts.add("mining",capture.mining.facts());
         }
         if(profile.equals(ScopedPlacement.PROFILE)){capture.placement=new ScopedPlacement(mc,parsed,capture.nano,capture.tick);capture.facts.add("placement",capture.placement.facts());}
+        if(profile.equals(ScopedItemInteraction.PROFILE)){capture.itemInteraction=new ScopedItemInteraction(mc,parsed,capture.nano,capture.tick);capture.facts.add("item_interaction",capture.itemInteraction.facts());}
+        if(profile.equals(ScopedPortalEntry.PROFILE)){capture.portalEntry=new ScopedPortalEntry(mc,parsed,capture.nano,capture.tick);capture.facts.add("portal_entry",capture.portalEntry.facts());}
         capture.recheck(mc);
-        if(capture.movement!=null || capture.mining!=null || capture.placement!=null) {
+        if(capture.movement!=null || capture.mining!=null || capture.placement!=null || capture.targetAction!=null || capture.itemInteraction!=null || capture.portalEntry!=null) {
             capture.requireMovementResponseBudget(parsed);
             capture.recheck(mc); // All preview/state/slot hooks precede the unchanged final admission fences.
         }
@@ -133,7 +144,10 @@ final class ScopedNativePreflight {
         final ScopedLocalSegmentMovement localSegment;
         ScopedMining mining;
         ScopedPlacement placement;
+        ScopedItemInteraction itemInteraction;
+        ScopedPortalEntry portalEntry;
         final ScopedCombat combat;
+        final ScopedTargetAction targetAction;
 
         Capture(Minecraft mc, JsonObject scope, JsonObject intent) {
             player = mc.player; level = mc.level; menu = player.containerMenu;
@@ -153,6 +167,7 @@ final class ScopedNativePreflight {
                 ?new ScopedLocalSegmentMovement(mc,ClientActionRequest.parse(intent),nano,tick,ScopedRouteThreatPolicy.PROFILE.equals(profile),ScopedRouteStopPolicy.PROFILE.equals(profile)||ScopedRouteStopPolicy.PROFILE_V2.equals(profile),ScopedRouteStopPolicy.PROFILE_V2.equals(profile)):null;
             combat=(ScopedCombat.PROFILE.equals(profile)||DefensiveCombatPolicy.PROFILE.equals(profile))
                 ? new ScopedCombat(mc,ClientActionRequest.parse(intent),nano,profile) : null;
+            targetAction=ScopedTargetAction.PROFILE.equals(profile)?new ScopedTargetAction(mc,ClientActionRequest.parse(intent),nano):null;
             facts = captureFacts(mc);
             blockMenuEntity = blockMenu() ? mc.level.getBlockEntity(BlockMenuPreflight.target(originalIntent)) : null;
             blockMenuRawState = blockMenu() ? new BlockMenuRawState(mc, facts) : null;
@@ -167,15 +182,25 @@ final class ScopedNativePreflight {
             JsonObject out = facts(mc);
             if (block != null) out.add("block_menu", block);
             if(combat!=null)out.add("combat",combat.facts());
+            if(targetAction!=null)out.add("target_action",targetAction.facts());
             if (movement != null) out.add("movement", movement.facts());
             if (stepDown != null) out.add("step_down", stepDown.facts());
             if (localSegment != null) out.add("local_segment", localSegment.facts());
             if (mining != null) out.add("mining", mining.facts());
             if (placement != null) out.add("placement",placement.facts());
+            if (itemInteraction != null) out.add("item_interaction",itemInteraction.facts());
+            if (portalEntry != null) out.add("portal_entry",portalEntry.facts());
             return out;
         }
 
         void recheck(Minecraft mc) { recheck(mc, null); }
+
+        void finalPrimitiveAdmission(Minecraft mc) {
+            if (targetAction != null) targetAction.admissionRawFence(mc);
+            if (itemInteraction != null) itemInteraction.admissionRawFence(mc);
+            if (portalEntry != null) portalEntry.admissionRawFence(mc);
+            fence(mc, null); // Original capture clock/tick after the complete final snapshot.
+        }
 
         private void fence(Minecraft mc, String actionId) {
             boolean owner = actionId == null
@@ -202,17 +227,25 @@ final class ScopedNativePreflight {
             if(stepDown!=null){require(actionId==null,"step_down_admission_only");stepDown.admissionRecheck(mc);}
             if(localSegment!=null){require(actionId==null,"local_segment_admission_only");localSegment.admissionRecheck(mc);}
             if(combat!=null)combat.admission(mc);
+            if(targetAction!=null)targetAction.admission(mc);
             if(mining!=null)mining.admissionBeforeFacts(mc);
             if(placement!=null)placement.admission(mc);
+            if(itemInteraction!=null)itemInteraction.admission(mc);
+            if(portalEntry!=null)portalEntry.admissionRecheck(mc);
             if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.FACTS);
             require(facts.equals(captureFacts(mc)), "scoped_profile_facts_changed");
             if(mining!=null)mining.admissionAfterFacts(mc);
             if(placement!=null)placement.admission(mc);
+            if(itemInteraction!=null)itemInteraction.admission(mc);
             if(combat!=null)combat.admission(mc);
+            if(targetAction!=null)targetAction.admission(mc);
             // After generic permission hooks, only raw corridor/entity/pose/owner reads remain.
             if (movement != null) movement.admissionRawFence(mc);
             if (stepDown != null) stepDown.admissionRawFence(mc);
             if (localSegment != null) localSegment.admissionRawFence(mc);
+            if (targetAction != null) targetAction.admissionRawFence(mc);
+            if (itemInteraction != null) itemInteraction.admissionRawFence(mc);
+            if (portalEntry != null) portalEntry.admissionRawFence(mc);
             // Fact/slot/shape hooks are not assumed pure. Fence the original owner after them.
             if (actionId != null) blockMenuDiagnostics.phase(BlockMenuDiagnostics.Phase.OWNER_AFTER);
             fence(mc, actionId);

@@ -13,9 +13,10 @@ import re
 import uuid
 
 from resident_controller.action_safety import task_release_unconfirmed, task_handoff_required
+from resident_controller.capability_snapshot import exact as exact_json
 
 from fall_rescue_adjudication import OPS as ADJUDICATION_OPS
-CONTROL_OPS = frozenset({'external_stop_acquire', 'capability_acquire', 'capability_heartbeat', 'capability_release', 'capability_cancel'}) | ADJUDICATION_OPS
+CONTROL_OPS = frozenset({'acknowledge_new_life', 'acknowledge_idle_pause', 'external_stop_acquire', 'capability_acquire', 'capability_heartbeat', 'capability_release', 'capability_cancel'}) | ADJUDICATION_OPS
 ACTIONS = frozenset({'follow_path', 'break_block', 'place_block', 'click_slot',
     'combat_entity', 'recover_environment', 'boat_drive', 'boat_mount', 'boat_dismount',
     'interact_block', 'use_item', 'select_hotbar', 'close_menu', 'attack_entity', 'shoot_entity', 'gateway_pearl',
@@ -160,7 +161,8 @@ class CapabilityOwnership:
                 heartbeat_remaining_ms=max(0, int((lease['heartbeat'] - self.clock()) * 1000)),
                 post_observation_required=lease['post_observation_required'],
                 cleanup_only=lease.get('cleanup_started') is True)
-        return {'capability_cleanup_observation_schema_version': 1,
+        return {'historical_survey_result_contract': 'historical-survey-result/1',
+                'capability_cleanup_observation_schema_version': 1,
                 'capability_lease_schema_version': 1, 'capability_lease': visible,
                 'capability_cancel_schema_version': 1,
                 'managed_navigation_owner_control': 'managed-navigation-owner-control/1',
@@ -215,6 +217,12 @@ class CapabilityOwnership:
     def capability_control(self, intent_id, command):
         """Consume a same-inbox lease control. It never enters the resident queue."""
         op = command.get('op')
+        if op == 'acknowledge_new_life':
+            from new_life_acknowledgment import submit
+            return submit(self,intent_id,command)
+        if op == 'acknowledge_idle_pause':
+            from pause_acknowledgment import submit
+            return submit(self,intent_id,command)
         if op in ADJUDICATION_OPS:
             from fall_rescue_adjudication import submit
             return submit(self,intent_id,command)
@@ -741,6 +749,15 @@ class CapabilityOwnership:
                 and self.clock() + body.get('timeout_ms', 15000) / 1000 <= lease['deadline'])
         else:
             valid = False
+        typed_portal = (op == 'action' and ('typed_portal_entry' in body
+            or isinstance(body.get('scoped_native_preflight'), dict)
+                    and body['scoped_native_preflight'].get('profile') == 'portal-entry-observed-v1'))
+        if typed_portal:
+            metadata = body.get('typed_portal_entry')
+            valid = (valid and isinstance(metadata, dict)
+                and isinstance(body.get('scoped_native_preflight'), dict)
+                    and body['scoped_native_preflight'].get('profile') == 'portal-entry-observed-v1'
+                and expected_dimension is not None and metadata.get('destination') == expected_dimension)
         if op == 'action' and ('fall_rescue_policy' in body or 'fall_rescue_binding' in body):
             try:
                 from resident_controller.fall_rescue_attached import validate_envelope
@@ -761,6 +778,16 @@ class CapabilityOwnership:
         if session.get('session_id') != lease['resident_session'] or not safe_policy(session.get('resident_policy')):
             self.capability_pause('capability_resident_session_or_policy_changed')
             return self.capability_complete(intent_id, 'cancelled', 'capability_resident_session_or_policy_changed')
+        survey_command = None
+        if op == 'observe' and body.get('capability_survey') is True:
+            from resident_controller.survey_result import command_binding, VERSION
+            try:
+                command_binding(body)
+                if session.get('survey_result_contract') != VERSION or not callable(getattr(self.q, 'survey_result', None)):
+                    raise ValueError('survey_result_contract_unavailable')
+            except ValueError:
+                return self.capability_complete(intent_id, 'failed', 'survey_result_contract_or_bounds_unavailable')
+            survey_command = deepcopy(body)
         request_id = queue_request_id or uuid.uuid4().hex
         if op == 'action' and 'fall_rescue_policy' in body:
             from resident_controller.fall_rescue_attached import binding_for
@@ -768,10 +795,14 @@ class CapabilityOwnership:
         self.owner = {'id': intent_id, 'request_id': request_id, 'capability_owner': owner_id,
                       'resident_session': lease['resident_session'], 'capability_op': op,
                       'expected_dimension': expected_dimension,
+                      'typed_portal_binding': ({'scope': deepcopy(body['scoped_native_preflight']),
+                          'intent': deepcopy({k:v for k,v in body.items() if k not in ('op','scoped_native_preflight')})}
+                          if typed_portal else None),
                       'external_navigation_operation': body.get('operation') if op == 'external_navigation_control' else None,
                       'fall_rescue_operation': body.get('operation') if op == 'fall_rescue_control' else None,
                       'compact_observation': body.get('compact_observation') is True,
                       'cleanup_observation': cleanup is True,
+                      'survey_command': survey_command,
                       'attached_fall_binding': deepcopy(body.get('fall_rescue_binding')),
                       'attached_fall_action': body.get('action') if 'fall_rescue_binding' in body else None}
         if cleanup is True:
@@ -846,6 +877,8 @@ class CapabilityOwnership:
                            or a.get('action_session') != lease['context']['action_session']
                            or a.get('status') != transition['native_status']
                            or a.get('result', {}).get('input_release_confirmed') is not True
+                           or transition.get('typed_portal_terminal') is not None
+                               and not exact_json(a.get('result', {}).get('portal_entry'), transition['typed_portal_terminal'])
                            for a in (state_action, action))):
                 self.capability_pause('capability_transition_action_binding_changed')
                 return False
@@ -879,8 +912,26 @@ class CapabilityOwnership:
         self.capability_cancel_tick(lease)
         if self.owner and self.owner.get('capability_owner'):
             owner = self.owner
-            result = self.q.result(owner['request_id'])
-            if result is None or owner.get('reported'):
+            if owner.get('reported'):
+                return True
+            if owner.get('survey_command') is not None:
+                try:
+                    result = self.q.survey_result(owner['request_id'], owner['survey_command'], owner['resident_session'])
+                except (OSError, ValueError, TypeError, KeyError):
+                    if self.owner is owner and self.capability_lease is lease:
+                        self.completed.append({'intent_id': owner['id'], 'session_id': self.session_id,
+                            'queue_request_id': owner['request_id'], 'result': {
+                                'request_id': owner['request_id'], 'session_id': owner['resident_session'],
+                                'status': 'uncertain', 'reason': 'survey_original_receipt_unreadable',
+                                'requires_handoff': True}})
+                        owner['reported'] = True
+                        self.capability_pause('survey_original_receipt_unreadable')
+                    return True
+                if self.owner is not owner or self.capability_lease is not lease:
+                    return True
+            else:
+                result = self.q.result(owner['request_id'])
+            if result is None:
                 return True
             valid = (isinstance(result, dict) and result.get('request_id') == owner['request_id']
                      and result.get('session_id') == owner['resident_session']
@@ -919,6 +970,29 @@ class CapabilityOwnership:
             if owner['capability_op'] == 'action' and owner.get('expected_dimension'):
                 native = result.get('action') or result.get('result', {}).get('action')
                 expected_id = uuid.uuid5(uuid.UUID(owner['resident_session']), owner['request_id'] + ':1').hex
+                typed = owner.get('typed_portal_binding')
+                typed_terminal = None
+                if typed is not None:
+                    try:
+                        from resident_controller.capability_snapshot import validate_scoped_witness, exact
+                        intent = {**deepcopy(typed['intent']), 'action_id': expected_id}
+                        validate_scoped_witness(native, typed['scope'], expected_id, intent)
+                        typed_terminal = native['result']['portal_entry']
+                        transition_now = self.clock()
+                        if (typed_terminal['transition_eligible'] is not True
+                                or native.get('status') != 'cancelled'
+                                or typed_terminal['destination'] != owner['expected_dimension']
+                                or typed_terminal['integrated_server_instance'] != lease.get('integrated_server_instance')
+                                or not exact(owner['transition_source'], lease['context'])
+                                or self.owner is not owner or self.capability_lease is not lease
+                                or self.stop_requested or self.stopped or not self.armed
+                                or self.defense_epoch != lease['defense_epoch']
+                                or transition_now >= owner['transition_deadline']):
+                            raise ValueError('typed_portal_original_transition_binding_changed')
+                    except (ValueError, KeyError, TypeError, AttributeError):
+                        if self.owner is owner and self.capability_lease is lease:
+                            self.capability_pause('capability_portal_transition_unconfirmed')
+                        return True
                 if (isinstance(native, dict) and native.get('action_id') == expected_id
                         and native.get('action_session') == lease['context']['action_session']
                         and native.get('result', {}).get('input_release_confirmed') is True
@@ -928,7 +1002,8 @@ class CapabilityOwnership:
                     lease['transition'] = {'dimension': owner['expected_dimension'], 'request_id': owner['request_id'],
                         'intent_id': owner['id'], 'action_id': expected_id, 'native_status': native['status'],
                         'source_context': deepcopy(owner['transition_source']),
-                        'deadline': owner['transition_deadline'], 'observations_remaining': MAX_TRANSITION_OBSERVATIONS}
+                        'deadline': owner['transition_deadline'], 'observations_remaining': MAX_TRANSITION_OBSERVATIONS,
+                        'typed_portal_terminal': deepcopy(typed_terminal)}
             if owner['capability_op'] == 'managed_navigation_control' and result['status'] == 'succeeded' and result.get('result', {}).get('state') == 'settled':
                 lease.pop('managed_navigation', None)
                 lease.pop('managed_navigation_cancel_submitted', None)
@@ -943,9 +1018,9 @@ class CapabilityOwnership:
             if owner['capability_op'] == 'observe' and result['status'] == 'succeeded':
                 if owner.get('cleanup_observation'):
                     self.capability_capture_cleanup(result.get('result', {}), owner)
-                elif not owner.get('compact_observation'):
+                elif not owner.get('compact_observation') and owner.get('survey_command') is None:
                     self.capability_capture(result.get('result', {}))
-                # Compact reads retain the owner lifecycle but cannot refresh dispatch authority.
+                # Compact and historical survey reads retain owner lifecycle but cannot refresh dispatch authority.
             elif owner['capability_op'] == 'action' and result.get('action_admission', {}).get('admitted') is False:
                 lease['post_observation_required'] = False
             self.owner = None

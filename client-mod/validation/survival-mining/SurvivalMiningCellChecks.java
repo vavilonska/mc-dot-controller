@@ -11,7 +11,7 @@ final class SurvivalMiningCellChecks {
     static JsonObject props(String text){return JsonParser.parseString(text).getAsJsonObject();}
     public static void main(String[]args)throws Exception{
         Path in=Path.of(args[0]),out=Path.of(args[1]);Files.createDirectory(out);
-        for(String kind:List.of("oak","spruce","birch","jungle","acacia","dark_oak"))for(String axis:List.of("x","y","z")){
+        for(String kind:List.of("oak","spruce","birch","jungle","acacia","dark_oak","mangrove"))for(String axis:List.of("x","y","z")){
             String id="minecraft:"+kind+"_log";JsonObject p=props("{\"axis\":\""+axis+"\"}");
             check(ScopedMiningCellPolicy.target(id,p),"exact log target");
             check(ScopedMiningCellPolicy.accepts(id,"net.minecraft.world.level.block.RotatedPillarBlock",p),"exact log class");
@@ -30,6 +30,14 @@ final class SurvivalMiningCellChecks {
                 "{\"distance\":\"1\",\"persistent\":\"false\",\"waterlogged\":\"true\"}",
                 "{\"distance\":1,\"persistent\":\"false\",\"waterlogged\":\"false\"}"))
             check(!ScopedMiningCellPolicy.accepts("minecraft:jungle_leaves","net.minecraft.world.level.block.LeavesBlock",props(p)),"malformed/wet leaves");
+        JsonObject dry=props("{\"distance\":\"3\",\"persistent\":\"false\",\"waterlogged\":\"false\"}");
+        check(ScopedMiningCellPolicy.accepts("minecraft:mangrove_leaves","net.minecraft.world.level.block.MangroveLeavesBlock",dry),"exact mangrove leaf class");
+        check(!ScopedMiningCellPolicy.accepts("minecraft:mangrove_leaves","net.minecraft.world.level.block.LeavesBlock",dry),"generic leaf class refused for mangrove");
+        JsonObject wet=dry.deepCopy();wet.addProperty("waterlogged","true");
+        check(!ScopedMiningCellPolicy.accepts("minecraft:mangrove_leaves","net.minecraft.world.level.block.MangroveLeavesBlock",wet),"wet mangrove leaves excluded");
+        check(!ScopedMiningCellPolicy.support("minecraft:mangrove_leaves"),"mangrove leaf support excluded");
+        check(!ScopedMiningCellPolicy.bodyClear("minecraft:mangrove_leaves"),"mangrove leaf body excluded");
+        for(String id:List.of("minecraft:mangrove_roots","minecraft:muddy_mangrove_roots","minecraft:mangrove_propagule"))check(!ScopedMiningCellPolicy.CELLS.contains(id),"roots and propagules excluded");
         check(!ScopedMiningCellPolicy.support("minecraft:jungle_leaves"),"leaf support excluded");
         check(!ScopedMiningCellPolicy.bodyClear("minecraft:jungle_leaves"),"leaf body excluded");
         check(!ScopedMiningCellPolicy.bodyClear("minecraft:vine"),"climbing body excluded");

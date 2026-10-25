@@ -15,13 +15,15 @@ public final class NativeManagedNavigation {
     private static Data active;
     private static final class Data {
         final ManagedNavigationLease.Request request;
-        final LocalPlayer player;final ClientLevel level;final Object mode;
+        final LocalPlayer player;final ClientLevel level;final Object mode;final java.util.UUID uuid;
         final long ownerRevision;final Object process,path,input,goal;
         final Method start,cancel;final ManagedNavigationSettings settings;
         final double x,y,z;final float initialHealth;
+        String dryRefusal;long dryChecks,dryJumpInputs,dryTravelInputs;int dryCells;boolean dryChecking,dryPoisoned;
         ManagedNavigationLease.Entry entry;JsonObject proof;ManagedNavigationInputPolicy.Token inputToken;
         Data(Minecraft mc,ManagedNavigationLease.Request r) throws Exception {
-            request=r;player=mc.player;level=mc.level;mode=mc.gameMode;ownerRevision=ClientActions.externalOwnerRevision();
+            request=r;player=mc.player;level=mc.level;mode=mc.gameMode;uuid=player.getUUID();ownerRevision=ClientActions.externalOwnerRevision();
+            require(inputFenceReady(),"managed_navigation_dry_fence_unavailable");ManagedDryRoute.verify();
             x=player.getX();y=player.getY();z=player.getZ();initialHealth=player.getHealth();
             require(Double.isFinite(x)&&Double.isFinite(y)&&Double.isFinite(z)&&Float.isFinite(initialHealth),"managed_navigation_initial_state_nonfinite");
             ClassLoader loader=NativeManagedNavigation.class.getClassLoader();settings=new ManagedNavigationSettings(loader);
@@ -44,6 +46,7 @@ public final class NativeManagedNavigation {
                           ExternalControllerProof.ManagedProof managed) {}
     static boolean blocksInput(){return LEASES.blocked();}
     static JsonObject start(ManagedNavigationLease.Request request){
+        NativeRecoveryShortInput.requireLegacyAllowed();
         Minecraft mc=Minecraft.getInstance();thread(mc);
         var old=LEASES.existing(request);if(old!=null)return describe(old);
         require(BridgeServer.isRunning()&&ManagedNavigationInputPolicy.admissionOpen(),"managed_navigation_bridge_unavailable");
@@ -53,21 +56,24 @@ public final class NativeManagedNavigation {
         Data data;try{data=new Data(mc,request);}catch(Exception|LinkageError e){throw new ClientActionRequest.Rejected(409,"managed_navigation_supported_api_required");}
         require(Math.hypot(request.x()+.5-data.x,request.z()+.5-data.z)<=request.radius()
             &&Math.abs(request.y()-data.y)<=64,"managed_navigation_goal_bound");
+        ManagedDryWorld.Frame dry=dryCapture(mc,data,null,false);
         Sample sample=sample(mc,data,false);long now=System.nanoTime();
+        try{dry.unchanged(mc);}catch(Exception unavailable){throw new ClientActionRequest.Rejected(409,"managed_navigation_dry_admission_changed");}
         require(sample.same()&&sample.hazard()==null&&sample.grounded()&&sample.neutral()
             &&sample.managed().exactOwner()&&sample.managed().external().get("idle_proven").getAsBoolean(),"managed_navigation_admission_not_safe_idle");
         require(BridgeServer.isRunning()&&ManagedNavigationInputPolicy.admissionOpen()&&localBound(mc,data)&&!LEASES.blocked()&&!NativeExternalNavigation.blocksInput()&&localMdcFree(),"managed_navigation_final_admission_owner");
-        fresh(request.identity(),sample.tick(),now);
+        now=System.nanoTime();fresh(request.identity(),sample.tick(),now);
         var entry=LEASES.claim(request,now,sample.tick());data.entry=entry;active=data;
         try {
             data.inputToken=ManagedNavigationInputPolicy.claim(data.input,()->inputAllowed(data));
             data.settings.install();
             // Resolve all settings/API callbacks, then recheck the original source and exact owner.
-            Sample ready=sample(mc,data,true);now=System.nanoTime();
+            ManagedDryWorld.Frame startDry=ManagedDryWorld.capture(mc,data.path,null,false);
+            Sample ready=sample(mc,data,true);now=System.nanoTime();startDry.unchanged(mc);
             require(ready.same()&&ready.hazard()==null&&ready.grounded()&&ready.neutral()
                 &&ready.managed().exactOwner()&&ready.managed().external().get("idle_proven").getAsBoolean(),"managed_navigation_start_context_changed");
             require(BridgeServer.isRunning()&&ManagedNavigationInputPolicy.admissionOpen()&&localBound(mc,data)&&active==data&&LEASES.owns(entry)&&localMdcFree(),"managed_navigation_start_owner_changed");
-            fresh(request.identity(),ready.tick(),now);LEASES.startAttempt(entry);data.proof=ready.managed().external();
+            now=System.nanoTime();fresh(request.identity(),ready.tick(),now);LEASES.startAttempt(entry);data.proof=ready.managed().external();
             data.start.invoke(data.process,data.goal);
         }catch(Exception|LinkageError failure){unknown(entry,"managed_navigation_start_outcome_unknown");}
         return describe(entry);
@@ -89,6 +95,10 @@ public final class NativeManagedNavigation {
             String blocked=ManagedNavigationInputPolicy.blockedReason();
             if(blocked!=null)LEASES.requestStop(entry,blocked,now);
             if(sample.hazard()!=null)LEASES.requestStop(entry,sample.hazard(),now);
+            if(entry.phase==ManagedNavigationLease.Phase.ROUTING){
+                try{ManagedDryWorld.Frame dry=ManagedDryWorld.capture(mc,data.path,null,false);dry.unchanged(mc);data.dryChecks++;data.dryCells=dry.decision.checkedCells();}
+                catch(Exception|LinkageError unsafe){refuseDry(data,reason(unsafe));}
+            }
             LEASES.deadlines(entry,now);if(!LEASES.owns(entry)){if(entry.phase==ManagedNavigationLease.Phase.UNKNOWN)ManagedNavigationInputPolicy.quarantine(data.inputToken);return;}
             boolean idle=sample.neutral()&&sample.managed().external().get("idle_proven").getAsBoolean();
             LEASES.sample(entry,true,idle,sample.atGoal()&&sample.grounded(),sample.tick(),now);
@@ -126,6 +136,7 @@ public final class NativeManagedNavigation {
         },() -> localBound(mc,d)&&localMdcFree()&&(!owned||active==d&&LEASES.owns(d.entry)));
     }
     private static boolean localBound(Minecraft mc,Data d){return mc.player==d.player&&mc.level==d.level&&mc.gameMode==d.mode
+        &&d.player.getUUID()==d.uuid&&d.player.level()==d.level
         &&ClientActions.externalOwnerRevision()==d.ownerRevision&&ClientActions.session().equals(d.request.identity().session())
         &&WorldGeneration.matches(d.level,d.request.identity().world());}
     private static boolean localMdcFree(){return !ClientActions.hasRuntimeAction()&&!NativeFallRescue.armedOrBlocked()
@@ -142,16 +153,69 @@ public final class NativeManagedNavigation {
         if(data==null||data.entry!=entry||!LEASES.owns(entry)||!ManagedNavigationInputPolicy.shutdownOwns(shutdownToken,data.inputToken))return;
         LEASES.bridgeStopping(entry,System.nanoTime());tick(mc);
     }
-    private static boolean inputAllowed(Data data){
+    private static ManagedDryWorld.Frame dryCapture(Minecraft mc,Data data,net.minecraft.world.phys.Vec3 pending,boolean requireStep){
+        try{return ManagedDryWorld.capture(mc,data.path,pending,requireStep);}
+        catch(Exception|LinkageError unsafe){throw new ClientActionRequest.Rejected(409,reason(unsafe));}
+    }
+    private static String reason(Throwable failure){String s=failure.getMessage();return s!=null&&s.startsWith("managed_navigation_")?s:"managed_navigation_dry_proof_unavailable";}
+    private static void refuseDry(Data data,String reason){
+        if(active==data&&LEASES.owns(data.entry)){data.dryRefusal=reason;LEASES.requestStop(data.entry,reason,System.nanoTime());}
+    }
+    private static boolean inputAllowed(Data data){return inputAllowed(data,null,true);}
+    private static boolean inputAllowed(Data data,net.minecraft.world.phys.Vec3 pending,boolean requireStep){return inputAllowed(data,pending,requireStep,0);}
+    private static boolean inputAllowed(Data data,net.minecraft.world.phys.Vec3 pending,boolean requireStep,double pendingJump){
         Minecraft mc=Minecraft.getInstance();
-        if(!BridgeServer.isRunning()||!ManagedNavigationInputPolicy.admissionOpen()||!mc.isSameThread()||active!=data||!LEASES.owns(data.entry)||!data.entry.startAttempted)return false;
+        if(data.dryChecking){data.dryPoisoned=true;refuseDry(data,"managed_navigation_dry_reentrant_check");return false;}
+        if(data.dryPoisoned||!BridgeServer.isRunning()||!ManagedNavigationInputPolicy.admissionOpen()||!mc.isSameThread()||active!=data
+            ||!LEASES.owns(data.entry)||data.entry.phase!=ManagedNavigationLease.Phase.ROUTING||!data.entry.startAttempted)return false;
+        data.dryChecking=true;
         try {
+            ManagedDryWorld.Frame dry=ManagedDryWorld.capture(mc,data.path,pending,requireStep,pendingJump);
             boolean settings=data.settings.unchanged();Sample sample=sample(mc,data,true);
-            return settings&&sample.same()&&sample.hazard()==null
-                &&ManagedNavigationInputPolicy.movementOwner(sample.managed().exactOwner(),sample.managed().customActive(),sample.managed().input(),data.input)
-                &&localBound(mc,data)&&active==data&&localMdcFree()
+            // External controller/setting callbacks are complete before the pure original snapshot and owner fence.
+            dry.unchanged(mc);
+            boolean okay=!data.dryPoisoned&&settings&&sample.same()&&sample.hazard()==null
+                &&(ManagedNavigationInputPolicy.movementOwner(sample.managed().exactOwner(),sample.managed().customActive(),sample.managed().input(),data.input)
+                    ||!requireStep&&sample.managed().exactOwner()&&sample.managed().input()==data.input)
+                &&localBound(mc,data)&&active==data&&localMdcFree()&&data.entry.phase==ManagedNavigationLease.Phase.ROUTING
                 &&BridgeServer.isRunning()&&ManagedNavigationInputPolicy.admissionOpen()&&LEASES.permitsInput(data.entry,System.nanoTime());
-        }catch(Exception|LinkageError unavailable){return false;}
+            if(okay){data.dryChecks++;data.dryCells=dry.decision.checkedCells();}else refuseDry(data,"managed_navigation_dry_final_owner_or_context");
+            return okay;
+        }catch(Exception|LinkageError unavailable){refuseDry(data,reason(unavailable));return false;}
+        finally{data.dryChecking=false;}
+    }
+    /** Final ordinary-input consumption seam. true authorizes only neutral writes to this exact old owner. */
+    public static boolean neutralizeDryInput(LocalPlayer player,net.minecraft.world.phys.Vec3 pending){
+        Minecraft mc=Minecraft.getInstance();Data data=active;
+        if(data==null||data.player!=player||mc.player!=player||!mc.isSameThread())return false;
+        boolean moving=pending==null||pending.x!=0||pending.y!=0||pending.z!=0||player.input.jumping;
+        if(inputAllowed(data,pending,moving))return false;
+        // Cleanup never regains authority after replacement; it does not invoke ordinary admission or another callback.
+        return active==data&&LEASES.active()==data.entry&&data.entry.phase!=ManagedNavigationLease.Phase.SETTLED
+            &&localBound(mc,data)&&localMdcFree()&&mc.player==player&&mc.level==data.level&&mc.gameMode==data.mode;
+    }
+    public static net.minecraft.world.phys.Vec3 dryTravelIntent(LocalPlayer player,net.minecraft.world.phys.Vec3 pending){
+        Data data=active;if(data==null||data.player!=player)return pending;
+        // Refusing this captured old call argument does not write a replacement owner's input state.
+        return inputAllowed(data,pending,pending.x!=0||pending.y!=0||pending.z!=0)?pending:net.minecraft.world.phys.Vec3.ZERO;
+    }
+    public static boolean refuseDryAcceleration(LocalPlayer player,float amount,net.minecraft.world.phys.Vec3 pending){
+        Data data=active;if(data==null||data.player!=player)return false;
+        if(!Float.isFinite(amount)||amount<0||amount>.101f||pending==null||pending.getClass()!=net.minecraft.world.phys.Vec3.class){refuseDry(data,"managed_navigation_acceleration_unproven");return true;}
+        if(!inputAllowed(data,pending,pending.x!=0||pending.y!=0||pending.z!=0))return true;
+        if(amount>0&&(pending.x!=0||pending.z!=0))data.dryTravelInputs++;return false;
+    }
+    private static boolean finalDryOwner(Data data){Minecraft mc=Minecraft.getInstance();return active==data&&localBound(mc,data)&&localMdcFree()
+        &&!data.dryPoisoned&&data.entry.phase==ManagedNavigationLease.Phase.ROUTING&&BridgeServer.isRunning()&&ManagedNavigationInputPolicy.admissionOpen()&&LEASES.permitsInput(data.entry,System.nanoTime());}
+    public static boolean refuseDryJump(LocalPlayer player,float power,net.minecraft.world.phys.Vec3 originalMotion){
+        Data data=active;if(data==null||data.player!=player)return false;
+        if(!player.onGround()||!Float.isFinite(power)||Math.abs(power-.42f)>1e-6||originalMotion==null||originalMotion.getClass()!=net.minecraft.world.phys.Vec3.class
+            ||player.getDeltaMovement()!=originalMotion){refuseDry(data,"managed_navigation_jump_power_unproven");return true;}
+        var pending=new net.minecraft.world.phys.Vec3(player.xxa,0,player.zza);
+        if(!inputAllowed(data,pending,true,power))return true;
+        // Exact immutable local arguments remain bound after the last external callback.
+        if(player.getDeltaMovement()!=originalMotion||!player.onGround()||!finalDryOwner(data))return true;
+        data.dryJumpInputs++;return false;
     }
     private static void unknown(ManagedNavigationLease.Entry entry,String reason){
         LEASES.unknown(entry,reason);
@@ -160,17 +224,21 @@ public final class NativeManagedNavigation {
     }
     static void contextLost(){var e=LEASES.active();unknown(e,"managed_navigation_context_changed");}
     private static boolean inputFenceReady(){
-        try{return ManagedNavigationInputFence.class.isAssignableFrom(Class.forName("baritone.fj",false,NativeManagedNavigation.class.getClassLoader()));}
+        try{return ManagedNavigationInputFence.class.isAssignableFrom(Class.forName("baritone.fj",false,NativeManagedNavigation.class.getClassLoader()))
+            &&ManagedDryInputFence.class.isAssignableFrom(LocalPlayer.class)&&ManagedDryTravelFence.class.isAssignableFrom(LocalPlayer.class)
+            &&ManagedDryAccelerationFence.class.isAssignableFrom(LocalPlayer.class);}
         catch(ClassNotFoundException|LinkageError unavailable){return false;}
     }
     static JsonObject capabilities(){JsonObject j=new JsonObject();j.addProperty("schema_version",1);j.addProperty("version","managed-navigation-owner-control/1");
         j.addProperty("input_fence_ready",inputFenceReady());j.addProperty("max_goal_distance",200);j.addProperty("max_timeout_ms",120000);j.addProperty("normal_chunk_loading",true);
+        j.addProperty("dry_step_profile","managed-dry-current-step-v1");j.addProperty("dry_step_max_cells",128);j.addProperty("surface_rescue",false);
         j.addProperty("unloaded_terrain_certified",false);j.addProperty("walking_only",true);j.addProperty("no_auto_resume",true);return j;}
     static JsonObject status(){thread(Minecraft.getInstance());return describe(LEASES.active());}
     private static JsonObject describe(ManagedNavigationLease.Entry e){
         if(e!=null&&history.containsKey(e.request.identity().id()))return history.get(e.request.identity().id()).deepCopy();
         return ManagedNavigationResponses.status(e,active!=null&&active.entry==e?active.proof:null,System.nanoTime());
     }
+
     private static void exact(Object o,String type,ClassLoader loader)throws Exception{require(o!=null&&o.getClass()==Class.forName(type,false,loader),"managed_navigation_api_receiver_changed");}
     private static void thread(Minecraft mc){require(mc.isSameThread(),"minecraft_thread_required");}
     private static void require(boolean okay,String reason){if(!okay)throw new ClientActionRequest.Rejected(409,reason);}

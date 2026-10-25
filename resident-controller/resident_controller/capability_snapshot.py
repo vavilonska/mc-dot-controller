@@ -178,6 +178,15 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
                  and valid_rejection_diagnostic(native['result']['route_entity_rejection'])
                  and native['result']['route_entity_rejection']['profile'] == request['profile'],
                  'route_spatial_stop_rejection_diagnostic')
+    if request.get('profile') == 'target-action-stationary-v1' or native_intent.get('action') in ('attack_entity','shoot_entity'):
+        from .target_action_snapshot import validate_request as validate_target_request
+        validate_target_request(request, native_intent)
+    if request.get('profile') == 'item-on-block-observed-v1' or 'typed_item_interaction' in native_intent:
+        from .item_interaction_snapshot import validate_request as validate_item_request
+        validate_item_request(request, native_intent)
+    if request.get('profile') == 'portal-entry-observed-v1' or 'typed_portal_entry' in native_intent:
+        from .portal_entry_snapshot import validate_request as validate_portal_request
+        validate_portal_request(request, native_intent)
     value = native.get('result', {}).get('scoped_native_preflight')
     _require(type(value) is dict and value.get('version') == 'scoped-native-preflight/1'
              and type(value.get('schema_version')) is int and value['schema_version'] == 1,
@@ -187,10 +196,10 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
              and _integer(value.get('defense_epoch')) and _integer(value.get('owner_generation'), 1)
              and value.get('action_id') == action_id and value.get('action_session') == native.get('action_session'),
              'scoped_owner_identity')
-    _require(value.get('profile') in ('state-menu-v1', 'state-use-v1', 'block-menu-v1', 'movement-flat-observed-v2', 'movement-step-down-observed-v1', 'movement-local-segment-observed-v1', 'movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2', 'mining-local-observed-v2', 'placement-local-observed-v1', 'collect-local-observed-v1', 'combat-local-observed-v1', 'combat-defensive-local-v1')
+    _require(value.get('profile') in ('state-menu-v1', 'state-use-v1', 'block-menu-v1', 'movement-flat-observed-v2', 'movement-step-down-observed-v1', 'movement-local-segment-observed-v1', 'movement-local-segment-spatial-threat-v1', 'movement-local-segment-spatial-stop-v1', 'movement-local-segment-spatial-stop-v2', 'mining-local-observed-v2', 'placement-local-observed-v1', 'collect-local-observed-v1', 'combat-local-observed-v1', 'combat-defensive-local-v1', 'target-action-stationary-v1', 'item-on-block-observed-v1', 'portal-entry-observed-v1')
              and native_intent.get('action') in {'state-menu-v1': {'click_slot','close_menu','select_hotbar'},
                  'state-use-v1': {'use_item'}, 'block-menu-v1': {'interact_block'},
-                 'movement-flat-observed-v2': {'follow_path'}, 'movement-step-down-observed-v1': {'follow_path'}, 'movement-local-segment-observed-v1': {'follow_path'}, 'movement-local-segment-spatial-threat-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v2': {'follow_path'}, 'collect-local-observed-v1': {'follow_path'}, 'mining-local-observed-v2': {'break_block'}, 'placement-local-observed-v1': {'place_block'}, 'combat-local-observed-v1': {'combat_entity'}, 'combat-defensive-local-v1': {'combat_entity'}}[value['profile']]
+                 'movement-flat-observed-v2': {'follow_path'}, 'movement-step-down-observed-v1': {'follow_path'}, 'movement-local-segment-observed-v1': {'follow_path'}, 'movement-local-segment-spatial-threat-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v1': {'follow_path'}, 'movement-local-segment-spatial-stop-v2': {'follow_path'}, 'collect-local-observed-v1': {'follow_path'}, 'mining-local-observed-v2': {'break_block'}, 'placement-local-observed-v1': {'place_block'}, 'combat-local-observed-v1': {'combat_entity'}, 'combat-defensive-local-v1': {'combat_entity'}, 'target-action-stationary-v1': {'attack_entity','shoot_entity'}, 'item-on-block-observed-v1': {'interact_block'}, 'portal-entry-observed-v1': {'follow_path'}}[value['profile']]
              and value.get('coverage_complete') is True and value.get('admitted') is True
              and value.get('clock_domain') == 'native-system-nanotime'
              and _integer(value.get('source_tick')) and _integer(value.get('native_owner_revision'))
@@ -297,6 +306,15 @@ def validate_scoped_witness(native, request, action_id, native_intent=None):
     if value['profile'] in ('combat-local-observed-v1','combat-defensive-local-v1'):
         from .combat_snapshot import validate_combat
         validate_combat(value, native_intent, native)
+    if value['profile'] == 'target-action-stationary-v1':
+        from .target_action_snapshot import validate_target_action
+        validate_target_action(value, native_intent, native)
+    if value['profile'] == 'item-on-block-observed-v1':
+        from .item_interaction_snapshot import validate_item_interaction
+        validate_item_interaction(value, native_intent, native)
+    if value['profile'] == 'portal-entry-observed-v1':
+        from .portal_entry_snapshot import validate_portal_entry
+        validate_portal_entry(value, native_intent, native)
     if 'route_terrain_rejection' in native.get('result', {}):
         from .route_terrain_snapshot import validate_diagnostic
         validate_diagnostic(native['result']['route_terrain_rejection'], value, native)

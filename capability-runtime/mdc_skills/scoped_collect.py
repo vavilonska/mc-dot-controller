@@ -11,8 +11,8 @@ PROFILE = 'collect-local-observed-v1'
 # checks still apply independently to every admitted target.
 ITEMS = frozenset('minecraft:' + name for name in (
     'stone', 'cobblestone', 'dirt', 'coal', 'stick', 'iron_nugget',
-    'oak_log', 'spruce_log', 'birch_log', 'jungle_log', 'acacia_log', 'dark_oak_log',
-    'oak_planks', 'spruce_planks', 'birch_planks', 'jungle_planks', 'acacia_planks', 'dark_oak_planks',
+    'oak_log', 'spruce_log', 'birch_log', 'jungle_log', 'acacia_log', 'dark_oak_log', 'mangrove_log',
+    'oak_planks', 'spruce_planks', 'birch_planks', 'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'mangrove_planks',
     'raw_iron', 'charcoal', 'crafting_table', 'furnace', 'apple', 'bread',
     'beef', 'cooked_beef', 'porkchop', 'cooked_porkchop', 'chicken', 'cooked_chicken',
     'mutton', 'cooked_mutton', 'baked_potato',

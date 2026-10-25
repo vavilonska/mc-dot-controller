@@ -20,6 +20,7 @@ public final class MineClientBridgeMod {
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
                 event -> BridgeServer.terrainAcquisitionTick());
+        RecoveryDamageDiagnostics.install();
         BridgeServer.start();
         Runtime.getRuntime().addShutdownHook(new Thread(
                 BridgeServer::stop,

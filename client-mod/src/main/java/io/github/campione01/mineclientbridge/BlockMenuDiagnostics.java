@@ -142,6 +142,8 @@ final class BlockMenuDiagnostics {
         String code = rejected ? failure.getMessage() : null;
         out.addProperty("rejection_code", code != null && REJECTIONS.contains(code)
             ? code : rejected ? "unclassified_rejection" : "unclassified_runtime_exception");
+        if (failure instanceof ClientActionRequest.Rejected typed && typed.blockMenuGeometryRejection != null)
+            out.add("geometry_rejection", typed.blockMenuGeometryRejection.deepCopy());
         out.addProperty("capture_elapsed_nanos", Long.toString(elapsedNanos));
         return out;
     }

@@ -1,6 +1,7 @@
 package io.github.campione01.mineclientbridge.mixin;
 
 import io.github.campione01.mineclientbridge.ScopedMiningDispatch;
+import io.github.campione01.mineclientbridge.RecoveryInteractionDispatch;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -18,32 +19,32 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(MultiPlayerGameMode.class)
 public abstract class ScopedMiningGameModeMixin {
     @Inject(method="<init>",at=@At("RETURN"),require=1)
-    private void mineclientBridge$miningGameInstalled(CallbackInfo ci){ScopedMiningDispatch.gameModeInstalled();}
+    private void mineclientBridge$miningGameInstalled(CallbackInfo ci){ScopedMiningDispatch.gameModeInstalled();RecoveryInteractionDispatch.gameInstalled();}
     @Inject(method="startDestroyBlock",at=@At("HEAD"),require=1)
-    private void mineclientBridge$beforeStart(BlockPos pos,Direction face,CallbackInfoReturnable<Boolean> cir){ScopedMiningDispatch.beforeDestroy(pos);}
+    private void mineclientBridge$beforeStart(BlockPos pos,Direction face,CallbackInfoReturnable<Boolean> cir){ScopedMiningDispatch.beforeDestroy(pos);RecoveryInteractionDispatch.beforeDestroy(pos);}
     @Inject(method="continueDestroyBlock",at=@At("HEAD"),require=1)
-    private void mineclientBridge$beforeContinue(BlockPos pos,Direction face,CallbackInfoReturnable<Boolean> cir){ScopedMiningDispatch.beforeDestroy(pos);}
+    private void mineclientBridge$beforeContinue(BlockPos pos,Direction face,CallbackInfoReturnable<Boolean> cir){ScopedMiningDispatch.beforeDestroy(pos);RecoveryInteractionDispatch.beforeDestroy(pos);}
     @Redirect(method="destroyBlock",at=@At(value="INVOKE",target="Lnet/minecraft/world/level/block/state/BlockState;onDestroyedByPlayer(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/entity/player/Player;ZLnet/minecraft/world/level/material/FluidState;)Z"),require=1)
     private boolean mineclientBridge$afterDestroyHooks(BlockState state,net.minecraft.world.level.Level level,BlockPos pos,
             net.minecraft.world.entity.player.Player player,boolean harvest,net.minecraft.world.level.material.FluidState fluid){
-        ScopedMiningDispatch.beforeRemoval(state,level,pos,player,harvest,fluid);
+        ScopedMiningDispatch.beforeRemoval(state,level,pos,player,harvest,fluid);RecoveryInteractionDispatch.beforeRemoval(state,level,pos,player);
         return state.onDestroyedByPlayer(level,pos,player,harvest,fluid);
     }
     @Redirect(method="startDestroyBlock",at=@At(value="INVOKE",target="Lnet/minecraft/client/multiplayer/ClientPacketListener;send(Lnet/minecraft/network/protocol/Packet;)V"),require=1)
     private void mineclientBridge$progressAbort(net.minecraft.client.multiplayer.ClientPacketListener connection,Packet<?> packet){
-        ScopedMiningDispatch.progressAbort(packet);connection.send(packet);
+        ScopedMiningDispatch.progressAbort(packet);RecoveryInteractionDispatch.progressAbort(packet);connection.send(packet);
     }
     @Redirect(method="stopDestroyBlock",at=@At(value="INVOKE",target="Lnet/minecraft/client/multiplayer/ClientPacketListener;send(Lnet/minecraft/network/protocol/Packet;)V"),require=1)
     private void mineclientBridge$abort(net.minecraft.client.multiplayer.ClientPacketListener connection,Packet<?> packet){
-        ScopedMiningDispatch.abort(packet);connection.send(packet);
+        ScopedMiningDispatch.abort(packet);RecoveryInteractionDispatch.abort(packet);connection.send(packet);
     }
     @Inject(method="lambda$startDestroyBlock$1",at=@At("RETURN"),require=1,remap=false)
     private void mineclientBridge$startPacket(BlockState state,PlayerInteractEvent.LeftClickBlock event,BlockPos pos,
             Direction face,int sequence,CallbackInfoReturnable<Packet<?>> cir){
-        ScopedMiningDispatch.packet(cir.getReturnValue(),pos,face,sequence,false);
+        ScopedMiningDispatch.packet(cir.getReturnValue(),pos,face,sequence,false);RecoveryInteractionDispatch.packet(cir.getReturnValue(),pos,face,sequence,false);
     }
     @Inject(method="lambda$continueDestroyBlock$3",at=@At("RETURN"),require=1,remap=false)
     private void mineclientBridge$stopPacket(BlockPos pos,Direction face,int sequence,CallbackInfoReturnable<Packet<?>> cir){
-        ScopedMiningDispatch.packet(cir.getReturnValue(),pos,face,sequence,true);
+        ScopedMiningDispatch.packet(cir.getReturnValue(),pos,face,sequence,true);RecoveryInteractionDispatch.packet(cir.getReturnValue(),pos,face,sequence,true);
     }
 }

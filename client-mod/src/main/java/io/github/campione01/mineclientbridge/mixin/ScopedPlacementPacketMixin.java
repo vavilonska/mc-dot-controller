@@ -18,14 +18,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(MultiPlayerGameMode.class)
 public abstract class ScopedPlacementPacketMixin {
     @Inject(method="<init>",at=@At("RETURN"),require=1)
-    private void mineclientBridge$placementPacketInstalled(CallbackInfo ci){ScopedPlacementDispatch.packetInstalled();}
+    private void mineclientBridge$placementPacketInstalled(CallbackInfo ci){ScopedPlacementDispatch.packetInstalled();io.github.campione01.mineclientbridge.RecoveryMaintenancePlacementDispatch.packetInstalled();}
     @Inject(method="useItemOn",at=@At("HEAD"),require=1)
     private void mineclientBridge$placementEnter(LocalPlayer player,InteractionHand hand,BlockHitResult hit,CallbackInfoReturnable<InteractionResult> cir){
-        ScopedPlacementDispatch.enterUse(player,hand,hit);
+        ScopedPlacementDispatch.enterUse(player,hand,hit);io.github.campione01.mineclientbridge.RecoveryMaintenancePlacementDispatch.enterUse(player,hand,hit);
     }
     @Inject(method="lambda$useItemOn$4",at=@At("RETURN"),require=1,remap=false)
     private void mineclientBridge$placementPacket(MutableObject<InteractionResult> result,LocalPlayer player,
             InteractionHand hand,BlockHitResult hit,int sequence,CallbackInfoReturnable<Packet<?>> cir){
-        ScopedPlacementDispatch.packet(cir.getReturnValue(),player,hand,hit,sequence);
+        ScopedPlacementDispatch.packet(cir.getReturnValue(),player,hand,hit,sequence);io.github.campione01.mineclientbridge.RecoveryMaintenancePlacementDispatch.packet(cir.getReturnValue(),player,hand,hit,sequence);
     }
 }

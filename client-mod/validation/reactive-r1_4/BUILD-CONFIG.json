@@ -1,0 +1,1089 @@
+{
+  "roots": {
+    "base": "mdc-native-blaze-escort-FROZEN-20261023-bc9e4c5d",
+    "build": "mdc-world-backup-r1-FROZEN-20261023-c69e5785",
+    "deployed": "mdc-native-reactive-defense-r1_2-FROZEN-20261025-f51c8791"
+  },
+  "compile_classpath": [
+    {
+      "root": "base",
+      "path": "deps/000-compile-only-original-at.jar"
+    },
+    {
+      "root": "deployed",
+      "path": "mineclient-bridge-C8-reactive-defense-test.1.2-20261025.jar"
+    },
+    {
+      "root": "build",
+      "path": "deps/minecraft-1.21.1-neoforge21.1.255-named-merged.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/001-gson-2.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/002-mineclient-bridge-C8-ordinary-boundary-v2-20261023.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/003-neoforge-21.1.255-client.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/004-fastutil-8.5.12.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/005-jopt-simple-5.0.4.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/006-client-1.21.1-20240808.144430-slim.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/007-client-1.21.1-20240808.144430-extra.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/008-client-1.21.1-20240808.144430-srg.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/009-JarJarFileSystems-0.4.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/010-coremods-7.0.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/011-mergetool-2.0.0-api.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/012-neoforge-21.1.255-universal.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/013-AutoRenamingTool-2.0.3-all.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/014-bus-8.0.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/015-loader-4.0.45.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/016-earlydisplay-4.0.45.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/017-srgutils-1.0.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/018-JarJarMetadata-0.4.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/019-accesstransformers-10.0.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/020-at-modlauncher-10.0.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/021-JarJarSelector-0.4.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/022-typetools-0.6.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/023-srgutils-0.4.15.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/024-SpecialSource-1.11.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/025-terminalconsoleappender-1.3.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/026-jna-platform-5.14.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/027-jna-5.14.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/028-sponge-mixin-0.16.4+mixin.0.8.7.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/029-commons-collections-3.2.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/030-ForgeWrapper-mmc7.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/031-netty-codec-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/032-netty-transport-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/033-netty-transport-classes-epoll-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/034-netty-buffer-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/035-netty-handler-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/036-netty-transport-native-epoll-4.1.97.Final-linux-aarch_64.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/037-netty-transport-native-epoll-4.1.97.Final-linux-x86_64.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/038-netty-common-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/039-netty-transport-native-unix-common-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/040-netty-resolver-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/041-commons-io-2.15.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/042-commons-logging-1.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/043-jorbis-0.0.17.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/044-nashorn-core-15.4.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/045-asm-util-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/046-asm-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/047-asm-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/048-asm-tree-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/049-asm-tree-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/050-asm-analysis-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/051-asm-analysis-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/052-asm-commons-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/053-asm-commons-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/054-plexus-utils-3.3.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/055-jline-reader-3.20.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/056-jline-terminal-3.20.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/057-joml-1.10.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/058-slf4j-api-2.0.9.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/059-checker-qual-3.33.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/081-lwjgl-freetype-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/061-lwjgl-freetype-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/074-lwjgl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/083-lwjgl-opengl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/071-lwjgl-glfw-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/065-lwjgl-glfw-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/066-lwjgl-stb-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/070-lwjgl-stb-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/068-lwjgl-tinyfd-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/077-lwjgl-tinyfd-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/070-lwjgl-stb-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/071-lwjgl-glfw-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/079-lwjgl-openal-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/073-lwjgl-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/074-lwjgl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/075-lwjgl-jemalloc-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/078-lwjgl-jemalloc-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/077-lwjgl-tinyfd-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/078-lwjgl-jemalloc-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/079-lwjgl-openal-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/080-lwjgl-openal-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/081-lwjgl-freetype-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/082-lwjgl-freetype-natives-macos-patch-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/083-lwjgl-opengl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/084-lwjgl-opengl-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/085-log4j-api-2.22.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/086-log4j-slf4j2-impl-2.22.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/087-log4j-core-2.22.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/088-maven-artifact-3.8.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/089-httpcore-4.4.16.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/090-httpclient-4.5.13.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/091-commons-text-1.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/092-commons-lang3-3.14.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/093-commons-lang3-3.8.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/094-commons-collections4-4.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/095-commons-compress-1.26.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/096-antlr4-runtime-4.13.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/097-lz4-java-1.8.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/098-securejarhandler-3.0.8.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/099-bootstraplauncher-2.0.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/100-modlauncher-11.0.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/101-commons-codec-1.16.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/102-fastcsv-2.0.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/103-oshi-core-6.4.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/104-listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/105-guava-20.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/106-guava-32.1.2-jre.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/107-failureaccess-1.0.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/108-gson-2.8.9.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/109-jsr305-3.0.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/110-error_prone_annotations-2.18.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/111-j2objc-annotations-2.8.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/112-icu4j-73.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/113-noexception-1.7.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/114-text2speech-1.17.9.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/115-patchy-2.2.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/116-minecraft-1.21.1-client.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/117-brigadier-1.3.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/118-logging-1.2.7.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/119-authlib-6.0.54.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/120-datafixerupper-8.0.16.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/121-blocklist-1.0.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/122-opencsv-4.4.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/123-core-3.8.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/124-toml-3.8.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/125-commons-beanutils-1.9.3.jar"
+    }
+  ],
+  "runtime_classpath": [
+    {
+      "root": "deployed",
+      "path": "mineclient-bridge-C8-reactive-defense-test.1.2-20261025.jar"
+    },
+    {
+      "root": "build",
+      "path": "deps/minecraft-1.21.1-neoforge21.1.255-named-merged.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/001-gson-2.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/002-mineclient-bridge-C8-ordinary-boundary-v2-20261023.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/003-neoforge-21.1.255-client.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/004-fastutil-8.5.12.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/005-jopt-simple-5.0.4.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/006-client-1.21.1-20240808.144430-slim.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/007-client-1.21.1-20240808.144430-extra.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/008-client-1.21.1-20240808.144430-srg.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/009-JarJarFileSystems-0.4.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/010-coremods-7.0.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/011-mergetool-2.0.0-api.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/012-neoforge-21.1.255-universal.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/013-AutoRenamingTool-2.0.3-all.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/014-bus-8.0.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/015-loader-4.0.45.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/016-earlydisplay-4.0.45.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/017-srgutils-1.0.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/018-JarJarMetadata-0.4.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/019-accesstransformers-10.0.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/020-at-modlauncher-10.0.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/021-JarJarSelector-0.4.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/022-typetools-0.6.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/023-srgutils-0.4.15.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/024-SpecialSource-1.11.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/025-terminalconsoleappender-1.3.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/026-jna-platform-5.14.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/027-jna-5.14.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/028-sponge-mixin-0.16.4+mixin.0.8.7.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/029-commons-collections-3.2.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/030-ForgeWrapper-mmc7.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/031-netty-codec-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/032-netty-transport-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/033-netty-transport-classes-epoll-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/034-netty-buffer-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/035-netty-handler-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/036-netty-transport-native-epoll-4.1.97.Final-linux-aarch_64.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/037-netty-transport-native-epoll-4.1.97.Final-linux-x86_64.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/038-netty-common-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/039-netty-transport-native-unix-common-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/040-netty-resolver-4.1.97.Final.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/041-commons-io-2.15.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/042-commons-logging-1.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/043-jorbis-0.0.17.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/044-nashorn-core-15.4.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/045-asm-util-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/046-asm-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/047-asm-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/048-asm-tree-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/049-asm-tree-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/050-asm-analysis-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/051-asm-analysis-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/052-asm-commons-9.10.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/053-asm-commons-9.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/054-plexus-utils-3.3.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/055-jline-reader-3.20.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/056-jline-terminal-3.20.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/057-joml-1.10.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/058-slf4j-api-2.0.9.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/059-checker-qual-3.33.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/081-lwjgl-freetype-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/061-lwjgl-freetype-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/074-lwjgl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/083-lwjgl-opengl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/071-lwjgl-glfw-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/065-lwjgl-glfw-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/066-lwjgl-stb-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/070-lwjgl-stb-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/068-lwjgl-tinyfd-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/077-lwjgl-tinyfd-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/070-lwjgl-stb-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/071-lwjgl-glfw-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/079-lwjgl-openal-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/073-lwjgl-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/074-lwjgl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/075-lwjgl-jemalloc-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/078-lwjgl-jemalloc-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/077-lwjgl-tinyfd-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/078-lwjgl-jemalloc-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/079-lwjgl-openal-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/080-lwjgl-openal-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/081-lwjgl-freetype-natives-linux-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/082-lwjgl-freetype-natives-macos-patch-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/083-lwjgl-opengl-3.3.3-natives-linux.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/084-lwjgl-opengl-3.3.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/085-log4j-api-2.22.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/086-log4j-slf4j2-impl-2.22.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/087-log4j-core-2.22.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/088-maven-artifact-3.8.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/089-httpcore-4.4.16.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/090-httpclient-4.5.13.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/091-commons-text-1.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/092-commons-lang3-3.14.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/093-commons-lang3-3.8.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/094-commons-collections4-4.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/095-commons-compress-1.26.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/096-antlr4-runtime-4.13.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/097-lz4-java-1.8.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/098-securejarhandler-3.0.8.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/099-bootstraplauncher-2.0.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/100-modlauncher-11.0.5.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/101-commons-codec-1.16.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/102-fastcsv-2.0.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/103-oshi-core-6.4.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/104-listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/105-guava-20.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/106-guava-32.1.2-jre.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/107-failureaccess-1.0.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/108-gson-2.8.9.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/109-jsr305-3.0.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/110-error_prone_annotations-2.18.0.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/111-j2objc-annotations-2.8.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/112-icu4j-73.2.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/113-noexception-1.7.1.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/114-text2speech-1.17.9.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/115-patchy-2.2.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/116-minecraft-1.21.1-client.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/117-brigadier-1.3.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/118-logging-1.2.7.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/119-authlib-6.0.54.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/120-datafixerupper-8.0.16.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/121-blocklist-1.0.10.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/122-opencsv-4.4.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/123-core-3.8.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/124-toml-3.8.3.jar"
+    },
+    {
+      "root": "base",
+      "path": "deps/125-commons-beanutils-1.9.3.jar"
+    }
+  ],
+  "base_jar": {
+    "root": "deployed",
+    "path": "mineclient-bridge-C8-reactive-defense-test.1.2-20261025.jar",
+    "sha256": "f51c879146bec1050fc9335f37d76a79c806dd3474f5a47aea9f2cc27760bed1"
+  },
+  "allowed_families": [
+    "NativeReactiveGuard",
+    "NativeReactiveDefense",
+    "ReactiveDefensePolicy",
+    "ReactivePhysicalRelease"
+  ],
+  "java_tests": [
+    {
+      "class": "AdmissionBoundaryChecks"
+    },
+    {
+      "class": "ReactiveTerminalCleanupChecks",
+      "source_args": [
+        "native-src/io/github/campione01/mineclientbridge/ClientActions.java"
+      ]
+    },
+    {
+      "class": "ReactiveDefenseChecks"
+    },
+    {
+      "class": "ReactiveGuardDispatchChecks",
+      "source_args": [
+        "native-src/io/github/campione01/mineclientbridge/ClientActions.java",
+        "native-src/io/github/campione01/mineclientbridge/NativeReactiveGuard.java"
+      ]
+    },
+    {
+      "class": "ReactiveLocalPlannerChecks"
+    },
+    {
+      "class": "ReactiveRespawnLifecycleChecks",
+      "source_args": [
+        "native-src/io/github/campione01/mineclientbridge/NativeReactiveGuard.java"
+      ]
+    },
+    {
+      "class": "PhantomDefenseChecks",
+      "source_args": [
+        "native-src/io/github/campione01/mineclientbridge/NativeReactiveDefense.java",
+        "prepare-defense-test-request.py"
+      ]
+    },
+    {
+      "class": "ReactiveDirectReleaseChecks",
+      "source_args": [
+        "native-src/io/github/campione01/mineclientbridge/NativeReactiveGuard.java"
+      ]
+    }
+  ],
+  "python_tests": [
+    "test_prepare_defense_test_request.py"
+  ],
+  "jar": "mineclient-bridge-C8-reactive-defense-test.1.4-20261025.jar"
+}

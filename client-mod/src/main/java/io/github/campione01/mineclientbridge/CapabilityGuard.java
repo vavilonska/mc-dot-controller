@@ -19,10 +19,13 @@ final class CapabilityGuard {
     private final net.minecraft.world.inventory.AbstractContainerMenu capturedMenu;
     private final int selected;
     private final long sourceNano,sourceTick;
+    private final JsonObject sourceClock;
     private boolean activeSelection;
     private float bestHealth;
     private CapabilityGuard(Minecraft mc,ClientActionRequest request,long nano,long tick) {
         this.request=request;player=mc.player;level=mc.level;sourceNano=nano;sourceTick=tick;capturedMenu=player.containerMenu;bestHealth=player.getHealth();
+        JsonObject spec=request.original().getAsJsonObject("capability_guard");
+        sourceClock=spec.get("schema_version").getAsInt()==2?spec.getAsJsonObject("source_clock").deepCopy():null;
         selected=request.hotbarSlot()>=0?request.hotbarSlot():player.getInventory().selected;
         held=player.getInventory().getItem(selected).copy();
     }
@@ -40,9 +43,19 @@ final class CapabilityGuard {
         }
         ClientActionRequest.require(b.get("capability_guard").isJsonObject(),"invalid_capability_guard");
         JsonObject g=b.getAsJsonObject("capability_guard");
-        ClientActionRequest.require(g.keySet().equals(Set.of("schema_version","source_tick","source_nano"))
-                && ClientActionRequest.integer(g,"schema_version",-1)==1,"invalid_capability_guard");
-        parseNano(g);parseTick(g);
+        int schema=ClientActionRequest.integer(g,"schema_version",-1);
+        if(schema==1) {
+            ClientActionRequest.require(g.keySet().equals(Set.of("schema_version","source_tick","source_nano")),"invalid_capability_guard");
+            parseTick(g);
+        } else if(schema==2) {
+            ClientActionRequest.require(g.keySet().equals(Set.of("schema_version","source_clock","source_nano"))
+                    && g.get("source_clock").isJsonObject(),"invalid_capability_guard");
+            // This additive ordinary profile does not change any existing scoped protocol.
+            ClientActionRequest.require(Set.of("break_block","follow_path").contains(r.action())
+                    && !b.has("capability_route") && !b.has("capability_descent")
+                    && !b.has("encounter_route_guard"),"monotonic_guard_ordinary_action_required");
+        } else throw new ClientActionRequest.Rejected(400,"invalid_capability_guard");
+        parseNano(g);
         for(String key:Set.of("expected_world_generation","expected_player_uuid","expected_action_session","expected_dimension"))
             ClientActionRequest.require(!ClientActionRequest.string(b,key).isBlank(),"capability_identity_required");
         ClientActionRequest.require(r.timeoutMs()>0 && r.timeoutMs()<=60000,"capability_finite_deadline_required");
@@ -80,7 +93,7 @@ final class CapabilityGuard {
         if(!requested(r.original()))return null;
         validate(r);
         var spec=r.original().getAsJsonObject("capability_guard");
-        CapabilityGuard guard=new CapabilityGuard(mc,r,parseNano(spec),parseTick(spec));
+        CapabilityGuard guard=new CapabilityGuard(mc,r,parseNano(spec),spec.get("schema_version").getAsInt()==1?parseTick(spec):0);
         guard.requireFresh(mc,"guard_start");
         String denied=guard.check(mc,false);
         if(denied!=null)throw new ClientActionRequest.Rejected(409,denied);
@@ -90,7 +103,31 @@ final class CapabilityGuard {
     }
     void activate(){activeSelection=true;}
     void requireFresh(Minecraft mc,String phase) {
-        requireFresh(sourceNano,sourceTick,System.nanoTime(),mc.level.getGameTime(),phase);
+        if(sourceClock==null)requireFresh(sourceNano,sourceTick,System.nanoTime(),mc.level.getGameTime(),phase);
+        else {
+            try {requireMonotonicFresh(sourceClock,sourceNano,ObservationClockBridge.sample(),System.nanoTime(),phase);}
+            catch(ObservationClientClock.Unavailable unavailable) {
+                throw new ClientActionRequest.Rejected(409,"capability_clock_"+unavailable.reason);
+            }
+        }
+    }
+    /** Original sample and limits, but no dependency on server-synchronized world gameTime. */
+    static void requireMonotonicFresh(JsonObject sourceClock,long sourceNano,
+            ObservationClientClock.Stamp current,long currentNano,String phase) {
+        final long sourceCount;
+        try {sourceCount=ObservationClientClock.wireCount(sourceClock,current);}
+        catch(ObservationClientClock.Unavailable unavailable) {
+            throw new ClientActionRequest.Rejected(409,"capability_clock_"+unavailable.reason);
+        } catch(RuntimeException malformed) {
+            throw new ClientActionRequest.Rejected(400,"invalid_capability_source_clock");
+        }
+        try {requireFresh(sourceNano,sourceCount,currentNano,current.count(),phase);}
+        catch(ClientActionRequest.Rejected expired) {
+            JsonObject evidence=expired.capabilitySourceFreshness.deepCopy();
+            evidence.addProperty("schema_version",2);evidence.addProperty("clock_contract",ObservationClientClock.CONTRACT);
+            evidence.addProperty("clock_generation",current.generation());
+            throw new ClientActionRequest.Rejected(expired.httpStatus,expired.getMessage(),evidence);
+        }
     }
     static void requireFresh(long sourceNano,long sourceTick,long currentNano,long tick,String phase) {
         long elapsed=currentNano-sourceNano;

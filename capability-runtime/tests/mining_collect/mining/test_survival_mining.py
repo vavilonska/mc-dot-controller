@@ -11,7 +11,7 @@ from mdc_toolbox.catalog import CapabilityCatalog
 from .mining_fixture import mining_fixture
 from .test_mining_chain import PublicMiningChainTests
 
-LOGS=('oak','spruce','birch','jungle','acacia','dark_oak')
+LOGS=('oak','spruce','birch','jungle','acacia','dark_oak','mangrove')
 
 def fixture(block='minecraft:jungle_log',properties=None):
     old=mining_fixture();intent=deepcopy(old[3]);intent['expected_block_id']=block
@@ -34,7 +34,7 @@ class SurvivalVocabularyTests(unittest.TestCase):
         for ore in ('iron_ore','deepslate_iron_ore'):
             validate_scoped_witness(*fixture('minecraft:'+ore))
     def test_natural_context_exact_leaves_plants_and_vines(self):
-        cases=[('minecraft:'+kind+'_leaves','LeavesBlock',{'distance':'3','persistent':'false','waterlogged':'false'},True) for kind in LOGS]
+        cases=[('minecraft:'+kind+'_leaves','MangroveLeavesBlock' if kind=='mangrove' else 'LeavesBlock',{'distance':'3','persistent':'false','waterlogged':'false'},True) for kind in LOGS]
         cases += [('minecraft:short_grass','TallGrassBlock',{},False),('minecraft:fern','TallGrassBlock',{},False),
                   ('minecraft:tall_grass','DoublePlantBlock',{'half':'lower'},False),('minecraft:large_fern','DoublePlantBlock',{'half':'upper'},False),
                   ('minecraft:poppy','FlowerBlock',{},False),('minecraft:vine','VineBlock',dict.fromkeys(('up','north','south','east','west'),'false'),False),
@@ -76,6 +76,15 @@ class SurvivalVocabularyTests(unittest.TestCase):
                                     ('minecraft:short_grass','TallGrassBlock',{},True)]:
             d=fixture();cell(d,(1,65,1),block,cls,props,full)
             with self.assertRaises(ValueError):validate_scoped_witness(*d)
+    def test_mangrove_exact_class_dry_context_and_no_leaf_support(self):
+        props={'distance':'3','persistent':'false','waterlogged':'false'}
+        d=fixture('minecraft:mangrove_log');cell(d,(1,65,1),'minecraft:mangrove_leaves','MangroveLeavesBlock',props);validate_scoped_witness(*d)
+        for xyz,cls,p in [((1,65,1),'LeavesBlock',props),((1,65,1),'MangroveLeavesBlock',{**props,'waterlogged':'true'}),((0,63,0),'MangroveLeavesBlock',props),((0,64,0),'MangroveLeavesBlock',props)]:
+            d=fixture('minecraft:mangrove_log');cell(d,xyz,'minecraft:mangrove_leaves',cls,p)
+            with self.subTest(xyz=xyz,cls=cls,p=p),self.assertRaises(ValueError):validate_scoped_witness(*d)
+        for name in ('mangrove_roots','muddy_mangrove_roots','mangrove_propagule'):
+            self.assertNotIn('minecraft:'+name,mining_snapshot.STATIC)
+            self.assertNotIn('minecraft:'+name,scoped_mining.BLOCKS)
     def test_placement_vocabulary_remains_original(self):
         self.assertEqual(set(scoped_placement.BLOCKS),set(scoped_mining.LEGACY_BLOCKS))
         self.assertEqual(placement_snapshot.BLOCKS,mining_snapshot.LEGACY_BLOCKS)
@@ -111,6 +120,11 @@ class SurvivalPublicChainTests(PublicMiningChainTests):
         posts=[body for path,body in self.bridge.posts if path=='/control/scoped-action']
         self.assertEqual(len(posts),1);self.assertEqual(posts[0]['intent']['expected_block_properties'],{'axis':'y'})
         self.assertFalse(self.bridge.terrain_responses);self.assertEqual(result['cleanup_certainty'],'confirmed')
+    def test_mangrove_log_crosses_actual_public_owner_chain(self):
+        args={'target':{'x':2,'y':64,'z':0},'expected_block_id':'minecraft:mangrove_log','expected_block_properties':{'axis':'z'}}
+        result=self.finish_job(self.submit(args));self.assertEqual(result['state'],'succeeded',(self.bridge.fixture_error,result))
+        posts=[b for p,b in self.bridge.posts if p=='/control/scoped-action'];self.assertEqual(len(posts),1)
+        self.assertEqual(posts[0]['intent']['expected_block_properties'],{'axis':'z'});self.assertEqual(result['cleanup_certainty'],'confirmed')
     def test_iron_crosses_actual_public_owner_chain(self):
         args={'target':{'x':2,'y':64,'z':0},'expected_block_id':'minecraft:iron_ore','expected_block_properties':{}}
         result=self.finish_job(self.submit(args));self.assertEqual(result['state'],'succeeded',(self.bridge.fixture_error,result))

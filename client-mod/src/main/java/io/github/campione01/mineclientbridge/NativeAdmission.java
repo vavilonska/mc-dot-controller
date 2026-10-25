@@ -11,6 +11,7 @@ final class NativeAdmission {
     enum Stage { VALIDATION, HOOKS_POSSIBLE, INPUT_TRANSFER, REGISTERED }
     private static final ThreadLocal<NativeAdmission> CURRENT = new ThreadLocal<>();
     private Stage stage = Stage.VALIDATION;
+    private boolean ordinaryStartEntered, reentryObserved;
     private final JsonObject binding;
     NativeAdmission(JsonObject envelope, boolean scoped, String actionSession) {
         binding = new JsonObject();
@@ -28,19 +29,27 @@ final class NativeAdmission {
     }
     static JsonObject run(JsonObject envelope, boolean scoped, String actionSession, Callable<JsonObject> call) throws Exception {
         NativeAdmission previous = CURRENT.get();
-        if(previous != null) { previous.advance(Stage.HOOKS_POSSIBLE); throw new ClientActionRequest.Rejected(409,"native_admission_reentry"); }
+        if(previous != null) { previous.reentryObserved=true; previous.advance(Stage.HOOKS_POSSIBLE); throw new ClientActionRequest.Rejected(409,"native_admission_reentry"); }
         NativeAdmission admission = new NativeAdmission(envelope,scoped,actionSession);
         CURRENT.set(admission);
         try { return call.call(); }
         catch(ClientActionRequest.Rejected failure) { throw failure.withNativeAdmission(admission.proof(failure.getMessage())); }
         finally { CURRENT.remove(); }
     }
+    static void ordinaryStartEntered() { NativeAdmission current=CURRENT.get(); if(current!=null)current.ordinaryStartEntered=true; }
     static void mark(Stage stage) { NativeAdmission current=CURRENT.get(); if(current!=null)current.advance(stage); }
     void advance(Stage stage) { if(stage.ordinal()>this.stage.ordinal())this.stage=stage; }
     JsonObject proof(String reason) {
         JsonObject proof=binding.deepCopy();
         proof.addProperty("stage",stage.name().toLowerCase(Locale.ROOT));
         proof.addProperty("reason",reason);
+        // Additive per-request admission boundary evidence; not a global no-world-effects claim.
+        // Kept separate from legacy conservative stage/effects_none_proven semantics.
+        proof.addProperty("boundary_schema_version",2);
+        proof.addProperty("ordinary_start_entered",ordinaryStartEntered);
+        proof.addProperty("input_transfer_entered",stage.ordinal()>=Stage.INPUT_TRANSFER.ordinal());
+        proof.addProperty("registration_entered",stage.ordinal()>=Stage.REGISTERED.ordinal());
+        proof.addProperty("reentry_observed",reentryObserved);
         proof.addProperty("effects_none_proven",stage==Stage.VALIDATION);
         proof.addProperty("dispatch_authority",false);
         proof.addProperty("retry_authority",false);

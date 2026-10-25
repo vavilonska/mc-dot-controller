@@ -96,6 +96,34 @@ class QueueClient:
         path = self.root / 'results' / (request_id + '.json')
         return read_json(path, 2 * 1024 * 1024) if path.exists() else None
 
+    def survey_result(self, request_id, command, session_id):
+        # Capacity is selected exclusively from the captured original read, never
+        # from a field in the file being read. Ordinary/action result() stays 2MiB.
+        from .survey_result import command_binding, validate, MAX_BYTES
+        command_binding(command)
+        if not isinstance(request_id, str) or not ID.fullmatch(request_id):
+            raise ValueError('invalid_request_id')
+        path = self.root / 'results' / (request_id + '.json')
+        if not path.exists():
+            return None
+        with path.open('rb') as stream:
+            raw = stream.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            raise ValueError('mailbox_file_too_large')
+        def pairs(items):
+            value = {}
+            for key, item in items:
+                if key in value:
+                    raise ValueError('survey_result_duplicate_key')
+                value[key] = item
+            return value
+        try:
+            value = json.loads(raw, object_pairs_hook=pairs,
+                               parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite_json')))
+        except (RecursionError, UnicodeError) as exc:
+            raise ValueError('survey_result_invalid_json') from exc
+        return validate(value, command, request_id, session_id)
+
     def wait(self, request_id, timeout=30):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:

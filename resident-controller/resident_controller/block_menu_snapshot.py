@@ -12,6 +12,10 @@ FAMILIES = {'minecraft:crafting_table': ('CraftingMenu', '', set()),
 STATIC_IDS = set(FAMILIES) | {'minecraft:' + v for v in ('air','cave_air','void_air','stone',
     'cobblestone','dirt','grass_block','smooth_stone','stone_bricks','bedrock',
     'oak_planks','spruce_planks','birch_planks')}
+LOG_IDS = {'minecraft:' + prefix + species + suffix
+    for species in ('oak','spruce','birch','jungle','acacia','dark_oak','mangrove','cherry')
+    for prefix in ('','stripped_') for suffix in ('_log','_wood')}
+STATIC_IDS |= LOG_IDS
 FACES = {'down': (0,-1,0), 'up': (0,1,0), 'north': (0,0,-1), 'south': (0,0,1), 'west': (-1,0,0), 'east': (1,0,0)}
 
 def require(ok, reason):
@@ -70,6 +74,9 @@ def cell(v):
         for box in v[key]:
             if type(box) is not list or len(box) != 6 or not all(number(n) and 0 <= n <= 1 for n in box) or not all(box[i] < box[i+3] for i in range(3)):
                 return False
+    if v['id'] in LOG_IDS:
+        return (set(v['properties']) == {'axis'} and v['properties']['axis'] in ('x','y','z')
+            and v['collision'] == [[0,0,0,1,1,1]] and v['outline'] == [[0,0,0,1,1,1]])
     return True
 
 def validate(value, native, intent):

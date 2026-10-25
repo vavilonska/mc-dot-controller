@@ -184,6 +184,7 @@ class BridgeError(RuntimeError):
                  route_threat_rejection=None, route_threat_rejection_status=None,
                  native_admission=None, native_admission_status=None,
                  native_entity_rejection=None, native_entity_rejection_status=None,
+                 block_menu_geometry_rejection=None, block_menu_geometry_rejection_status=None,
                  compact_observation_diagnostic=None, compact_observation_diagnostic_status=None,
                  fall_rescue_refusal=None):
         super().__init__(code)
@@ -200,6 +201,8 @@ class BridgeError(RuntimeError):
         self.native_admission_status = native_admission_status
         self.native_entity_rejection = deepcopy(native_entity_rejection)
         self.native_entity_rejection_status = native_entity_rejection_status
+        self.block_menu_geometry_rejection = deepcopy(block_menu_geometry_rejection)
+        self.block_menu_geometry_rejection_status = block_menu_geometry_rejection_status
         self.compact_observation_diagnostic = deepcopy(compact_observation_diagnostic)
         self.compact_observation_diagnostic_status = compact_observation_diagnostic_status
         self.fall_rescue_refusal = deepcopy(fall_rescue_refusal)
@@ -387,6 +390,7 @@ class Bridge:
                 route_threat_rejection = None
                 native_admission = native_entity_rejection = None
                 native_admission_status = native_entity_rejection_status = None
+                menu_geometry = menu_geometry_status = None
                 compact_diagnostic = compact_diagnostic_status = None
                 fall_refusal = None
                 try:
@@ -411,6 +415,11 @@ class Bridge:
                             valid = validate_admission(value['native_admission'], body, code)
                             native_admission_status = 'reported' if valid else 'invalid'
                             if valid: native_admission = deepcopy(value['native_admission'])
+                        if 'block_menu_geometry_rejection' in value:
+                            from .block_menu_geometry_diagnostic import valid as valid_menu_geometry, CODE as menu_geometry_code
+                            valid = response.status == 409 and code == menu_geometry_code and valid_menu_geometry(value['block_menu_geometry_rejection'])
+                            menu_geometry_status = 'reported' if valid else 'invalid'
+                            if valid: menu_geometry = deepcopy(value['block_menu_geometry_rejection'])
                         if 'native_entity_rejection' in value:
                             valid = entity_diagnostic(value['native_entity_rejection'], code)
                             native_entity_rejection_status = 'reported' if valid else 'invalid'
@@ -462,6 +471,7 @@ class Bridge:
                                   route_threat_rejection_status=self.last_response_metadata.get('route_threat_rejection_status'),
                                   native_admission=native_admission, native_admission_status=native_admission_status,
                                   native_entity_rejection=native_entity_rejection, native_entity_rejection_status=native_entity_rejection_status,
+                                  block_menu_geometry_rejection=menu_geometry, block_menu_geometry_rejection_status=menu_geometry_status,
                                   compact_observation_diagnostic=compact_diagnostic, compact_observation_diagnostic_status=compact_diagnostic_status,
                                   fall_rescue_refusal=fall_refusal,
                                   uncertain=method == 'POST' and response.status >= 500)

@@ -16,9 +16,9 @@ public final class ScopedCollectPolicyFiniteTest {
         checks++;
     }
     public static void main(String[] args){
-        var expected=java.util.Set.of("minecraft:stone","minecraft:cobblestone","minecraft:dirt","minecraft:coal","minecraft:stick","minecraft:iron_nugget","minecraft:oak_log","minecraft:spruce_log","minecraft:birch_log","minecraft:jungle_log","minecraft:acacia_log","minecraft:dark_oak_log","minecraft:oak_planks","minecraft:spruce_planks","minecraft:birch_planks","minecraft:jungle_planks","minecraft:acacia_planks","minecraft:dark_oak_planks","minecraft:raw_iron","minecraft:charcoal","minecraft:crafting_table","minecraft:furnace","minecraft:apple","minecraft:bread","minecraft:beef","minecraft:cooked_beef","minecraft:porkchop","minecraft:cooked_porkchop","minecraft:chicken","minecraft:cooked_chicken","minecraft:mutton","minecraft:cooked_mutton","minecraft:baked_potato");
+        var expected=java.util.Set.of("minecraft:stone","minecraft:cobblestone","minecraft:dirt","minecraft:coal","minecraft:stick","minecraft:iron_nugget","minecraft:oak_log","minecraft:spruce_log","minecraft:birch_log","minecraft:jungle_log","minecraft:acacia_log","minecraft:dark_oak_log","minecraft:mangrove_log","minecraft:oak_planks","minecraft:spruce_planks","minecraft:birch_planks","minecraft:jungle_planks","minecraft:acacia_planks","minecraft:dark_oak_planks","minecraft:mangrove_planks","minecraft:raw_iron","minecraft:charcoal","minecraft:crafting_table","minecraft:furnace","minecraft:apple","minecraft:bread","minecraft:beef","minecraft:cooked_beef","minecraft:porkchop","minecraft:cooked_porkchop","minecraft:chicken","minecraft:cooked_chicken","minecraft:mutton","minecraft:cooked_mutton","minecraft:baked_potato");
         if(!ScopedCollectTarget.ITEMS.equals(expected))throw new AssertionError("finite collect vocabulary drift");checks++;
-        for(String denied:List.of("minecraft:diamond","minecraft:mangrove_log","minecraft:carrot","minecraft:potato",
+        for(String denied:List.of("minecraft:diamond","minecraft:mangrove_roots","minecraft:carrot","minecraft:potato",
                 "minecraft:potion","minecraft:bucket","minecraft:iron_pickaxe","mod:bread")) {
             if(ScopedCollectTarget.ITEMS.contains(denied))throw new AssertionError("unsupported item admitted "+denied);checks++;
         }

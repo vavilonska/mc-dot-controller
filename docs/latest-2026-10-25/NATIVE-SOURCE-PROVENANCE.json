@@ -1,0 +1,116 @@
+{
+  "scope": "C8 source plus audited native overlays; resources unchanged from C8",
+  "installed_jar_sha256": "29141caad50641cdcfc9826a138ff30b2cfd7c555e24ce726fd03abbe366b68e",
+  "final_overlays": [
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ActionRegistry.java",
+      "source_package": "mdc-world-backup-r1_2-FROZEN-20261023-eb6a61f0",
+      "sha256": "a8a1a0a758ba4e06e66413c5ba77a70fb9fd70ea8b8a06ca70a84a7b0917762f"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BackupSaveValidation.java",
+      "source_package": "mdc-world-backup-r1-FROZEN-20261023-c69e5785",
+      "sha256": "88a4f9ed00cd47cc4c50eed32f030985f329631193bcb5d19cd3be612cb88e42"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BackupStageFiles.java",
+      "source_package": "mdc-world-backup-r1-FROZEN-20261023-c69e5785",
+      "sha256": "3c9987cf3762da02112008da1c66f2d5899bfba95ba07acba51c5bc8ee4f20ae"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BlazeEscortPolicy.java",
+      "source_package": "mdc-native-blaze-escort-r6_1-FROZEN-20261023-b19cbae5",
+      "sha256": "153133c490de2c33fbd4385e3441de18ec567dd2d72caa3f523044199440fa0b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/BridgeServer.java",
+      "source_package": "mdc-native-reactive-defense-r1-FROZEN-20261024-5dc81dd1",
+      "sha256": "09ff4fea399d768148157a13c4b754e6d5d1217d40fa72f83347c1edfb0de5cd"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/CapabilityGuard.java",
+      "source_package": "ordinary-monotonic-schema2",
+      "sha256": "9dc112555c8245983541905fc8026ef0382b2a3780e9db0c1c75ca18ae03d13b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActionRequest.java",
+      "source_package": "mdc-native-reactive-defense-r1-FROZEN-20261024-5dc81dd1",
+      "sha256": "b2a283be73bcedd0ddff5b52892f6331aa3f248e0ff78f96c846eb6af5222658"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ClientActions.java",
+      "source_package": "mdc-native-reactive-defense-r1_4-FROZEN-20261025-29141caa",
+      "sha256": "cc415f794f3f50fa51e80338415bbd5423e529a30c7d4386ed1a69c45be6ef4e"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/EndermanShelterPolicy.java",
+      "source_package": "mdc-native-enderman-shelter-r1-FROZEN-20261024-32b878b2",
+      "sha256": "6f6602db782d7b800907e66fc918e9e6eb395adf9dd61a343664f946f6d13a74"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeAdmission.java",
+      "source_package": "mdc-ordinary-admission-recovery-20261023",
+      "sha256": "ea0ebc7ac9f2ae0c28b367db2b406daa985848686148cefaca2487f436b845fb"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeBlazeEscort.java",
+      "source_package": "mdc-native-escort-husk-r1-FROZEN-20261024-38e548a0",
+      "sha256": "149c61739b17e0cfad03071fc1101b30b310a242f51c731fda6925b7ecaa4c30"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativePortalHandoff.java",
+      "source_package": "mdc-native-blaze-escort-r6_1-FROZEN-20261023-b19cbae5",
+      "sha256": "b8977c1350ae1a29433386f7074e2347903ac809c94dd155d2d6d81db4e59154"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeReactiveDefense.java",
+      "source_package": "mdc-native-reactive-defense-r1_4-FROZEN-20261025-29141caa",
+      "sha256": "349f5b325abd3f37fa95c7d957fea13cbb19955ba7ba7db4b13583360b6aa990"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeReactiveGuard.java",
+      "source_package": "mdc-native-reactive-defense-r1_4-FROZEN-20261025-29141caa",
+      "sha256": "6eda772003d9dc910a69c376a389c4d47ad44653dcd2aa790b036143d5d9ca26"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeShelteredEnderman.java",
+      "source_package": "mdc-native-enderman-shelter-r1-FROZEN-20261024-32b878b2",
+      "sha256": "0f2f1ab3aeeffa0a1584165c908642c6bfa7241f17c1581bd46ee1019022598b"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeThreatObservation.java",
+      "source_package": "mdc-native-blaze-escort-r6_1-FROZEN-20261023-b19cbae5",
+      "sha256": "cc39f0b2518f8e55ace09ff8d1090432d8382c1a751fbd48be384521b67828cd"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/NativeWorldBackup.java",
+      "source_package": "mdc-world-backup-r1_2-FROZEN-20261023-eb6a61f0",
+      "sha256": "fe218e1585e1f8bf63799cfd4455a68fa29928ab0772a9b1981c30fc71d58613"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ObservationClockBridge.java",
+      "source_package": "ordinary-monotonic-schema2",
+      "sha256": "9013b0efbb046cc7e702eb05b0bae34ffe996f284d2631a4ac344262dc48fbe2"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ReactiveDefensePolicy.java",
+      "source_package": "mdc-native-reactive-defense-r1_4-FROZEN-20261025-29141caa",
+      "sha256": "671050cc2cf9034bfe35acce1e7a7415c9017b4067129b9d6176a9b5d90a6f52"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ReactiveGuardDispatch.java",
+      "source_package": "mdc-native-reactive-defense-r1-FROZEN-20261024-5dc81dd1",
+      "sha256": "375963f287a69ad6d1b86c8ea5706aa173cf510447ee72af20fc366c94757010"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ReactiveLocalPlanner.java",
+      "source_package": "mdc-native-reactive-defense-r1-FROZEN-20261024-5dc81dd1",
+      "sha256": "1d0cfaffee093e7608cf792b28e26e9b1b5d776a9a8b42a0c5a4718d087f5a45"
+    },
+    {
+      "path": "client-mod/src/main/java/io/github/campione01/mineclientbridge/ReactivePhysicalRelease.java",
+      "source_package": "mdc-native-reactive-defense-r1_4-FROZEN-20261025-29141caa",
+      "sha256": "a37ca33297c3c988e9579c8bb7c6f2f7dcb91ba7890b4a8626ad38e9e0bc90ff"
+    }
+  ]
+}

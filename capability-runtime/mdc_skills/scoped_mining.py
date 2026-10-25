@@ -9,7 +9,7 @@ LEGACY_BLOCKS = ('minecraft:stone', 'minecraft:cobblestone', 'minecraft:dirt', '
           'minecraft:granite', 'minecraft:diorite', 'minecraft:smooth_stone', 'minecraft:stone_bricks',
           'minecraft:bricks', 'minecraft:oak_planks', 'minecraft:spruce_planks', 'minecraft:birch_planks')
 LOGS = tuple('minecraft:' + name + '_log' for name in
-             ('oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak'))
+             ('oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove'))
 ORES = ('minecraft:iron_ore', 'minecraft:deepslate_iron_ore')
 BLOCKS = LEGACY_BLOCKS + LOGS + ORES
 
