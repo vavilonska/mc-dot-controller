@@ -11,6 +11,12 @@
 - 这些是离线编译、源码与字节一致性、模拟上下文/实际生产谓词测试。**不是完整 Gradle/NeoForge loader 测试，也不等于新实机验收。**最初仅用 r1.4 局部编译 classpath 编译全树时出现 22 个既有 access-transformer 可见性错误；应用原项目全部、未改变的 AT 规则后全量编译通过。临时可见性 overlay 未进入模组。
 - Python/Node 分组件结果、原失败与排除项见 [VALIDATION.json](VALIDATION.json)。不存在“全仓测试全绿”声明。
 
+## 聚合检查终态（2026-10-25 20:30 UTC）
+
+原始源码已在 `2b839b886f24aba65001e7256520d9bf3f0aea2a` 保存，其三语言 CodeQL 成功。随后原聚合检查自然结束：15 个组件中 14 个通过；`capability-runtime` 的 1,712 项测试记录 **22 failures、5 errors、87 skips**，所以总结果失败。27 条失败/错误诊断中仅 3 条直接对应缺失 fixture/Java 测试配置，其余包括准入/陈旧观测/清理、runtime unavailable、非战斗 watchdog、catalog 重复绑定、运行账本记录和历史源码断言等；本次不把它们都归因于环境或缺样本，也未为取得绿灯修改生产实现。
+
+后续聚合 Node portable 171/171、framing 9/9 和平台 synthetic self-test 通过；此前单独 `npm test` 与串行重试的非通过结果仍保留。具体各组件、失败分类及范围见 `VALIDATION.json`。此补充仅更新验证记录，不改变已核对的生产源码/JAR 配对。
+
 ## 相比上次 GitHub 保存新增的范围
 
 上次 main 是 `39799603de3372ec30a917a09382684d3593566c`（Recovery 2.5）。本次保留其全部远端文件/历史文档，不用较旧本地 README 覆盖已公开的限定结论。

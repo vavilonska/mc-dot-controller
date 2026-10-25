@@ -296,10 +296,160 @@
     }
   ],
   "python_node_aggregate": {
-    "status": "RUNNING",
-    "started_utc": "2026-10-25T19:48:48Z",
+    "status": "COMPLETED",
+    "exit_code": 1,
     "command": "python3 capability-runtime/run_checks.py",
-    "full_suite_green": false
+    "full_suite_green": false,
+    "started_utc": "2026-10-25T19:48:48.814133+00:00",
+    "scope": "offline only",
+    "components": [
+      {
+        "component": "toolbox-doc-examples",
+        "exit_code": 0,
+        "summary": []
+      },
+      {
+        "component": "toolbox-package-integrity",
+        "exit_code": 0,
+        "summary": [
+          "Ran 4 tests in 0.007s",
+          "OK"
+        ]
+      },
+      {
+        "component": "capability-runtime",
+        "exit_code": 1,
+        "summary": [
+          "Ran 1712 tests in 2358.434s",
+          "FAILED (failures=22, errors=5, skipped=87)"
+        ]
+      },
+      {
+        "component": "resident-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 461 tests in 10.831s",
+          "OK (skipped=2)"
+        ]
+      },
+      {
+        "component": "navigation-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 254 tests in 4.251s",
+          "OK"
+        ]
+      },
+      {
+        "component": "navigation-cursor",
+        "exit_code": 0,
+        "summary": [
+          "Ran 83 tests in 0.298s",
+          "OK"
+        ]
+      },
+      {
+        "component": "defense-watchdog",
+        "exit_code": 0,
+        "summary": [
+          "Ran 166 tests in 6.396s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "component": "gameplay-helpers",
+        "exit_code": 0,
+        "summary": [
+          "Ran 64 tests in 5.568s",
+          "OK"
+        ]
+      },
+      {
+        "component": "building-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 119 tests in 5.773s",
+          "OK"
+        ]
+      },
+      {
+        "component": "external-controller",
+        "exit_code": 0,
+        "summary": [
+          "Ran 115 tests in 0.334s",
+          "OK"
+        ]
+      },
+      {
+        "component": "multiagent-coordination",
+        "exit_code": 0,
+        "summary": [
+          "Ran 322 tests in 9.651s",
+          "OK (skipped=1)"
+        ]
+      },
+      {
+        "component": "python-toolbox",
+        "exit_code": 0,
+        "summary": [
+          "Ran 125 tests in 4.116s",
+          "OK"
+        ]
+      },
+      {
+        "component": "node-portable",
+        "exit_code": 0,
+        "summary": [
+          "ℹ tests 171",
+          "ℹ pass 171",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ]
+      },
+      {
+        "component": "node-framing",
+        "exit_code": 0,
+        "summary": [
+          "ℹ tests 9",
+          "ℹ pass 9",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ]
+      },
+      {
+        "component": "node-platform",
+        "exit_code": 0,
+        "summary": [
+          "SELF_TEST_PLATFORM synthetic-windows-paths/node-fixture-launcher; Windows/PowerShell NOT validated",
+          "SELF_TEST_OK tools=12 legacy-tools=8 launch=ready register=exact frame=png query=4 input=15 isolation=capability-gated native-callbacks=integer-min-2 jar=4-rejections unsafe-launch=6-closed close=pid-exit exit=release secrets=redacted"
+        ]
+      }
+    ],
+    "ended_utc": "2026-10-25T20:30:30.290966+00:00",
+    "failure_classification": {
+      "tests": 1712,
+      "failures": 22,
+      "errors": 5,
+      "skipped": 87,
+      "seconds": 2358.434,
+      "failure_record_categories": {
+        "stale_observation_admission_or_cleanup_result_assertions": 11,
+        "runtime_unavailable_frontdoor_setup_assertions": 4,
+        "explicit_12_second_offline_adapter_timeout": 1,
+        "historical_exact_source_snippet_assertion": 1,
+        "noncombat_watchdog_behavior_or_lease_assertions": 3,
+        "missing_combat_entity_dispatch_assertion": 1,
+        "spatial_default_teardown_exit_code_mismatch": 1
+      },
+      "error_record_categories": {
+        "missing_crystal_tower_worlds_fixture": 1,
+        "missing_MDC_ADJUDICATION_JAVA_setup": 2,
+        "duplicate_capability_catalog_binding": 1,
+        "missing_expected_runtime_journal_record_StopIteration": 1
+      },
+      "qualification": "Only 3 of 27 diagnostic records directly report missing fixture/setup dependencies; the remaining 24 are actual assertion/runtime-contract diagnostics. This single run does not establish their root causes. Original outcomes retained; no production workaround."
+    },
+    "note": "All14 other aggregate components passed. Earlier separate npm failures remain recorded; later node-portable171 passed without production changes, which does not erase those failures or establish their root cause."
   },
   "npm_test": {
     "result": "FAIL",
@@ -318,7 +468,8 @@
   },
   "static_python_parse": {
     "result": "PASS",
-    "files": 759
+    "files": 759,
+    "errors": []
   },
   "excluded_private_inputs": [
     "TEST-world cold geometry block dump",
@@ -340,5 +491,17 @@
       "existing output rejected",
       "wrong reference SHA rejected before output creation"
     ]
+  },
+  "source_save_commit": "2b839b886f24aba65001e7256520d9bf3f0aea2a",
+  "source_save_codeql": {
+    "commit": "2b839b886f24aba65001e7256520d9bf3f0aea2a",
+    "conclusion": "success",
+    "languages": [
+      "java-kotlin",
+      "python",
+      "javascript-typescript"
+    ],
+    "url": "https://github.com/vavilonska/mc-dot-controller/actions/runs/40229840039",
+    "scope": "Static analysis, not runtime tests"
   }
 }
